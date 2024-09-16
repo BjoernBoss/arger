@@ -142,6 +142,121 @@ namespace arger {
 		}
 	};
 
+	struct Configuration {
+	public:
+		std::set<std::wstring> users;
+		std::vector<arger::Constraint> constraints;
+		std::wstring description;
+		std::wstring payload;
+		arger::Type type;
+		size_t minimum = 0;
+		size_t maximum = 0;
+		wchar_t abbreviation = 0;
+		bool helpFlag = false;
+		bool versionFlag = false;
+
+	public:
+		template <class RType>
+		constexpr arger::Configuration& operator|(const RType& r) {
+			r.apply(*this);
+			return *this;
+		}
+	};
+
+	namespace detail {
+		template <class Type>
+		struct ConfigBase {
+			constexpr operator arger::Configuration() const {
+				arger::Configuration config;
+				static_cast<const Type&>(*this).apply(config);
+				return config;
+			}
+			template <class RType>
+			constexpr arger::Configuration operator|(const RType& r) const {
+				arger::Configuration config;
+				static_cast<const Type&>(*this).apply(config);
+				r.apply(config);
+				return config;
+			}
+		};
+	}
+
+	namespace conf {
+		/* add description for the option */
+		struct Description : public detail::ConfigBase<conf::Description> {
+			std::wstring desc;
+			constexpr Description(std::wstring desc) : desc{ desc } {}
+			constexpr void apply(arger::Configuration& config) const {
+				config.description = desc;
+			}
+		};
+
+		/* configure the required counters (minium greater than 0 implies required; maximum of null implies no maximum) */
+		struct Require : public detail::ConfigBase<conf::Require> {
+			size_t minimum = 0;
+			size_t maximum = 0;
+			constexpr Require(size_t min = 1, size_t max = 0) : minimum{ min }, maximum{ max } {}
+			constexpr void apply(arger::Configuration& config) const {
+				config.minimum = minimum;
+				config.maximum = maximum;
+			}
+		};
+
+		/* add a shortcut single character to reference this option */
+		struct Abbreviation : public detail::ConfigBase<conf::Abbreviation> {
+			wchar_t chr;
+			constexpr Abbreviation(wchar_t c) : chr{ c } {}
+			constexpr void apply(arger::Configuration& config) const {
+				config.abbreviation = chr;
+			}
+		};
+
+		/* add a payload requirement to the option */
+		struct Payload : public detail::ConfigBase<conf::Payload> {
+			std::wstring name;
+			arger::Type type;
+			constexpr Payload(std::wstring name, arger::Type type) : name{ name }, type{ type } {}
+			constexpr void apply(arger::Configuration& config) const {
+				config.payload = name;
+				config.type = type;
+			}
+		};
+
+		/* limit the option to a subset of defined groups */
+		struct Limit : public detail::ConfigBase<conf::Limit> {
+			std::set<std::wstring> users;
+			Limit(std::set<std::wstring> names) : users{ names } {}
+			void apply(arger::Configuration& config) const {
+				config.users.insert(users.begin(), users.end());
+			}
+		};
+
+		/* define callback-constraints to be executed if one or more of the options have been passed in */
+		struct Constraint : public detail::ConfigBase<conf::Constraint> {
+			arger::Constraint constraint;
+			Constraint(arger::Constraint con) : constraint{ con } {}
+			constexpr void apply(arger::Configuration& config) const {
+				config.constraints.push_back(constraint);
+			}
+		};
+
+		/* define this as the help-menu option-flag */
+		struct Help : detail::ConfigBase<conf::Help> {
+			constexpr Help() {}
+			constexpr void apply(arger::Configuration& config) const {
+				config.helpFlag = true;
+			}
+		};
+
+		/* define this as the version-menu option-flag */
+		struct Version : detail::ConfigBase<conf::Version> {
+			constexpr Version() {}
+			constexpr void apply(arger::Configuration& config) const {
+				config.versionFlag = true;
+			}
+		};
+	}
+
 	class Parser {
 	private:
 		static constexpr size_t NumCharsHelpLeft = 32;
@@ -159,12 +274,12 @@ namespace arger {
 			std::wstring payload;
 			std::wstring description;
 			std::vector<arger::Value> parsed;
+			std::vector<arger::Constraint> constraints;
 			std::set<std::wstring> users;
+			size_t minimum = 0;
+			size_t maximum = 0;
 			arger::Type type;
 			wchar_t abbreviation = 0;
-			bool generalPurpose = false;
-			bool multiple = false;
-			bool required = false;
 			bool helpFlag = false;
 			bool versionFlag = false;
 		};
@@ -250,16 +365,12 @@ namespace arger {
 		void addGlobalHelp(std::wstring name, std::wstring desc);
 
 	public:
-		void addFlag(const std::wstring& name, wchar_t abbr, std::wstring desc, bool generalPurpose);
-		void addOption(const std::wstring& name, wchar_t abbr, const std::wstring& payload, bool multiple, bool required, const arger::Type& type, std::wstring desc, bool generalPurpose);
-		void addHelpFlag(const std::wstring& name, wchar_t abbr);
-		void addVersionFlag(const std::wstring& name, wchar_t abbr);
+		void addOption(const std::wstring& name, const arger::Configuration& config);
 
 	public:
 		void addGroup(const std::wstring& name, size_t required, bool lastCatchAll, std::wstring desc);
 		void addPositional(const std::wstring& name, const arger::Type& type, std::wstring desc);
 		void addGroupHelp(const std::wstring& name, std::wstring desc);
-		void bindSpecialFlagsOrOptions(const std::set<std::wstring>& names);
 
 	public:
 		void addConstraint(arger::Constraint fn);

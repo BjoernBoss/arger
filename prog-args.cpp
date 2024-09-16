@@ -98,9 +98,9 @@ void arger::Parser::fBuildHelpUsage(HelpState& s) const {
 	bool hasOptionals = false;
 	for (const auto& opt : pOptional) {
 		/* check if the entry can be skipped for this group */
-		if (!pNullGroup && !opt.second.generalPurpose && pCurrent != 0 && opt.second.users.count(pCurrent->name) == 0)
+		if (!pNullGroup && !opt.second.users.empty() && pCurrent != 0 && opt.second.users.count(pCurrent->name) == 0)
 			continue;
-		if (!opt.second.required) {
+		if (opt.second.minimum == 0) {
 			hasOptionals = true;
 			continue;
 		}
@@ -140,13 +140,13 @@ void arger::Parser::fBuildHelpAddOptionals(bool required, HelpState& s) const {
 	/* iterate over the optionals and add the corresponding type */
 	auto it = pOptional.begin();
 	while (it != pOptional.end()) {
-		if (it->second.required != required) {
+		if ((it->second.minimum > 0) != required) {
 			++it;
 			continue;
 		}
 
 		/* check if the argument is excluded by the current selected group, based on the user-requirements */
-		if (!pNullGroup && !it->second.generalPurpose && pCurrent != 0 && it->second.users.count(pCurrent->name) == 0) {
+		if (!pNullGroup && !it->second.users.empty() && pCurrent != 0 && it->second.users.count(pCurrent->name) == 0) {
 			++it;
 			continue;
 		}
@@ -163,11 +163,21 @@ void arger::Parser::fBuildHelpAddOptionals(bool required, HelpState& s) const {
 
 		/* construct the description text (add the users, if the optional argument is not a general purpose argument) */
 		temp = it->second.description;
-		if (!pNullGroup && !it->second.generalPurpose && pCurrent == 0) {
+		if (!pNullGroup && !it->second.users.empty() && pCurrent == 0) {
 			temp += L" (Used for: ";
 			size_t index = 0;
 			for (const auto& grp : it->second.users)
 				temp.append(index++ > 0 ? L"|" : L"").append(grp);
+			temp.append(1, L')');
+		}
+		if (it->second.minimum > 0 || it->second.maximum > 0) {
+			temp.append(L" (");
+			if (it->second.minimum > 0)
+				str::BuildTo(temp, L"At least: ", it->second.minimum, L" times");
+			if (it->second.minimum > 0 && it->second.maximum > 0)
+				temp.append(L"; ");
+			if (it->second.maximum > 0)
+				str::BuildTo(temp, L"At most: ", it->second.maximum, L" times");
 			temp.append(1, L')');
 		}
 		fAddHelpString(temp, s, Parser::NumCharsHelpLeft, 1);
@@ -252,8 +262,8 @@ std::wstring arger::Parser::fBuildHelpString() const {
 	/* check if there are optional/required arguments */
 	bool optArgs = false, reqArgs = false;
 	for (const auto& entry : pOptional) {
-		if (pNullGroup || entry.second.generalPurpose || pCurrent == 0 || entry.second.users.count(pCurrent->name) > 0)
-			(entry.second.required ? reqArgs : optArgs) = true;
+		if (pNullGroup || entry.second.users.empty() || pCurrent == 0 || entry.second.users.count(pCurrent->name) > 0)
+			(entry.second.minimum > 0 ? reqArgs : optArgs) = true;
 	}
 
 	/* add the required argument descriptions (will automatically be sorted lexicographically) */
@@ -406,22 +416,19 @@ void arger::Parser::fVerifyOptional() {
 	/* iterate over the optional arguments and verify them */
 	for (auto& opt : pOptional) {
 		/* check if the current group is not a user of the optional argument (current cannot be null) */
-		if (!pNullGroup && !opt.second.generalPurpose && opt.second.users.count(pCurrent->name) == 0) {
+		if (!pNullGroup && !opt.second.users.empty() && opt.second.users.count(pCurrent->name) == 0) {
 			if (!opt.second.parsed.empty())
 				throw fException(L"Argument [", opt.second.name, L"] not meant for ", pGroupName, L" [", pCurrent->name, L"].");
 			continue;
 		}
 
 		/* check if the optional-argument has been found */
-		if (opt.second.parsed.empty()) {
-			if (opt.second.required)
-				throw fException(L"Required argument [", opt.second.name, L"] missing.");
-			continue;
-		}
+		if (opt.second.minimum > opt.second.parsed.size())
+			throw fException(L"Argument [", opt.second.name, L"] is required at least ", opt.second.minimum, " times.");
 
 		/* check if too many instances were found */
-		if (opt.second.parsed.size() > 1 && !opt.second.multiple)
-			throw fException(L"Argument [", opt.second.name, L"] can only be specified once.");
+		if (opt.second.maximum > 0 && opt.second.parsed.size() > opt.second.maximum)
+			throw fException(L"Argument [", opt.second.name, L"] can only be specified ", opt.second.maximum, " times.");
 
 		/* verify the values themselves */
 		for (size_t i = 0; i < opt.second.parsed.size(); ++i)
@@ -449,6 +456,17 @@ void arger::Parser::fParseArgs(std::vector<std::wstring> args) {
 	pPositional.clear();
 	for (auto& opt : pOptional)
 		opt.second.parsed.clear();
+
+	/* sanitize the remaining constraints */
+	for (auto& entry : pOptional) {
+		auto it = entry.second.users.begin();
+		while (it != entry.second.users.end()) {
+			if (pNullGroup || pGroups.find(*it) == pGroups.end())
+				it = entry.second.users.erase(it);
+			else
+				++it;
+		}
+	}
 
 	/* setup the arguments-state */
 	ArgState state{ std::move(args), 0, false, false, false };
@@ -531,6 +549,15 @@ void arger::Parser::fParseArgs(std::vector<std::wstring> args) {
 		if (!err.empty())
 			throw arger::ArgsParsingException{ err };
 	}
+	for (const auto& opt : pOptional) {
+		if (opt.second.parsed.empty())
+			continue;
+		for (const auto& fn : opt.second.constraints) {
+			std::wstring err = fn(*this);
+			if (!err.empty())
+				throw arger::ArgsParsingException{ err };
+		}
+	}
 }
 
 void arger::Parser::configure(std::wstring version, std::wstring desc, std::wstring groupName) {
@@ -543,87 +570,34 @@ void arger::Parser::addGlobalHelp(std::wstring name, std::wstring desc) {
 		pHelpContent.emplace_back(name, desc);
 }
 
-void arger::Parser::addFlag(const std::wstring& name, wchar_t abbr, std::wstring desc, bool generalPurpose) {
+void arger::Parser::addOption(const std::wstring& name, const arger::Configuration& config) {
+	/* validate the general configuration */
 	if (pOptional.count(name) > 0 || name.empty())
 		return;
-
-	/* insert the new entry and insert the reference to the abbreviations */
-	OptArg& entry = pOptional.insert({ name, OptArg() }).first->second;
-	if (abbr != L'\0' && pAbbreviations.count(abbr) == 0)
-		pAbbreviations.insert({ abbr, &entry });
-
-	/* populate the new argument-entry */
-	entry.name = name;
-	entry.payload = L"";
-	entry.description = desc;
-	entry.generalPurpose = generalPurpose;
-	entry.abbreviation = abbr;
-	entry.multiple = true;
-	entry.required = false;
-	entry.helpFlag = false;
-	entry.versionFlag = false;
-}
-void arger::Parser::addOption(const std::wstring& name, wchar_t abbr, const std::wstring& payload, bool multiple, bool required, const arger::Type& type, std::wstring desc, bool generalPurpose) {
-	if (pOptional.count(name) > 0 || name.empty() || payload.empty())
-		return;
-	if (std::holds_alternative<arger::Enum>(type) && std::get<arger::Enum>(type).empty())
+	if (!config.payload.empty() && std::holds_alternative<arger::Enum>(config.type) && std::get<arger::Enum>(config.type).empty())
 		return;
 
 	/* insert the new entry and insert the reference to the abbreviations */
 	OptArg& entry = pOptional.insert({ name, OptArg() }).first->second;
-	if (abbr != L'\0' && pAbbreviations.count(abbr) == 0)
-		pAbbreviations.insert({ abbr, &entry });
+	if (config.abbreviation != L'\0' && pAbbreviations.count(config.abbreviation) == 0)
+		pAbbreviations.insert({ config.abbreviation, &entry });
 
-	/* populate the new argument-entry */
+	/* populate the new argument-entry and sanitize it further */
 	entry.name = name;
-	entry.payload = payload;
-	entry.description = desc;
-	entry.generalPurpose = generalPurpose;
-	entry.abbreviation = abbr;
-	entry.type = type;
-	entry.multiple = multiple;
-	entry.required = required;
-	entry.helpFlag = false;
-	entry.versionFlag = false;
-}
-void arger::Parser::addHelpFlag(const std::wstring& name, wchar_t abbr) {
-	if (pOptional.count(name) > 0 || name.empty())
-		return;
-
-	/* insert the new entry and insert the reference to the abbreviations */
-	OptArg& entry = pOptional.insert({ name, OptArg() }).first->second;
-	if (abbr != L'\0' && pAbbreviations.count(abbr) == 0)
-		pAbbreviations.insert({ abbr, &entry });
-
-	/* populate the new argument-entry */
-	entry.name = name;
-	entry.payload = L"";
-	entry.generalPurpose = true;
-	entry.description = L"Print this help menu.";
-	entry.abbreviation = abbr;
-	entry.multiple = true;
-	entry.required = false;
-	entry.helpFlag = true;
-}
-void arger::Parser::addVersionFlag(const std::wstring& name, wchar_t abbr) {
-	if (pOptional.count(name) > 0 || name.empty())
-		return;
-
-	/* insert the new entry and insert the reference to the abbreviations */
-	OptArg& entry = pOptional.insert({ name, OptArg() }).first->second;
-	if (abbr != L'\0' && pAbbreviations.count(abbr) == 0)
-		pAbbreviations.insert({ abbr, &entry });
-
-	/* populate the new argument-entry */
-	entry.name = name;
-	entry.payload = L"";
-	entry.generalPurpose = true;
-	entry.description = L"Print the current program version.";
-	entry.abbreviation = abbr;
-	entry.multiple = true;
-	entry.required = false;
-	entry.helpFlag = false;
-	entry.versionFlag = true;
+	entry.description = config.description;
+	entry.abbreviation = config.abbreviation;
+	if (entry.helpFlag = config.helpFlag)
+		entry.description = L"Print this help menu.";
+	else if (entry.versionFlag = config.versionFlag)
+		entry.description = L"Print the current program version.";
+	else {
+		entry.users = config.users;
+		entry.constraints = config.constraints;
+		entry.payload = config.payload;
+		entry.minimum = config.minimum;
+		entry.maximum = (config.maximum == 0 ? 0 : std::max<size_t>(config.minimum, config.maximum));
+		entry.type = (entry.payload.empty() ? arger::Primitive::any : config.type);
+	}
 }
 
 void arger::Parser::addGroup(const std::wstring& name, size_t required, bool lastCatchAll, std::wstring desc) {
@@ -657,19 +631,6 @@ void arger::Parser::addPositional(const std::wstring& name, const arger::Type& t
 void arger::Parser::addGroupHelp(const std::wstring& name, std::wstring desc) {
 	if (!name.empty() && pGroupInsert != 0)
 		pGroupInsert->helpContent.push_back({ name, desc });
-}
-void arger::Parser::bindSpecialFlagsOrOptions(const std::set<std::wstring>& names) {
-	/* for null-groups, the concept of users does not exist, as the flags/optionals are all used by the single group */
-	if (names.empty() || pGroupInsert == 0 || pNullGroup)
-		return;
-
-	/* iterate over the names and add the current group as users to them */
-	for (const auto& name : names) {
-		auto it = pOptional.find(name);
-		if (it == pOptional.end() || it->second.generalPurpose)
-			continue;
-		it->second.users.insert(pGroupInsert->name);
-	}
 }
 
 void arger::Parser::addConstraint(arger::Constraint fn) {
