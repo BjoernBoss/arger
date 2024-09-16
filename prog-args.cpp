@@ -92,7 +92,7 @@ void arger::Parser::fBuildHelpUsage(HelpState& s) const {
 
 	/* add the general group token, or explicit group selected */
 	if (!pNullGroup)
-		fAddHelpSpacedToken((pCurrent == 0 ? pGroupLower : pCurrent->name), s);
+		fAddHelpSpacedToken((pCurrent == 0 ? pGroupName : pCurrent->name), s);
 
 	/* add all required options (must all consume a payload, as flags are never required) */
 	bool hasOptionals = false;
@@ -228,7 +228,7 @@ std::wstring arger::Parser::fBuildHelpString() const {
 		if (pNullGroup)
 			fAddHelpString(L"Positional Arguments: ", out);
 		else
-			fAddHelpString(str::Build<std::wstring>(L"Positional Arguments for ", pGroupLower, " [", pCurrent->name, "]: "), out);
+			fAddHelpString(str::Build<std::wstring>(L"Positional Arguments for ", pGroupName, " [", pCurrent->name, "]: "), out);
 
 		/* add the positional arguments descriptions (will automatically be sorted by position) */
 		for (size_t i = 0; i < pCurrent->positional.size(); ++i) {
@@ -379,7 +379,7 @@ void arger::Parser::fParseOptional(const std::wstring& arg, const std::wstring& 
 void arger::Parser::fVerifyPositional() {
 	/* check if no group has been selected (because of no arguments having been passed to the program) */
 	if (pCurrent == 0)
-		throw fException(pGroupUpper, L" missing.");
+		throw fException(str::View{ pGroupName }.title(), L" missing.");
 
 	/* validate the requirements for the positional arguments and parse their values */
 	for (size_t i = 0; i < pPositional.size(); ++i) {
@@ -387,7 +387,7 @@ void arger::Parser::fVerifyPositional() {
 		if (pCurrent->positional.empty() || (i >= pCurrent->positional.size() && !pCurrent->catchAll)) {
 			if (pCurrent->name.empty())
 				throw fException(L"Unrecognized argument [", pPositional[i].str(), L"] encountered.");
-			throw fException(L"Unrecognized argument [", pPositional[i].str(), L"] encountered for ", pGroupLower, L" [", pCurrent->name, L"].");
+			throw fException(L"Unrecognized argument [", pPositional[i].str(), L"] encountered for ", pGroupName, L" [", pCurrent->name, L"].");
 		}
 
 		/* parse the argument */
@@ -400,7 +400,7 @@ void arger::Parser::fVerifyPositional() {
 		return;
 	else if (pCurrent->name.empty())
 		throw fException(L"Arguments missing.");
-	throw fException(L"Arguments missing for ", pGroupLower, L" [", pCurrent->name, L"].");
+	throw fException(L"Arguments missing for ", pGroupName, L" [", pCurrent->name, L"].");
 }
 void arger::Parser::fVerifyOptional() {
 	/* iterate over the optional arguments and verify them */
@@ -408,7 +408,7 @@ void arger::Parser::fVerifyOptional() {
 		/* check if the current group is not a user of the optional argument (current cannot be null) */
 		if (!pNullGroup && !opt.second.generalPurpose && opt.second.users.count(pCurrent->name) == 0) {
 			if (!opt.second.parsed.empty())
-				throw fException(L"Argument [", opt.second.name, L"] not meant for ", pGroupLower, L" [", pCurrent->name, L"].");
+				throw fException(L"Argument [", opt.second.name, L"] not meant for ", pGroupName, L" [", pCurrent->name, L"].");
 			continue;
 		}
 
@@ -498,7 +498,7 @@ void arger::Parser::fParseArgs(std::vector<std::wstring> args) {
 
 			/* check if a group has been found */
 			if (it == pGroups.end())
-				throw fException(L"Unknown ", pGroupLower, L" [", next, L"] encountered.");
+				throw fException(L"Unknown ", pGroupName, L" [", next, L"] encountered.");
 			pCurrent = &it->second;
 			continue;
 		}
@@ -533,11 +533,10 @@ void arger::Parser::fParseArgs(std::vector<std::wstring> args) {
 	}
 }
 
-void arger::Parser::configure(std::wstring version, std::wstring desc, std::wstring groupNameLower, std::wstring groupNameUpper) {
+void arger::Parser::configure(std::wstring version, std::wstring desc, std::wstring groupName) {
 	pVersion = version;
 	pDescription = desc;
-	pGroupLower = groupNameLower;
-	pGroupUpper = groupNameUpper;
+	pGroupName = str::View{ groupName }.lower();
 }
 void arger::Parser::addGlobalHelp(std::wstring name, std::wstring desc) {
 	if (!name.empty())

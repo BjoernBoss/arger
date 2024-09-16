@@ -207,8 +207,7 @@ namespace arger {
 		std::wstring pVersion;
 		std::wstring pDescription;
 		std::wstring pProgram;
-		std::wstring pGroupLower = L"mode";
-		std::wstring pGroupUpper = L"Mode";
+		std::wstring pGroupName = L"mode";
 		std::vector<arger::Value> pPositional;
 		std::vector<HelpEntry> pHelpContent;
 		std::vector<ConstraintEntry> pConstraints;
@@ -247,7 +246,7 @@ namespace arger {
 		void fParseArgs(std::vector<std::wstring> args);
 
 	public:
-		void configure(std::wstring version, std::wstring desc, std::wstring groupNameLower = L"mode", std::wstring groupNameUpper = L"Mode");
+		void configure(std::wstring version, std::wstring desc, std::wstring groupName = L"mode");
 		void addGlobalHelp(std::wstring name, std::wstring desc);
 
 	public:
