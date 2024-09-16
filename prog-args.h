@@ -163,10 +163,24 @@ namespace arger {
 		std::optional<arger::Value> positional(size_t index) const;
 	};
 
+	namespace detail {
+		struct Positional {
+			std::wstring name;
+			arger::Type type;
+			std::wstring description;
+		};
+		struct Help {
+			std::wstring name;
+			std::wstring description;
+		};
+	}
+
 	struct Configuration {
 	public:
 		std::set<std::wstring> users;
 		std::vector<arger::Constraint> constraints;
+		std::vector<detail::Positional> positional;
+		std::vector<detail::Help> help;
 		std::wstring description;
 		std::wstring payload;
 		arger::Type type;
@@ -175,6 +189,7 @@ namespace arger {
 		wchar_t abbreviation = 0;
 		bool helpFlag = false;
 		bool versionFlag = false;
+		bool lastCatchAll = false;
 
 	public:
 		template <class RType>
@@ -203,7 +218,7 @@ namespace arger {
 	}
 
 	namespace conf {
-		/* add description for the option */
+		/* [options/groups] add description for the group/option */
 		struct Description : public detail::ConfigBase<conf::Description> {
 			std::wstring desc;
 			constexpr Description(std::wstring desc) : desc{ desc } {}
@@ -212,7 +227,7 @@ namespace arger {
 			}
 		};
 
-		/* configure the required counters (minium greater than 0 implies required; maximum of null implies no maximum) */
+		/* [options/groups] configure the required counters (minium greater than 0 implies required; maximum of null implies no maximum) */
 		struct Require : public detail::ConfigBase<conf::Require> {
 			size_t minimum = 0;
 			size_t maximum = 0;
@@ -223,7 +238,7 @@ namespace arger {
 			}
 		};
 
-		/* add a shortcut single character to reference this option */
+		/* [options] add a shortcut single character to reference this option */
 		struct Abbreviation : public detail::ConfigBase<conf::Abbreviation> {
 			wchar_t chr;
 			constexpr Abbreviation(wchar_t c) : chr{ c } {}
@@ -232,7 +247,7 @@ namespace arger {
 			}
 		};
 
-		/* add a payload requirement to the option */
+		/* [options] add a payload requirement to the option */
 		struct Payload : public detail::ConfigBase<conf::Payload> {
 			std::wstring name;
 			arger::Type type;
@@ -243,7 +258,7 @@ namespace arger {
 			}
 		};
 
-		/* limit the option to a subset of defined groups */
+		/* [options] limit the option to a subset of defined groups */
 		struct Limit : public detail::ConfigBase<conf::Limit> {
 			std::set<std::wstring> users;
 			Limit(std::set<std::wstring> names) : users{ names } {}
@@ -252,7 +267,7 @@ namespace arger {
 			}
 		};
 
-		/* define callback-constraints to be executed if one or more of the options have been passed in */
+		/* [global/options/groups] define callback-constraints to be executed (all globals or) if one or more of the groups/options have been passed in */
 		struct Constraint : public detail::ConfigBase<conf::Constraint> {
 			arger::Constraint constraint;
 			Constraint(arger::Constraint con) : constraint{ con } {}
@@ -261,19 +276,45 @@ namespace arger {
 			}
 		};
 
-		/* define this as the help-menu option-flag */
-		struct Help : detail::ConfigBase<conf::Help> {
-			constexpr Help() {}
+		/* [options] define this as the help-menu option-flag */
+		struct HelpFlag : detail::ConfigBase<conf::HelpFlag> {
+			constexpr HelpFlag() {}
 			constexpr void apply(arger::Configuration& config) const {
 				config.helpFlag = true;
 			}
 		};
 
-		/* define this as the version-menu option-flag */
-		struct Version : detail::ConfigBase<conf::Version> {
-			constexpr Version() {}
+		/* [options] define this as the version-menu option-flag */
+		struct VersionFlag : detail::ConfigBase<conf::VersionFlag> {
+			constexpr VersionFlag() {}
 			constexpr void apply(arger::Configuration& config) const {
 				config.versionFlag = true;
+			}
+		};
+
+		/* [groups] define the last positional argument of the group to catch any remaining incoming arguments */
+		struct LastCatchAll : detail::ConfigBase<conf::LastCatchAll> {
+			constexpr LastCatchAll() {}
+			constexpr void apply(arger::Configuration& config) const {
+				config.lastCatchAll = true;
+			}
+		};
+
+		/* [groups] add another positional argument */
+		struct Positional : detail::ConfigBase<conf::Positional> {
+			detail::Positional positional;
+			constexpr Positional(std::wstring name, const arger::Type& type, std::wstring description = L"") : positional{ name, type, description } {}
+			constexpr void apply(arger::Configuration& config) const {
+				config.positional.push_back(positional);
+			}
+		};
+
+		/* [global/groups] add another help-string to the given group or the global list */
+		struct Help : detail::ConfigBase<conf::Help> {
+			detail::Help help;
+			constexpr Help(std::wstring name, std::wstring description) : help{ name, description } {}
+			constexpr void apply(arger::Configuration& config) const {
+				config.help.push_back(help);
 			}
 		};
 	}
@@ -284,12 +325,7 @@ namespace arger {
 		static constexpr size_t NumCharsHelp = 100;
 
 	private:
-		enum class BindType :uint8_t {
-			none,
-			group,
-			positional
-		};
-		struct OptArg {
+		struct OptionalEntry {
 			std::wstring name;
 			std::wstring payload;
 			std::wstring description;
@@ -302,21 +338,13 @@ namespace arger {
 			bool helpFlag = false;
 			bool versionFlag = false;
 		};
-		struct PosArg {
-			std::wstring name;
-			std::wstring description;
-			arger::Type type;
-		};
-		struct HelpEntry {
-			std::wstring name;
-			std::wstring description;
-		};
 		struct GroupEntry {
 			std::wstring name;
 			std::wstring description;
-			std::vector<HelpEntry> helpContent;
-			std::vector<PosArg> positional;
-			size_t required = 0;
+			std::vector<detail::Help> helpContent;
+			std::vector<detail::Positional> positional;
+			std::vector<arger::Constraint> constraints;
+			size_t minimum = 0;
 			bool catchAll = false;
 		};
 		struct HelpState {
@@ -333,24 +361,20 @@ namespace arger {
 			bool printVersion = false;
 			bool positionalLocked = false;
 		};
-		struct ConstraintEntry {
-			arger::Constraint fn;
-			std::wstring binding;
-			size_t index = 0;
-			BindType type = BindType::none;
-		};
 
 	private:
 		std::wstring pVersion;
 		std::wstring pDescription;
-		std::wstring pGroupName = L"mode";
-		std::vector<HelpEntry> pHelpContent;
-		std::vector<ConstraintEntry> pConstraints;
+		std::wstring pGroupName;
+		std::vector<detail::Help> pHelpContent;
+		std::vector<arger::Constraint> pConstraints;
 		std::map<std::wstring, GroupEntry> pGroups;
-		std::map<std::wstring, OptArg> pOptional;
-		std::map<wchar_t, OptArg*> pAbbreviations;
-		GroupEntry* pGroupInsert = 0;
+		std::map<std::wstring, OptionalEntry> pOptional;
+		std::map<wchar_t, OptionalEntry*> pAbbreviations;
 		bool pNullGroup = false;
+
+	public:
+		Arguments(std::wstring version, std::wstring desc, std::wstring groupName = L"mode");
 
 	private:
 		void fAddHelpNewLine(bool emptyLine, HelpState& s) const;
@@ -360,7 +384,7 @@ namespace arger {
 
 	private:
 		void fBuildHelpUsage(const GroupEntry* current, const std::wstring& program, HelpState& s) const;
-		void fBuildHelpAddHelpContent(const std::vector<HelpEntry>& content, HelpState& s) const;
+		void fBuildHelpAddHelpContent(const std::vector<detail::Help>& content, HelpState& s) const;
 		void fBuildHelpAddOptionals(bool required, const GroupEntry* current, HelpState& s) const;
 		void fBuildHelpAddEnumDescription(const arger::Type& type, HelpState& s) const;
 		const wchar_t* fBuildHelpArgValueString(const arger::Type& type) const;
@@ -379,19 +403,9 @@ namespace arger {
 		arger::Parsed fParseArgs(std::vector<std::wstring> args);
 
 	public:
-		void configure(std::wstring version, std::wstring desc, std::wstring groupName = L"mode");
-		void addGlobalHelp(std::wstring name, std::wstring desc);
+		void addGlobal(const arger::Configuration& config);
 		void addOption(const std::wstring& name, const arger::Configuration& config);
-
-	public:
-		void addGroup(const std::wstring& name, size_t required, bool lastCatchAll, std::wstring desc);
-		void addPositional(const std::wstring& name, const arger::Type& type, std::wstring desc);
-		void addGroupHelp(const std::wstring& name, std::wstring desc);
-
-	public:
-		void addConstraint(arger::Constraint fn);
-		void addGroupConstraint(const std::wstring& name, arger::Constraint fn);
-		void addPositionalConstraint(const std::wstring& name, size_t index, arger::Constraint fn);
+		void addGroup(const std::wstring& name, const arger::Configuration& config);
 
 	public:
 		arger::Parsed parse(int argc, const char* const* argv);

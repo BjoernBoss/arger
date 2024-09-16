@@ -40,6 +40,12 @@ std::optional<arger::Value> arger::Parsed::positional(size_t index) const {
 }
 
 
+arger::Arguments::Arguments(std::wstring version, std::wstring desc, std::wstring groupName) {
+	pVersion = version;
+	pDescription = desc;
+	pGroupName = str::View{ groupName }.lower();
+}
+
 void arger::Arguments::fAddHelpNewLine(bool emptyLine, HelpState& s) const {
 	if (s.buffer.empty() || s.buffer.back() != L'\n')
 		s.buffer.push_back(L'\n');
@@ -155,7 +161,7 @@ void arger::Arguments::fBuildHelpUsage(const GroupEntry* current, const std::wst
 
 		if (i + 1 >= current->positional.size() && current->catchAll)
 			token += L"...";
-		if (i >= current->required)
+		if (i >= current->minimum)
 			token = L"[" + token + L"]";
 		fAddHelpSpacedToken(token, s);
 	}
@@ -168,7 +174,7 @@ void arger::Arguments::fBuildHelpUsage(const GroupEntry* current, const std::wst
 		break;
 	}
 }
-void arger::Arguments::fBuildHelpAddHelpContent(const std::vector<HelpEntry>& content, HelpState& s) const {
+void arger::Arguments::fBuildHelpAddHelpContent(const std::vector<detail::Help>& content, HelpState& s) const {
 	/* iterate over the help-content and append it to the help-buffer */
 	for (size_t i = 0; i < content.size(); ++i) {
 		fAddHelpNewLine(true, s);
@@ -385,7 +391,7 @@ void arger::Arguments::fParseOptional(const std::wstring& arg, const std::wstrin
 
 	/* iterate over the list of optional abbreviations/single full-name and process them */
 	for (size_t i = 0; i < arg.size(); ++i) {
-		OptArg* entry = 0;
+		OptionalEntry* entry = 0;
 
 		/* resolve the optional-argument entry, depending on it being a short abbreviation, or a full name */
 		if (fullName) {
@@ -448,7 +454,7 @@ void arger::Arguments::fVerifyPositional(ArgState& s) {
 	}
 
 	/* check if the minimum required number of parameters has not been reached */
-	if (s.parsed.pPositional.size() >= s.current->required)
+	if (s.parsed.pPositional.size() >= s.current->minimum)
 		return;
 	else if (s.current->name.empty())
 		throw fException(L"Arguments missing.");
@@ -577,12 +583,8 @@ arger::Parsed arger::Arguments::fParseArgs(std::vector<std::wstring> args) {
 		state.parsed.pGroup = state.current->name;
 
 	/* validate all constraints */
-	for (const auto& con : pConstraints) {
-		if (con.type == BindType::group && state.current->name != con.binding)
-			continue;
-		else if (con.type == BindType::positional && (state.current->name != con.binding || state.parsed.pPositional.size() <= con.index))
-			continue;
-		std::wstring err = con.fn(state.parsed);
+	for (const auto& fn : pConstraints) {
+		std::wstring err = fn(state.parsed);
 		if (!err.empty())
 			throw arger::ArgsParsingException{ err };
 	}
@@ -595,17 +597,21 @@ arger::Parsed arger::Arguments::fParseArgs(std::vector<std::wstring> args) {
 				throw arger::ArgsParsingException{ err };
 		}
 	}
+	for (const auto& fn : state.current->constraints) {
+		std::wstring err = fn(state.parsed);
+		if (!err.empty())
+			throw arger::ArgsParsingException{ err };
+	}
 	return state.parsed;
 }
 
-void arger::Arguments::configure(std::wstring version, std::wstring desc, std::wstring groupName) {
-	pVersion = version;
-	pDescription = desc;
-	pGroupName = str::View{ groupName }.lower();
-}
-void arger::Arguments::addGlobalHelp(std::wstring name, std::wstring desc) {
-	if (!name.empty())
-		pHelpContent.emplace_back(name, desc);
+void arger::Arguments::addGlobal(const arger::Configuration& config) {
+	for (size_t i = 0; i < config.help.size(); ++i) {
+		if (!config.help[i].name.empty())
+			pHelpContent.push_back(config.help[i]);
+	}
+	for (size_t i = 0; i < config.constraints.size(); ++i)
+		pConstraints.push_back(config.constraints[i]);
 }
 void arger::Arguments::addOption(const std::wstring& name, const arger::Configuration& config) {
 	/* validate the general configuration */
@@ -615,7 +621,7 @@ void arger::Arguments::addOption(const std::wstring& name, const arger::Configur
 		return;
 
 	/* insert the new entry and insert the reference to the abbreviations */
-	OptArg& entry = pOptional.insert({ name, OptArg() }).first->second;
+	OptionalEntry& entry = pOptional.insert({ name, OptionalEntry{} }).first->second;
 	if (config.abbreviation != L'\0' && pAbbreviations.count(config.abbreviation) == 0)
 		pAbbreviations.insert({ config.abbreviation, &entry });
 
@@ -638,8 +644,7 @@ void arger::Arguments::addOption(const std::wstring& name, const arger::Configur
 		}
 	}
 }
-
-void arger::Arguments::addGroup(const std::wstring& name, size_t required, bool lastCatchAll, std::wstring desc) {
+void arger::Arguments::addGroup(const std::wstring& name, const arger::Configuration& config) {
 	/* check if the group has already been defined or a group is being added to no-group configuration/empty group added to groups */
 	if (pGroups.count(name) > 0)
 		return;
@@ -648,41 +653,24 @@ void arger::Arguments::addGroup(const std::wstring& name, size_t required, bool 
 	else if (pNullGroup || name.empty())
 		return;
 
-	/* populate the group-entry */
-	pGroupInsert = &pGroups.insert({ name, GroupEntry() }).first->second;
-	pGroupInsert->name = name;
-	pGroupInsert->description = desc;
-	pGroupInsert->required = required;
-	pGroupInsert->catchAll = lastCatchAll;
-}
-void arger::Arguments::addPositional(const std::wstring& name, const arger::Type& type, std::wstring desc) {
-	if (name.empty() || pGroupInsert == 0)
-		return;
-	if (std::holds_alternative<arger::Enum>(type) && std::get<arger::Enum>(type).empty())
-		return;
-	PosArg& entry = pGroupInsert->positional.emplace_back();
-
-	/* populate the new positional-entry */
+	/* setup the group-entry */
+	GroupEntry& entry = pGroups.insert({ name, GroupEntry() }).first->second;
 	entry.name = name;
-	entry.description = desc;
-	entry.type = type;
-}
-void arger::Arguments::addGroupHelp(const std::wstring& name, std::wstring desc) {
-	if (!name.empty() && pGroupInsert != 0)
-		pGroupInsert->helpContent.push_back({ name, desc });
-}
-
-void arger::Arguments::addConstraint(arger::Constraint fn) {
-	pConstraints.emplace_back(std::move(fn), L"", 0, BindType::none);
-}
-void arger::Arguments::addGroupConstraint(const std::wstring& name, arger::Constraint fn) {
-	if (pGroups.find(name) != pGroups.end())
-		pConstraints.emplace_back(std::move(fn), name, 0, BindType::group);
-}
-void arger::Arguments::addPositionalConstraint(const std::wstring& name, size_t index, arger::Constraint fn) {
-	auto it = pGroups.find(name);
-	if (it != pGroups.end() && index < it->second.positional.size())
-		pConstraints.emplace_back(std::move(fn), name, index, BindType::positional);
+	entry.description = config.description;
+	entry.minimum = config.minimum;
+	entry.catchAll = config.lastCatchAll;
+	for (size_t i = 0; i < config.help.size(); ++i) {
+		if (!config.help[i].name.empty())
+			entry.helpContent.push_back(config.help[i]);
+	}
+	for (size_t i = 0; i < config.positional.size(); ++i) {
+		if (config.positional[i].name.empty())
+			continue;
+		if (std::holds_alternative<arger::Enum>(config.positional[i].type) && std::get<arger::Enum>(config.positional[i].type).empty())
+			continue;
+		entry.positional.push_back(config.positional[i]);
+	}
+	entry.constraints = config.constraints;
 }
 
 arger::Parsed arger::Arguments::parse(int argc, const char* const* argv) {
