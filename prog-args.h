@@ -12,6 +12,8 @@
 #include <set>
 
 namespace arger {
+	class Parser;
+
 	enum class Primitive : uint8_t {
 		any,
 		inum,
@@ -21,6 +23,8 @@ namespace arger {
 	};
 	using Enum = std::map<std::wstring, std::wstring>;
 	using Type = std::variant<arger::Primitive, arger::Enum>;
+
+	using Constraint = std::function<std::wstring(const arger::Parser&)>;
 
 	class ExceptionBase {
 	private:
@@ -144,6 +148,12 @@ namespace arger {
 		static constexpr size_t NumCharsHelp = 100;
 
 	private:
+		enum class BindType :uint8_t {
+			none,
+			argument,
+			group,
+			positional
+		};
 		struct OptArg {
 			std::wstring name;
 			std::wstring payload;
@@ -152,7 +162,7 @@ namespace arger {
 			std::set<std::wstring> users;
 			arger::Type type;
 			wchar_t abbreviation = 0;
-			bool explicitUsage = false;
+			bool generalPurpose = false;
 			bool multiple = false;
 			bool required = false;
 			bool helpFlag = false;
@@ -186,6 +196,12 @@ namespace arger {
 			bool printVersion = false;
 			bool positionalLocked = false;
 		};
+		struct ConstraintEntry {
+			arger::Constraint fn;
+			std::wstring binding;
+			size_t index = 0;
+			BindType type = BindType::none;
+		};
 
 	private:
 		std::wstring pVersion;
@@ -195,6 +211,7 @@ namespace arger {
 		std::wstring pGroupUpper = L"Mode";
 		std::vector<arger::Value> pPositional;
 		std::vector<HelpEntry> pHelpContent;
+		std::vector<ConstraintEntry> pConstraints;
 		std::map<std::wstring, GroupEntry> pGroups;
 		std::map<std::wstring, OptArg> pOptional;
 		std::map<wchar_t, OptArg*> pAbbreviations;
@@ -234,8 +251,8 @@ namespace arger {
 		void addGlobalHelp(std::wstring name, std::wstring desc);
 
 	public:
-		void addFlag(const std::wstring& name, wchar_t abbr, std::wstring desc, bool explicitUsage);
-		void addOption(const std::wstring& name, wchar_t abbr, const std::wstring& payload, bool multiple, bool required, const arger::Type& type, std::wstring desc, bool explicitUsage);
+		void addFlag(const std::wstring& name, wchar_t abbr, std::wstring desc, bool generalPurpose);
+		void addOption(const std::wstring& name, wchar_t abbr, const std::wstring& payload, bool multiple, bool required, const arger::Type& type, std::wstring desc, bool generalPurpose);
 		void addHelpFlag(const std::wstring& name, wchar_t abbr);
 		void addVersionFlag(const std::wstring& name, wchar_t abbr);
 
@@ -243,7 +260,13 @@ namespace arger {
 		void addGroup(const std::wstring& name, size_t required, bool lastCatchAll, std::wstring desc);
 		void addPositional(const std::wstring& name, const arger::Type& type, std::wstring desc);
 		void addGroupHelp(const std::wstring& name, std::wstring desc);
-		void groupBindArgsOrOptions(const std::set<std::wstring>& names);
+		void bindSpecialFlagsOrOptions(const std::set<std::wstring>& names);
+
+	public:
+		void addConstraint(arger::Constraint fn);
+		void addFlagOrOptionConstraint(const std::wstring& name, arger::Constraint fn);
+		void addGroupConstraint(const std::wstring& name, arger::Constraint fn);
+		void addPositionalConstraint(const std::wstring& name, size_t index, arger::Constraint fn);
 
 	public:
 		void parse(int argc, const char* const* argv);
