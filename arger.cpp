@@ -1,4 +1,4 @@
-#include "prog-args.h"
+#include "arger.h"
 
 template <class Type>
 static std::wstring ParseProgramName(const Type* str, bool defOnError) {
