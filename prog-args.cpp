@@ -1,14 +1,14 @@
 #include "prog-args.h"
 
-void args::ArgParser::fAddHelpNewLine(bool emptyLine, HelpState& s) const {
+void arger::Parser::fAddHelpNewLine(bool emptyLine, HelpState& s) const {
 	if (s.buffer.empty() || s.buffer.back() != L'\n')
 		s.buffer.push_back(L'\n');
 	if (emptyLine)
 		s.buffer.push_back(L'\n');
 	s.pos = 0;
 }
-void args::ArgParser::fAddHelpToken(const std::wstring& add, HelpState& s) const {
-	if (s.pos > 0 && s.pos + add.size() > ArgParser::NumCharsHelp) {
+void arger::Parser::fAddHelpToken(const std::wstring& add, HelpState& s) const {
+	if (s.pos > 0 && s.pos + add.size() > Parser::NumCharsHelp) {
 		s.buffer.push_back(L'\n');
 		s.pos = 0;
 	}
@@ -16,9 +16,9 @@ void args::ArgParser::fAddHelpToken(const std::wstring& add, HelpState& s) const
 	s.buffer.append(add);
 	s.pos += add.size();
 }
-void args::ArgParser::fAddHelpSpacedToken(const std::wstring& add, HelpState& s) const {
+void arger::Parser::fAddHelpSpacedToken(const std::wstring& add, HelpState& s) const {
 	if (s.pos > 0) {
-		if (s.pos + 1 + add.size() > ArgParser::NumCharsHelp) {
+		if (s.pos + 1 + add.size() > Parser::NumCharsHelp) {
 			s.buffer.push_back(L'\n');
 			s.pos = 0;
 		}
@@ -29,7 +29,7 @@ void args::ArgParser::fAddHelpSpacedToken(const std::wstring& add, HelpState& s)
 	}
 	fAddHelpToken(add, s);
 }
-void args::ArgParser::fAddHelpString(const std::wstring& add, HelpState& s, size_t offset, size_t indentAutoBreaks) const {
+void arger::Parser::fAddHelpString(const std::wstring& add, HelpState& s, size_t offset, size_t indentAutoBreaks) const {
 	std::wstring tokenWhite, tokenPrint;
 	bool isWhitespace = true;
 
@@ -59,7 +59,7 @@ void args::ArgParser::fAddHelpString(const std::wstring& add, HelpState& s, size
 			/* check if the whitespace token should be replaced with a line-break, if the printable character
 			*	does not start at the beginning of the line but exceeds the line limit, and otherwise flush
 			*	the whitespace (this ensures that user-placed whitespace after a new-line will be respected) */
-			if ((s.pos > offset || tokenWhite.size() > 0) && s.pos + tokenWhite.size() + tokenPrint.size() > ArgParser::NumCharsHelp)
+			if ((s.pos > offset || tokenWhite.size() > 0) && s.pos + tokenWhite.size() + tokenPrint.size() > Parser::NumCharsHelp)
 				s.buffer.append(1, L'\n').append(s.pos = offset, L' ');
 			else {
 				s.buffer.append(tokenWhite);
@@ -84,7 +84,7 @@ void args::ArgParser::fAddHelpString(const std::wstring& add, HelpState& s, size
 	}
 }
 
-void args::ArgParser::fBuildHelpUsage(HelpState& s) const {
+void arger::Parser::fBuildHelpUsage(HelpState& s) const {
 	/* add the example-usage descriptive line */
 	fAddHelpNewLine(true, s);
 	fAddHelpToken(L"Usage: ", s);
@@ -128,15 +128,15 @@ void args::ArgParser::fBuildHelpUsage(HelpState& s) const {
 		break;
 	}
 }
-void args::ArgParser::fBuildHelpAddHelpContent(const std::vector<HelpEntry>& content, HelpState& s) const {
+void arger::Parser::fBuildHelpAddHelpContent(const std::vector<HelpEntry>& content, HelpState& s) const {
 	/* iterate over the help-content and append it to the help-buffer */
 	for (size_t i = 0; i < content.size(); ++i) {
 		fAddHelpNewLine(true, s);
 		fAddHelpString(content[i].name + L" ", s);
-		fAddHelpString(content[i].description, s, ArgParser::NumCharsHelpLeft);
+		fAddHelpString(content[i].description, s, Parser::NumCharsHelpLeft);
 	}
 }
-void args::ArgParser::fBuildHelpAddOptionals(bool required, HelpState& s) const {
+void arger::Parser::fBuildHelpAddOptionals(bool required, HelpState& s) const {
 	/* iterate over the optionals and add the corresponding type */
 	auto it = pOptional.begin();
 	while (it != pOptional.end()) {
@@ -170,39 +170,39 @@ void args::ArgParser::fBuildHelpAddOptionals(bool required, HelpState& s) const 
 				temp.append(index++ > 0 ? L"|" : L"").append(grp);
 			temp.append(1, L')');
 		}
-		fAddHelpString(temp, s, ArgParser::NumCharsHelpLeft, 1);
+		fAddHelpString(temp, s, Parser::NumCharsHelpLeft, 1);
 
 		/* expand all enum descriptions */
 		fBuildHelpAddEnumDescription(it->second.type, s);
 		++it;
 	}
 }
-void args::ArgParser::fBuildHelpAddEnumDescription(const args::Type& type, HelpState& s) const {
+void arger::Parser::fBuildHelpAddEnumDescription(const arger::Type& type, HelpState& s) const {
 	/* check if this is an enum to be added */
-	if (!std::holds_alternative<args::Enum>(type))
+	if (!std::holds_alternative<arger::Enum>(type))
 		return;
 
 	/* add the separate keys */
-	for (const auto& val : std::get<args::Enum>(type)) {
+	for (const auto& val : std::get<arger::Enum>(type)) {
 		fAddHelpNewLine(false, s);
-		fAddHelpString(str::Build<std::wstring>(L"- [", val.first, L"]: ", val.second), s, ArgParser::NumCharsHelpLeft, 1);
+		fAddHelpString(str::Build<std::wstring>(L"- [", val.first, L"]: ", val.second), s, Parser::NumCharsHelpLeft, 1);
 	}
 }
-const wchar_t* args::ArgParser::fBuildHelpArgValueString(const args::Type& type) const {
-	if (std::holds_alternative<args::Enum>(type))
+const wchar_t* arger::Parser::fBuildHelpArgValueString(const arger::Type& type) const {
+	if (std::holds_alternative<arger::Enum>(type))
 		return L" [enum]";
-	args::Primitive actual = std::get<args::Primitive>(type);
-	if (actual == args::Primitive::boolean)
+	arger::Primitive actual = std::get<arger::Primitive>(type);
+	if (actual == arger::Primitive::boolean)
 		return L" [bool]";
-	if (actual == args::Primitive::unum)
+	if (actual == arger::Primitive::unum)
 		return L" [uint]";
-	if (actual == args::Primitive::inum)
+	if (actual == arger::Primitive::inum)
 		return L" [int]";
-	if (actual == args::Primitive::real)
+	if (actual == arger::Primitive::real)
 		return L" [real]";
 	return L"";
 }
-std::wstring args::ArgParser::fBuildHelpString() const {
+std::wstring arger::Parser::fBuildHelpString() const {
 	HelpState out;
 
 	/* add the initial version line and program description */
@@ -234,7 +234,7 @@ std::wstring args::ArgParser::fBuildHelpString() const {
 		for (size_t i = 0; i < pCurrent->positional.size(); ++i) {
 			fAddHelpNewLine(false, out);
 			fAddHelpString(str::Build<std::wstring>("  ", pCurrent->positional[i].name, fBuildHelpArgValueString(pCurrent->positional[i].type), L" "), out);
-			fAddHelpString(pCurrent->positional[i].description, out, ArgParser::NumCharsHelpLeft, 1);
+			fAddHelpString(pCurrent->positional[i].description, out, Parser::NumCharsHelpLeft, 1);
 			fBuildHelpAddEnumDescription(pCurrent->positional[i].type, out);
 		}
 	}
@@ -245,7 +245,7 @@ std::wstring args::ArgParser::fBuildHelpString() const {
 		for (const auto& group : pGroups) {
 			fAddHelpNewLine(false, out);
 			fAddHelpString(str::Build<std::wstring>(L"  ", group.second.name), out);
-			fAddHelpString(group.second.description, out, ArgParser::NumCharsHelpLeft, 1);
+			fAddHelpString(group.second.description, out, Parser::NumCharsHelpLeft, 1);
 		}
 	}
 
@@ -278,59 +278,59 @@ std::wstring args::ArgParser::fBuildHelpString() const {
 		fBuildHelpAddHelpContent(pCurrent->helpContent, out);
 	return out.buffer;
 }
-std::wstring args::ArgParser::fBuildVersionString() const {
+std::wstring arger::Parser::fBuildVersionString() const {
 	return str::Build<std::wstring>(pProgram, L" Version [", pVersion, L"]");
 }
 
-std::wstring args::ArgParser::fParseValue(const std::wstring& name, args::Value& value, const args::Type& type) const {
+void arger::Parser::fParseValue(const std::wstring& name, arger::Value& value, const arger::Type& type) const {
 	/* check if an enum was expected */
-	if (std::holds_alternative<args::Enum>(type)) {
-		const args::Enum& expected = std::get<args::Enum>(type);
-		if (expected.count(value.str()) == 0)
-			return str::Build<std::wstring>(L"Invalid enum for argument [", name, L"] encountered.");
-		return L"";
+	if (std::holds_alternative<arger::Enum>(type)) {
+		const arger::Enum& expected = std::get<arger::Enum>(type);
+		if (expected.count(value.str()) != 0)
+			return;
+		throw fException(L"Invalid enum for argument [", name, L"] encountered.");
 	}
 
 	/* validate the expected type and found value */
-	switch (std::get<args::Primitive>(type)) {
-	case args::Primitive::inum: {
+	switch (std::get<arger::Primitive>(type)) {
+	case arger::Primitive::inum: {
 		auto [num, len, res] = str::ParseNum<int64_t>(value.str(), 10, str::PrefixMode::overwrite);
 		if (res != str::NumResult::valid || len != value.str().size())
-			return str::Build<std::wstring>(L"Invalid signed integer for argument [", name, L"] encountered.");
-		value = args::Value{ num };
-		return L"";
+			throw fException(L"Invalid signed integer for argument [", name, L"] encountered.");
+		value = arger::Value{ num };
+		break;
 	}
-	case args::Primitive::unum: {
+	case arger::Primitive::unum: {
 		auto [num, len, res] = str::ParseNum<uint64_t>(value.str(), 10, str::PrefixMode::overwrite);
 		if (res != str::NumResult::valid || len != value.str().size())
-			return str::Build<std::wstring>(L"Invalid unsigned integer for argument [", name, L"] encountered.");
-		value = args::Value{ num };
-		return L"";
+			throw fException(L"Invalid unsigned integer for argument [", name, L"] encountered.");
+		value = arger::Value{ num };
+		break;
 	}
-	case args::Primitive::real: {
+	case arger::Primitive::real: {
 		auto [num, len, res] = str::ParseNum<double>(value.str(), 10, str::PrefixMode::overwrite);
 		if (res != str::NumResult::valid || len != value.str().size())
-			return str::Build<std::wstring>(L"Invalid real for argument [", name, L"] encountered.");
-		value = args::Value{ num };
-		return L"";
+			throw fException(L"Invalid real for argument [", name, L"] encountered.");
+		value = arger::Value{ num };
+		break;
 	}
-	case args::Primitive::boolean: {
+	case arger::Primitive::boolean: {
 		if (str::View{ value.str() }.icompare(L"true") || value.str() == L"1") {
-			value = args::Value{ true };
-			return L"";
+			value = arger::Value{ true };
+			break;
 		}
 		if (str::View{ value.str() }.icompare(L"false") || value.str() == L"0") {
-			value = args::Value{ false };
-			return L"";
+			value = arger::Value{ false };
+			break;
 		}
-		return str::Build<std::wstring>(L"Invalid boolean for argument [", name, L"] encountered.");
+		throw fException(L"Invalid boolean for argument [", name, L"] encountered.");
 	}
-	case args::Primitive::any:
+	case arger::Primitive::any:
 	default:
-		return L"";
+		break;
 	}
 }
-std::wstring args::ArgParser::fParseOptional(const std::wstring& arg, const std::wstring& payload, bool fullName, ArgState& s) {
+void arger::Parser::fParseOptional(const std::wstring& arg, const std::wstring& payload, bool fullName, ArgState& s) {
 	bool payloadUsed = false;
 
 	/* iterate over the list of optional abbreviations/single full-name and process them */
@@ -341,21 +341,21 @@ std::wstring args::ArgParser::fParseOptional(const std::wstring& arg, const std:
 		if (fullName) {
 			auto it = pOptional.find(arg);
 			if (it == pOptional.end())
-				return str::Build<std::wstring>(L"Unknown optional argument [", arg, L"] encountered.");
+				throw fException(L"Unknown optional argument [", arg, L"] encountered.");
 			entry = &it->second;
 			i = arg.size();
 		}
 		else {
 			auto it = pAbbreviations.find(arg[i]);
 			if (it == pAbbreviations.end())
-				return str::Build<std::wstring>(L"Unknown optional argument-abbreviation [", arg[i], L"] encountered.");
+				throw fException(L"Unknown optional argument-abbreviation [", arg[i], L"] encountered.");
 			entry = it->second;
 		}
 
 		/* check if this is a flag and mark it as seen and check if its a special purpose argument */
 		if (entry->payload.empty()) {
 			if (entry->parsed.empty())
-				entry->parsed.emplace_back(args::Value{ true });
+				entry->parsed.emplace_back(arger::Value{ true });
 			if (entry->helpFlag)
 				s.printHelp = true;
 			else if (entry->versionFlag)
@@ -365,53 +365,50 @@ std::wstring args::ArgParser::fParseOptional(const std::wstring& arg, const std:
 
 		/* check if the payload has already been consumed */
 		if (payloadUsed || (payload.empty() && s.index >= s.args.size()))
-			return str::Build<std::wstring>(L"Value [", entry->payload, L"] missing for optional argument [", entry->name, L"].");
+			throw fException(L"Value [", entry->payload, L"] missing for optional argument [", entry->name, L"].");
 		payloadUsed = true;
 
 		/* write the value as raw string into the buffer (dont perform any validations or limit checks for now) */
-		entry->parsed.emplace_back(args::Value{ payload.empty() ? s.args[s.index++] : payload });
+		entry->parsed.emplace_back(arger::Value{ payload.empty() ? s.args[s.index++] : payload });
 	}
 
 	/* check if a payload was supplied but not consumed */
 	if (!payload.empty() && !payloadUsed)
-		return str::Build<std::wstring>(L"Value [", payload, L"] not used by optional arguments.");
-	return L"";
+		throw fException(L"Value [", payload, L"] not used by optional arguments.");
 }
-std::wstring args::ArgParser::fVerifyPositional() {
+void arger::Parser::fVerifyPositional() {
 	/* check if no group has been selected (because of no arguments having been passed to the program) */
 	if (pCurrent == 0)
-		return str::Build<std::wstring>(pGroupUpper, L" missing.");
+		throw fException(pGroupUpper, L" missing.");
 
 	/* validate the requirements for the positional arguments and parse their values */
 	for (size_t i = 0; i < pPositional.size(); ++i) {
 		/* check if the argument is out of range */
 		if (pCurrent->positional.empty() || (i >= pCurrent->positional.size() && !pCurrent->catchAll)) {
 			if (pCurrent->name.empty())
-				return str::Build<std::wstring>(L"Unrecognized argument [", pPositional[i].str(), L"] encountered.");
-			return str::Build<std::wstring>(L"Unrecognized argument [", pPositional[i].str(), L"] encountered for ", pGroupLower, L" [", pCurrent->name, L"].");
+				throw fException(L"Unrecognized argument [", pPositional[i].str(), L"] encountered.");
+			throw fException(L"Unrecognized argument [", pPositional[i].str(), L"] encountered for ", pGroupLower, L" [", pCurrent->name, L"].");
 		}
 
 		/* parse the argument */
 		size_t index = std::min<size_t>(i, pCurrent->positional.size() - 1);
-		std::wstring err = fParseValue(pCurrent->positional[index].name, pPositional[i], pCurrent->positional[index].type);
-		if (!err.empty())
-			return err;
+		fParseValue(pCurrent->positional[index].name, pPositional[i], pCurrent->positional[index].type);
 	}
 
 	/* check if the minimum required number of parameters has not been reached */
 	if (pPositional.size() >= pCurrent->required)
-		return L"";
+		return;
 	else if (pCurrent->name.empty())
-		return L"Arguments missing.";
-	return str::Build<std::wstring>(L"Arguments missing for ", pGroupLower, L" [", pCurrent->name, L"].");
+		throw fException(L"Arguments missing.");
+	throw fException(L"Arguments missing for ", pGroupLower, L" [", pCurrent->name, L"].");
 }
-std::wstring args::ArgParser::fVerifyOptional() {
+void arger::Parser::fVerifyOptional() {
 	/* iterate over the optional arguments and verify them */
 	for (auto& opt : pOptional) {
 		/* check if the current group is not a user of the optional argument (current cannot be null) */
 		if (!pNullGroup && opt.second.explicitUsage && opt.second.users.count(pCurrent->name) == 0) {
 			if (!opt.second.parsed.empty())
-				return str::Build<std::wstring>(L"Argument [", opt.second.name, L"] not meant for ", pGroupLower, L" [", pCurrent->name, L"].");
+				throw fException(L"Argument [", opt.second.name, L"] not meant for ", pGroupLower, L" [", pCurrent->name, L"].");
 			continue;
 		}
 
@@ -419,168 +416,33 @@ std::wstring args::ArgParser::fVerifyOptional() {
 		if (opt.second.parsed.empty()) {
 			if (!opt.second.required)
 				continue;
-			return str::Build<std::wstring>(L"Required argument [", opt.second.name, L"] missing.");
+			throw fException(L"Required argument [", opt.second.name, L"] missing.");
 		}
 
 		/* check if too many instances were found */
 		if (opt.second.parsed.size() > 1 && !opt.second.multiple)
-			return str::Build<std::wstring>(L"Argument [", opt.second.name, L"] can only be specified once.");
+			throw fException(L"Argument [", opt.second.name, L"] can only be specified once.");
 
 		/* verify the values themselves */
-		for (size_t i = 0; i < opt.second.parsed.size(); ++i) {
-			std::wstring err = fParseValue(opt.second.name, opt.second.parsed[i], opt.second.type);
-			if (!err.empty())
-				return err;
-		}
-	}
-	return L"";
-}
-
-void args::ArgParser::configure(const std::wstring& version, const std::wstring& desc, const wchar_t* groupNameLower, const wchar_t* groupNameUpper) {
-	pVersion = version;
-	pDescription = desc;
-	pGroupLower = groupNameLower;
-	pGroupUpper = groupNameUpper;
-}
-void args::ArgParser::addGlobalHelp(const std::wstring& name, const std::wstring& desc) {
-	if (!name.empty())
-		pHelpContent.push_back({ name, desc });
-}
-
-void args::ArgParser::addFlag(const std::wstring& name, wchar_t abbr, const std::wstring& desc, bool explicitUsage) {
-	if (pOptional.count(name) > 0 || name.empty())
-		return;
-
-	/* insert the new entry and insert the reference to the abbreviations */
-	OptArg& entry = pOptional.insert({ name, OptArg() }).first->second;
-	if (abbr != L'\0' && pAbbreviations.count(abbr) == 0)
-		pAbbreviations.insert({ abbr, &entry });
-
-	/* populate the new argument-entry */
-	entry.name = name;
-	entry.payload = L"";
-	entry.description = desc;
-	entry.explicitUsage = explicitUsage;
-	entry.abbreviation = abbr;
-	entry.multiple = true;
-	entry.required = false;
-	entry.helpFlag = false;
-	entry.versionFlag = false;
-}
-void args::ArgParser::addOption(const std::wstring& name, wchar_t abbr, const std::wstring& payload, bool multiple, bool required, const args::Type& type, const std::wstring& desc, bool explicitUsage) {
-	if (pOptional.count(name) > 0 || name.empty() || payload.empty())
-		return;
-	if (std::holds_alternative<args::Enum>(type) && std::get<args::Enum>(type).empty())
-		return;
-
-	/* insert the new entry and insert the reference to the abbreviations */
-	OptArg& entry = pOptional.insert({ name, OptArg() }).first->second;
-	if (abbr != L'\0' && pAbbreviations.count(abbr) == 0)
-		pAbbreviations.insert({ abbr, &entry });
-
-	/* populate the new argument-entry */
-	entry.name = name;
-	entry.payload = payload;
-	entry.description = desc;
-	entry.explicitUsage = explicitUsage;
-	entry.abbreviation = abbr;
-	entry.type = type;
-	entry.multiple = multiple;
-	entry.required = required;
-	entry.helpFlag = false;
-	entry.versionFlag = false;
-}
-void args::ArgParser::addHelpFlag(const std::wstring& name, wchar_t abbr) {
-	if (pOptional.count(name) > 0 || name.empty())
-		return;
-
-	/* insert the new entry and insert the reference to the abbreviations */
-	OptArg& entry = pOptional.insert({ name, OptArg() }).first->second;
-	if (abbr != L'\0' && pAbbreviations.count(abbr) == 0)
-		pAbbreviations.insert({ abbr, &entry });
-
-	/* populate the new argument-entry */
-	entry.name = name;
-	entry.payload = L"";
-	entry.explicitUsage = false;
-	entry.description = L"Print this help menu.";
-	entry.abbreviation = abbr;
-	entry.multiple = true;
-	entry.required = false;
-	entry.helpFlag = true;
-}
-void args::ArgParser::addVersionFlag(const std::wstring& name, wchar_t abbr) {
-	if (pOptional.count(name) > 0 || name.empty())
-		return;
-
-	/* insert the new entry and insert the reference to the abbreviations */
-	OptArg& entry = pOptional.insert({ name, OptArg() }).first->second;
-	if (abbr != L'\0' && pAbbreviations.count(abbr) == 0)
-		pAbbreviations.insert({ abbr, &entry });
-
-	/* populate the new argument-entry */
-	entry.name = name;
-	entry.payload = L"";
-	entry.explicitUsage = false;
-	entry.description = L"Print the current program version.";
-	entry.abbreviation = abbr;
-	entry.multiple = true;
-	entry.required = false;
-	entry.helpFlag = false;
-	entry.versionFlag = true;
-}
-
-void args::ArgParser::addGroup(const std::wstring& name, size_t required, bool lastCatchAll, const std::wstring& desc) {
-	/* check if the group has already been defined or a group is being added to no-group configuration/empty group added to groups */
-	if (pGroups.count(name) > 0)
-		return;
-	if (pGroups.empty())
-		pNullGroup = name.empty();
-	else if (pNullGroup || name.empty())
-		return;
-
-	/* populate the group-entry */
-	pGroupInsert = &pGroups.insert({ name, GroupEntry() }).first->second;
-	pGroupInsert->name = name;
-	pGroupInsert->description = desc;
-	pGroupInsert->required = required;
-	pGroupInsert->catchAll = lastCatchAll;
-}
-void args::ArgParser::addPositional(const std::wstring& name, const args::Type& type, const std::wstring& desc) {
-	if (name.empty() || pGroupInsert == 0)
-		return;
-	if (std::holds_alternative<args::Enum>(type) && std::get<args::Enum>(type).empty())
-		return;
-	PosArg& entry = pGroupInsert->positional.emplace_back();
-
-	/* populate the new positional-entry */
-	entry.name = name;
-	entry.description = desc;
-	entry.type = type;
-}
-void args::ArgParser::addGroupHelp(const std::wstring& name, const std::wstring& desc) {
-	if (!name.empty() && pGroupInsert != 0)
-		pGroupInsert->helpContent.push_back({ name, desc });
-}
-void args::ArgParser::groupBindArgsOrOptions(const std::set<std::wstring>& names) {
-	/* for null-groups, the concept of users does not exist, as the flags/optionals are all used by the single group */
-	if (names.empty() || pGroupInsert == 0 || pNullGroup)
-		return;
-
-	/* iterate over the names and add the current group as users to them */
-	for (const auto& name : names) {
-		auto it = pOptional.find(name);
-		if (it == pOptional.end() || !it->second.explicitUsage)
-			continue;
-		it->second.users.insert(pGroupInsert->name);
+		for (size_t i = 0; i < opt.second.parsed.size(); ++i)
+			fParseValue(opt.second.name, opt.second.parsed[i], opt.second.type);
 	}
 }
+void arger::Parser::fParseName(const std::wstring& arg) {
+	pProgram = L"%unknown%";
 
-std::pair<std::wstring, bool> args::ArgParser::parse(int argc, const char* const* argv) {
-	if (argc == 0)
-		return { L"Malformed arguments with no program-name.", false };
+	size_t begin = arg.size();
+	while (begin > 0 && arg[begin - 1] != L'/' && arg[begin - 1] != L'\\')
+		--begin;
+
+	/* check if a valid name has been encountered */
+	if (begin == arg.size())
+		throw fException(L"Malformed program path argument [", arg, L"] encountered.");
+	pProgram = arg.substr(begin);
+}
+void arger::Parser::fParseArgs(std::vector<std::wstring> args) {
 	if (pGroups.empty() || pVersion.empty())
-		return { L"Misconfigured arguments-parser.", false };
+		throw fException(L"Misconfigured arguments-parser.");
 
 	/* reset the state of the last parsing */
 	pCurrent = 0;
@@ -588,18 +450,8 @@ std::pair<std::wstring, bool> args::ArgParser::parse(int argc, const char* const
 	for (auto& opt : pOptional)
 		opt.second.parsed.clear();
 
-	/* fetch the current program name */
-	size_t begin = 0;
-	for (size_t i = 0; argv[0][i] != '\0'; ++i)
-		begin = ((argv[0][i] == '/' || argv[0][i] == L'\\') ? i + 1 : begin);
-	if (argv[0][begin] == '\0')
-		return { str::Build<std::wstring>(L"Malformed program path argument [", argv[0], L"] encountered."), false };
-	pProgram = str::View{ argv[0] + begin }.to<std::wstring>();
-
 	/* setup the arguments-state */
-	ArgState state;
-	for (size_t i = 1; i < argc; ++i)
-		state.args.push_back(str::View{ argv[i] }.to<std::wstring>());
+	ArgState state{ std::move(args), 0, false, false, false };
 
 	/* check if groups are not used, in which case the null group will be implicitly selected */
 	if (pNullGroup)
@@ -627,7 +479,7 @@ std::pair<std::wstring, bool> args::ArgParser::parse(int argc, const char* const
 
 				/* check if the payload is well-formed (--name=payload) and split it off */
 				if (i + 1 >= next.size())
-					return { str::Build<std::wstring>(L"Malformed payload assigned to optional argument [", next, L"]."), false };
+					throw fException(L"Malformed payload assigned to optional argument [", next, L"].");
 				payload = next.substr(i + 1);
 				end = i;
 				break;
@@ -635,9 +487,7 @@ std::pair<std::wstring, bool> args::ArgParser::parse(int argc, const char* const
 
 			/* parse the single long or multiple short arguments */
 			size_t hypenCount = (next.size() > 2 && next[1] == L'-' ? 2 : 1);
-			std::wstring err = fParseOptional(next.substr(hypenCount, end - hypenCount), payload, (hypenCount == 2), state);
-			if (!err.empty())
-				return { err, false };
+			fParseOptional(next.substr(hypenCount, end - hypenCount), payload, (hypenCount == 2), state);
 			continue;
 		}
 
@@ -648,53 +498,213 @@ std::pair<std::wstring, bool> args::ArgParser::parse(int argc, const char* const
 
 			/* check if a group has been found */
 			if (it == pGroups.end())
-				return { str::Build<std::wstring>(L"Unknown ", pGroupLower, L" [", next, L"] encountered."), false };
+				throw fException(L"Unknown ", pGroupLower, L" [", next, L"] encountered.");
 			pCurrent = &it->second;
 			continue;
 		}
 
 		/* add the argument to the list of positional arguments (dont perform any validations or limit checks for now) */
-		pPositional.emplace_back(args::Value{ next });
+		pPositional.emplace_back(arger::Value{ next });
 	}
 
 	/* check if the version or help should be printed */
 	if (state.printHelp)
-		return { fBuildHelpString(), true };
+		throw arger::ArgPrintMessage{ fBuildHelpString() };
 	if (state.printVersion)
-		return { fBuildVersionString(), true };
+		throw arger::ArgPrintMessage{ fBuildVersionString() };
 
 	/* verify the positional arguments */
-	if (std::wstring err = fVerifyPositional(); !err.empty())
-		return { err, false };
+	fVerifyPositional();
 
 	/* verify the optional arguments */
-	if (std::wstring err = fVerifyOptional(); !err.empty())
-		return { err, false };
-	return { L"", true };
+	fVerifyOptional();
 }
 
-bool args::ArgParser::flag(const std::wstring& name) const {
+void arger::Parser::configure(std::wstring version, std::wstring desc, std::wstring groupNameLower, std::wstring groupNameUpper) {
+	pVersion = version;
+	pDescription = desc;
+	pGroupLower = groupNameLower;
+	pGroupUpper = groupNameUpper;
+}
+void arger::Parser::addGlobalHelp(std::wstring name, std::wstring desc) {
+	if (!name.empty())
+		pHelpContent.emplace_back(name, desc);
+}
+
+void arger::Parser::addFlag(const std::wstring& name, wchar_t abbr, std::wstring desc, bool explicitUsage) {
+	if (pOptional.count(name) > 0 || name.empty())
+		return;
+
+	/* insert the new entry and insert the reference to the abbreviations */
+	OptArg& entry = pOptional.insert({ name, OptArg() }).first->second;
+	if (abbr != L'\0' && pAbbreviations.count(abbr) == 0)
+		pAbbreviations.insert({ abbr, &entry });
+
+	/* populate the new argument-entry */
+	entry.name = name;
+	entry.payload = L"";
+	entry.description = desc;
+	entry.explicitUsage = explicitUsage;
+	entry.abbreviation = abbr;
+	entry.multiple = true;
+	entry.required = false;
+	entry.helpFlag = false;
+	entry.versionFlag = false;
+}
+void arger::Parser::addOption(const std::wstring& name, wchar_t abbr, const std::wstring& payload, bool multiple, bool required, const arger::Type& type, std::wstring desc, bool explicitUsage) {
+	if (pOptional.count(name) > 0 || name.empty() || payload.empty())
+		return;
+	if (std::holds_alternative<arger::Enum>(type) && std::get<arger::Enum>(type).empty())
+		return;
+
+	/* insert the new entry and insert the reference to the abbreviations */
+	OptArg& entry = pOptional.insert({ name, OptArg() }).first->second;
+	if (abbr != L'\0' && pAbbreviations.count(abbr) == 0)
+		pAbbreviations.insert({ abbr, &entry });
+
+	/* populate the new argument-entry */
+	entry.name = name;
+	entry.payload = payload;
+	entry.description = desc;
+	entry.explicitUsage = explicitUsage;
+	entry.abbreviation = abbr;
+	entry.type = type;
+	entry.multiple = multiple;
+	entry.required = required;
+	entry.helpFlag = false;
+	entry.versionFlag = false;
+}
+void arger::Parser::addHelpFlag(const std::wstring& name, wchar_t abbr) {
+	if (pOptional.count(name) > 0 || name.empty())
+		return;
+
+	/* insert the new entry and insert the reference to the abbreviations */
+	OptArg& entry = pOptional.insert({ name, OptArg() }).first->second;
+	if (abbr != L'\0' && pAbbreviations.count(abbr) == 0)
+		pAbbreviations.insert({ abbr, &entry });
+
+	/* populate the new argument-entry */
+	entry.name = name;
+	entry.payload = L"";
+	entry.explicitUsage = false;
+	entry.description = L"Print this help menu.";
+	entry.abbreviation = abbr;
+	entry.multiple = true;
+	entry.required = false;
+	entry.helpFlag = true;
+}
+void arger::Parser::addVersionFlag(const std::wstring& name, wchar_t abbr) {
+	if (pOptional.count(name) > 0 || name.empty())
+		return;
+
+	/* insert the new entry and insert the reference to the abbreviations */
+	OptArg& entry = pOptional.insert({ name, OptArg() }).first->second;
+	if (abbr != L'\0' && pAbbreviations.count(abbr) == 0)
+		pAbbreviations.insert({ abbr, &entry });
+
+	/* populate the new argument-entry */
+	entry.name = name;
+	entry.payload = L"";
+	entry.explicitUsage = false;
+	entry.description = L"Print the current program version.";
+	entry.abbreviation = abbr;
+	entry.multiple = true;
+	entry.required = false;
+	entry.helpFlag = false;
+	entry.versionFlag = true;
+}
+
+void arger::Parser::addGroup(const std::wstring& name, size_t required, bool lastCatchAll, std::wstring desc) {
+	/* check if the group has already been defined or a group is being added to no-group configuration/empty group added to groups */
+	if (pGroups.count(name) > 0)
+		return;
+	if (pGroups.empty())
+		pNullGroup = name.empty();
+	else if (pNullGroup || name.empty())
+		return;
+
+	/* populate the group-entry */
+	pGroupInsert = &pGroups.insert({ name, GroupEntry() }).first->second;
+	pGroupInsert->name = name;
+	pGroupInsert->description = desc;
+	pGroupInsert->required = required;
+	pGroupInsert->catchAll = lastCatchAll;
+}
+void arger::Parser::addPositional(const std::wstring& name, const arger::Type& type, std::wstring desc) {
+	if (name.empty() || pGroupInsert == 0)
+		return;
+	if (std::holds_alternative<arger::Enum>(type) && std::get<arger::Enum>(type).empty())
+		return;
+	PosArg& entry = pGroupInsert->positional.emplace_back();
+
+	/* populate the new positional-entry */
+	entry.name = name;
+	entry.description = desc;
+	entry.type = type;
+}
+void arger::Parser::addGroupHelp(const std::wstring& name, std::wstring desc) {
+	if (!name.empty() && pGroupInsert != 0)
+		pGroupInsert->helpContent.push_back({ name, desc });
+}
+void arger::Parser::groupBindArgsOrOptions(const std::set<std::wstring>& names) {
+	/* for null-groups, the concept of users does not exist, as the flags/optionals are all used by the single group */
+	if (names.empty() || pGroupInsert == 0 || pNullGroup)
+		return;
+
+	/* iterate over the names and add the current group as users to them */
+	for (const auto& name : names) {
+		auto it = pOptional.find(name);
+		if (it == pOptional.end() || !it->second.explicitUsage)
+			continue;
+		it->second.users.insert(pGroupInsert->name);
+	}
+}
+
+void arger::Parser::parse(int argc, const char* const* argv) {
+	if (argc == 0)
+		throw fException(L"Malformed arguments with no program-name.");
+	fParseName(str::View{ argv[0] }.to<std::wstring>());
+
+	/* convert the arguments and parse them */
+	std::vector<std::wstring> args;
+	for (size_t i = 1; i < argc; ++i)
+		args.push_back(str::View{ argv[i] }.to<std::wstring>());
+	fParseArgs(args);
+}
+void arger::Parser::parse(int argc, const wchar_t* const* argv) {
+	if (argc == 0)
+		throw fException(L"Malformed arguments with no program-name.");
+	fParseName(argv[0]);
+
+	/* convert the arguments and parse them */
+	std::vector<std::wstring> args;
+	for (size_t i = 1; i < argc; ++i)
+		args.emplace_back(argv[i]);
+	fParseArgs(args);
+}
+
+bool arger::Parser::flag(const std::wstring& name) const {
 	return !pOptional.at(name).parsed.empty();
 }
-const std::wstring& args::ArgParser::group() const {
+const std::wstring& arger::Parser::group() const {
 	return pCurrent->name;
 }
-std::wstring args::ArgParser::helpHint() const {
+std::wstring arger::Parser::helpHint() const {
 	return str::Build<std::wstring>(L"Try '", pProgram, L" --help' for more information.");
 }
 
-size_t args::ArgParser::options(const std::wstring& name) const {
+size_t arger::Parser::options(const std::wstring& name) const {
 	return pOptional.at(name).parsed.size();
 }
-std::optional<args::Value> args::ArgParser::option(const std::wstring& name, size_t index) const {
+std::optional<arger::Value> arger::Parser::option(const std::wstring& name, size_t index) const {
 	if (index >= pOptional.at(name).parsed.size())
 		return {};
 	return pOptional.at(name).parsed[index];
 }
-size_t args::ArgParser::positionals() const {
+size_t arger::Parser::positionals() const {
 	return pPositional.size();
 }
-std::optional<args::Value> args::ArgParser::positional(size_t index) const {
+std::optional<arger::Value> arger::Parser::positional(size_t index) const {
 	if (index >= pPositional.size())
 		return {};
 	return pPositional[index];
