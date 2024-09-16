@@ -1,0 +1,3 @@
+[submodule "repos/ustring"]
+	path = repos/ustring
+	url = git@github.com:BjoernBoss/ustring.git
