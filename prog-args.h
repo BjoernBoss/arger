@@ -12,7 +12,8 @@
 #include <set>
 
 namespace arger {
-	class Parser;
+	class Parsed;
+	class Arguments;
 
 	enum class Primitive : uint8_t {
 		any,
@@ -24,7 +25,7 @@ namespace arger {
 	using Enum = std::map<std::wstring, std::wstring>;
 	using Type = std::variant<arger::Primitive, arger::Enum>;
 
-	using Constraint = std::function<std::wstring(const arger::Parser&)>;
+	using Constraint = std::function<std::wstring(const arger::Parsed&)>;
 
 	class ExceptionBase {
 	private:
@@ -142,6 +143,26 @@ namespace arger {
 		}
 	};
 
+	/* represents the parsed results of the arguments */
+	class Parsed {
+		friend class arger::Arguments;
+	private:
+		std::set<std::wstring> pFlags;
+		std::map<std::wstring, std::vector<arger::Value>> pOptions;
+		std::vector<arger::Value> pPositional;
+		std::wstring pGroup;
+
+	public:
+		bool flag(const std::wstring& name) const;
+		const std::wstring& group() const;
+
+	public:
+		size_t options(const std::wstring& name) const;
+		std::optional<arger::Value> option(const std::wstring& name, size_t index = 0) const;
+		size_t positionals() const;
+		std::optional<arger::Value> positional(size_t index) const;
+	};
+
 	struct Configuration {
 	public:
 		std::set<std::wstring> users;
@@ -257,7 +278,7 @@ namespace arger {
 		};
 	}
 
-	class Parser {
+	class Arguments {
 	private:
 		static constexpr size_t NumCharsHelpLeft = 32;
 		static constexpr size_t NumCharsHelp = 100;
@@ -265,7 +286,6 @@ namespace arger {
 	private:
 		enum class BindType :uint8_t {
 			none,
-			argument,
 			group,
 			positional
 		};
@@ -273,7 +293,6 @@ namespace arger {
 			std::wstring name;
 			std::wstring payload;
 			std::wstring description;
-			std::vector<arger::Value> parsed;
 			std::vector<arger::Constraint> constraints;
 			std::set<std::wstring> users;
 			size_t minimum = 0;
@@ -306,6 +325,9 @@ namespace arger {
 		};
 		struct ArgState {
 			std::vector<std::wstring> args;
+			GroupEntry* current = 0;
+			arger::Parsed parsed;
+			std::wstring program;
 			size_t index = 0;
 			bool printHelp = false;
 			bool printVersion = false;
@@ -321,16 +343,13 @@ namespace arger {
 	private:
 		std::wstring pVersion;
 		std::wstring pDescription;
-		std::wstring pProgram;
 		std::wstring pGroupName = L"mode";
-		std::vector<arger::Value> pPositional;
 		std::vector<HelpEntry> pHelpContent;
 		std::vector<ConstraintEntry> pConstraints;
 		std::map<std::wstring, GroupEntry> pGroups;
 		std::map<std::wstring, OptArg> pOptional;
 		std::map<wchar_t, OptArg*> pAbbreviations;
 		GroupEntry* pGroupInsert = 0;
-		GroupEntry* pCurrent = 0;
 		bool pNullGroup = false;
 
 	private:
@@ -340,13 +359,13 @@ namespace arger {
 		void fAddHelpString(const std::wstring& add, HelpState& s, size_t offset = 0, size_t indentAutoBreaks = 0) const;
 
 	private:
-		void fBuildHelpUsage(HelpState& s) const;
+		void fBuildHelpUsage(const GroupEntry* current, const std::wstring& program, HelpState& s) const;
 		void fBuildHelpAddHelpContent(const std::vector<HelpEntry>& content, HelpState& s) const;
-		void fBuildHelpAddOptionals(bool required, HelpState& s) const;
+		void fBuildHelpAddOptionals(bool required, const GroupEntry* current, HelpState& s) const;
 		void fBuildHelpAddEnumDescription(const arger::Type& type, HelpState& s) const;
 		const wchar_t* fBuildHelpArgValueString(const arger::Type& type) const;
-		std::wstring fBuildHelpString() const;
-		std::wstring fBuildVersionString() const;
+		std::wstring fBuildHelpString(const GroupEntry* current, const std::wstring& program) const;
+		std::wstring fBuildVersionString(const std::wstring& program) const;
 
 	private:
 		template <class... Args>
@@ -355,16 +374,13 @@ namespace arger {
 		}
 		void fParseValue(const std::wstring& name, arger::Value& value, const arger::Type& type) const;
 		void fParseOptional(const std::wstring& arg, const std::wstring& payload, bool fullName, ArgState& s);
-		void fVerifyPositional();
-		void fVerifyOptional();
-		void fParseName(const std::wstring& arg);
-		void fParseArgs(std::vector<std::wstring> args);
+		void fVerifyPositional(ArgState& s);
+		void fVerifyOptional(ArgState& s);
+		arger::Parsed fParseArgs(std::vector<std::wstring> args);
 
 	public:
 		void configure(std::wstring version, std::wstring desc, std::wstring groupName = L"mode");
 		void addGlobalHelp(std::wstring name, std::wstring desc);
-
-	public:
 		void addOption(const std::wstring& name, const arger::Configuration& config);
 
 	public:
@@ -374,24 +390,14 @@ namespace arger {
 
 	public:
 		void addConstraint(arger::Constraint fn);
-		void addFlagOrOptionConstraint(const std::wstring& name, arger::Constraint fn);
 		void addGroupConstraint(const std::wstring& name, arger::Constraint fn);
 		void addPositionalConstraint(const std::wstring& name, size_t index, arger::Constraint fn);
 
 	public:
-		void parse(int argc, const char* const* argv);
-		void parse(int argc, const wchar_t* const* argv);
-
-	public:
-		/* must all first be called after calling Arguments::parse(...) */
-		bool flag(const std::wstring& name) const;
-		const std::wstring& group() const;
-		std::wstring helpHint() const;
-
-	public:
-		size_t options(const std::wstring& name) const;
-		std::optional<arger::Value> option(const std::wstring& name, size_t index = 0) const;
-		size_t positionals() const;
-		std::optional<arger::Value> positional(size_t index) const;
+		arger::Parsed parse(int argc, const char* const* argv);
+		arger::Parsed parse(int argc, const wchar_t* const* argv);
 	};
+
+	std::wstring HelpHint(int argc, const char* const* argv);
+	std::wstring HelpHint(int argc, const wchar_t* const* argv);
 }
