@@ -346,7 +346,7 @@ void arger::Arguments::fParseValue(const std::wstring& name, arger::Value& value
 		const arger::Enum& expected = std::get<arger::Enum>(type);
 		if (expected.count(value.str()) != 0)
 			return;
-		throw fException(L"Invalid enum for argument [", name, L"] encountered.");
+		throw arger::ParsingException(L"Invalid enum for argument [", name, L"] encountered.");
 	}
 
 	/* validate the expected type and found value */
@@ -354,21 +354,21 @@ void arger::Arguments::fParseValue(const std::wstring& name, arger::Value& value
 	case arger::Primitive::inum: {
 		auto [num, len, res] = str::ParseNum<int64_t>(value.str(), 10, str::PrefixMode::overwrite);
 		if (res != str::NumResult::valid || len != value.str().size())
-			throw fException(L"Invalid signed integer for argument [", name, L"] encountered.");
+			throw arger::ParsingException(L"Invalid signed integer for argument [", name, L"] encountered.");
 		value = arger::Value{ num };
 		break;
 	}
 	case arger::Primitive::unum: {
 		auto [num, len, res] = str::ParseNum<uint64_t>(value.str(), 10, str::PrefixMode::overwrite);
 		if (res != str::NumResult::valid || len != value.str().size())
-			throw fException(L"Invalid unsigned integer for argument [", name, L"] encountered.");
+			throw arger::ParsingException(L"Invalid unsigned integer for argument [", name, L"] encountered.");
 		value = arger::Value{ num };
 		break;
 	}
 	case arger::Primitive::real: {
 		auto [num, len, res] = str::ParseNum<double>(value.str(), 10, str::PrefixMode::overwrite);
 		if (res != str::NumResult::valid || len != value.str().size())
-			throw fException(L"Invalid real for argument [", name, L"] encountered.");
+			throw arger::ParsingException(L"Invalid real for argument [", name, L"] encountered.");
 		value = arger::Value{ num };
 		break;
 	}
@@ -381,7 +381,7 @@ void arger::Arguments::fParseValue(const std::wstring& name, arger::Value& value
 			value = arger::Value{ false };
 			break;
 		}
-		throw fException(L"Invalid boolean for argument [", name, L"] encountered.");
+		throw arger::ParsingException(L"Invalid boolean for argument [", name, L"] encountered.");
 	}
 	case arger::Primitive::any:
 	default:
@@ -399,14 +399,14 @@ void arger::Arguments::fParseOptional(const std::wstring& arg, const std::wstrin
 		if (fullName) {
 			auto it = pOptional.find(arg);
 			if (it == pOptional.end())
-				throw fException(L"Unknown optional argument [", arg, L"] encountered.");
+				throw arger::ParsingException(L"Unknown optional argument [", arg, L"] encountered.");
 			entry = &it->second;
 			i = arg.size();
 		}
 		else {
 			auto it = pAbbreviations.find(arg[i]);
 			if (it == pAbbreviations.end())
-				throw fException(L"Unknown optional argument-abbreviation [", arg[i], L"] encountered.");
+				throw arger::ParsingException(L"Unknown optional argument-abbreviation [", arg[i], L"] encountered.");
 			entry = it->second;
 		}
 
@@ -422,7 +422,7 @@ void arger::Arguments::fParseOptional(const std::wstring& arg, const std::wstrin
 
 		/* check if the payload has already been consumed */
 		if (payloadUsed || (payload.empty() && s.index >= s.args.size()))
-			throw fException(L"Value [", entry->payload, L"] missing for optional argument [", entry->name, L"].");
+			throw arger::ParsingException(L"Value [", entry->payload, L"] missing for optional argument [", entry->name, L"].");
 		payloadUsed = true;
 
 		/* write the value as raw string into the buffer (dont perform any validations or limit checks for now) */
@@ -434,20 +434,20 @@ void arger::Arguments::fParseOptional(const std::wstring& arg, const std::wstrin
 
 	/* check if a payload was supplied but not consumed */
 	if (!payload.empty() && !payloadUsed)
-		throw fException(L"Value [", payload, L"] not used by optional arguments.");
+		throw arger::ParsingException(L"Value [", payload, L"] not used by optional arguments.");
 }
 void arger::Arguments::fVerifyPositional(ArgState& s) {
 	/* check if no group has been selected (because of no arguments having been passed to the program) */
 	if (s.current == 0)
-		throw fException(str::View{ pGroupName }.title(), L" missing.");
+		throw arger::ParsingException(str::View{ pGroupName }.title(), L" missing.");
 
 	/* validate the requirements for the positional arguments and parse their values */
 	for (size_t i = 0; i < s.parsed.pPositional.size(); ++i) {
 		/* check if the argument is out of range */
 		if (s.current->positional.empty() || (i >= s.current->positional.size() && !s.current->catchAll)) {
 			if (s.current->name.empty())
-				throw fException(L"Unrecognized argument [", s.parsed.pPositional[i].str(), L"] encountered.");
-			throw fException(L"Unrecognized argument [", s.parsed.pPositional[i].str(), L"] encountered for ", pGroupName, L" [", s.current->name, L"].");
+				throw arger::ParsingException(L"Unrecognized argument [", s.parsed.pPositional[i].str(), L"] encountered.");
+			throw arger::ParsingException(L"Unrecognized argument [", s.parsed.pPositional[i].str(), L"] encountered for ", pGroupName, L" [", s.current->name, L"].");
 		}
 
 		/* parse the argument */
@@ -459,8 +459,8 @@ void arger::Arguments::fVerifyPositional(ArgState& s) {
 	if (s.parsed.pPositional.size() >= s.current->minimum)
 		return;
 	else if (s.current->name.empty())
-		throw fException(L"Arguments missing.");
-	throw fException(L"Arguments missing for ", pGroupName, L" [", s.current->name, L"].");
+		throw arger::ParsingException(L"Arguments missing.");
+	throw arger::ParsingException(L"Arguments missing for ", pGroupName, L" [", s.current->name, L"].");
 }
 void arger::Arguments::fVerifyOptional(ArgState& s) {
 	/* iterate over the optional arguments and verify them */
@@ -468,7 +468,7 @@ void arger::Arguments::fVerifyOptional(ArgState& s) {
 		/* check if the current group is not a user of the optional argument (current cannot be null) */
 		if (!opt.second.users.empty() && opt.second.users.count(s.current->name) == 0) {
 			if ((opt.second.payload.empty() ? s.parsed.pFlags.count(opt.first) : s.parsed.pOptions.count(opt.first)) > 0)
-				throw fException(L"Argument [", opt.second.name, L"] not meant for ", pGroupName, L" [", s.current->name, L"].");
+				throw arger::ParsingException(L"Argument [", opt.second.name, L"] not meant for ", pGroupName, L" [", s.current->name, L"].");
 			continue;
 		}
 
@@ -478,11 +478,11 @@ void arger::Arguments::fVerifyOptional(ArgState& s) {
 
 		/* check if the optional-argument has been found */
 		if (opt.second.minimum > count)
-			throw fException(L"Argument [", opt.second.name, L"] is required at least ", opt.second.minimum, " times.");
+			throw arger::ParsingException(L"Argument [", opt.second.name, L"] is required at least ", opt.second.minimum, " times.");
 
 		/* check if too many instances were found */
 		if (opt.second.maximum > 0 && count > opt.second.maximum)
-			throw fException(L"Argument [", opt.second.name, L"] can only be specified ", opt.second.maximum, " times.");
+			throw arger::ParsingException(L"Argument [", opt.second.name, L"] can only be specified ", opt.second.maximum, " times.");
 
 		/* verify the values themselves */
 		for (size_t i = 0; i < count; ++i)
@@ -491,7 +491,7 @@ void arger::Arguments::fVerifyOptional(ArgState& s) {
 }
 arger::Parsed arger::Arguments::fParseArgs(std::vector<std::wstring> args) {
 	if (pGroups.empty() || pVersion.empty())
-		throw fException(L"Misconfigured arguments-parser.");
+		throw arger::ParsingException(L"Misconfigured arguments-parser.");
 
 	/* sanitize the constraints */
 	for (auto& entry : pOptional) {
@@ -509,10 +509,10 @@ arger::Parsed arger::Arguments::fParseArgs(std::vector<std::wstring> args) {
 
 	/* parse the program name */
 	if (state.args.empty())
-		throw fException(L"Malformed arguments with no program-name.");
+		throw arger::ParsingException(L"Malformed arguments with no program-name.");
 	state.program = ParseProgramName(state.args[0].c_str(), false);
 	if (state.program.empty())
-		throw fException(L"Malformed program path argument [", state.args[0], L"] encountered.");
+		throw arger::ParsingException(L"Malformed program path argument [", state.args[0], L"] encountered.");
 
 	/* check if groups are not used, in which case the null group will be implicitly selected */
 	if (pNullGroup)
@@ -540,7 +540,7 @@ arger::Parsed arger::Arguments::fParseArgs(std::vector<std::wstring> args) {
 
 				/* check if the payload is well-formed (--name=payload) and split it off */
 				if (i + 1 >= next.size())
-					throw fException(L"Malformed payload assigned to optional argument [", next, L"].");
+					throw arger::ParsingException(L"Malformed payload assigned to optional argument [", next, L"].");
 				payload = next.substr(i + 1);
 				end = i;
 				break;
@@ -559,7 +559,7 @@ arger::Parsed arger::Arguments::fParseArgs(std::vector<std::wstring> args) {
 
 			/* check if a group has been found */
 			if (it == pGroups.end())
-				throw fException(L"Unknown ", pGroupName, L" [", next, L"] encountered.");
+				throw arger::ParsingException(L"Unknown ", pGroupName, L" [", next, L"] encountered.");
 			state.current = &it->second;
 			continue;
 		}
@@ -570,9 +570,9 @@ arger::Parsed arger::Arguments::fParseArgs(std::vector<std::wstring> args) {
 
 	/* check if the version or help should be printed */
 	if (state.printHelp)
-		throw arger::ArgPrintMessage{ fBuildHelpString(state.current, state.program) };
+		throw arger::PrintMessage(fBuildHelpString(state.current, state.program));
 	if (state.printVersion)
-		throw arger::ArgPrintMessage{ fBuildVersionString(state.program) };
+		throw arger::PrintMessage(fBuildVersionString(state.program));
 
 	/* verify the positional arguments */
 	fVerifyPositional(state);
@@ -580,15 +580,18 @@ arger::Parsed arger::Arguments::fParseArgs(std::vector<std::wstring> args) {
 	/* verify the optional arguments */
 	fVerifyOptional(state);
 
-	/* setup the selected group (current cannot be null, as fVerifyPositional will otherwise throw) */
-	if (state.current != 0)
-		state.parsed.pGroup = state.current->name;
+	/* current cannot be null, as fVerifyPositional will otherwise throw, but intellisense cannot detect it */
+	if (state.current == 0)
+		return state.parsed;
+
+	/* setup the selected group */
+	state.parsed.pGroup = state.current->name;
 
 	/* validate all constraints */
 	for (const auto& fn : pConstraints) {
 		std::wstring err = fn(state.parsed);
 		if (!err.empty())
-			throw arger::ArgsParsingException{ err };
+			throw arger::ParsingException(err);
 	}
 	for (const auto& opt : pOptional) {
 		if (state.parsed.pOptions.count(opt.first) == 0)
@@ -596,13 +599,13 @@ arger::Parsed arger::Arguments::fParseArgs(std::vector<std::wstring> args) {
 		for (const auto& fn : opt.second.constraints) {
 			std::wstring err = fn(state.parsed);
 			if (!err.empty())
-				throw arger::ArgsParsingException{ err };
+				throw arger::ParsingException(err);
 		}
 	}
 	for (const auto& fn : state.current->constraints) {
 		std::wstring err = fn(state.parsed);
 		if (!err.empty())
-			throw arger::ArgsParsingException{ err };
+			throw arger::ParsingException(err);
 	}
 	return state.parsed;
 }

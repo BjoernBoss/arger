@@ -29,33 +29,22 @@ namespace arger {
 
 	using Constraint = std::function<std::wstring(const arger::Parsed&)>;
 
-	class ExceptionBase {
-	private:
-		std::wstring pMessage;
-
-	public:
-		constexpr ExceptionBase(const std::wstring& msg) : pMessage{ msg } {}
-		constexpr const std::wstring& what() const {
-			return pMessage;
-		}
-	};
-
 	/* exception thrown when accessing an arger::Value as a certain type, which it is not */
-	class ArgsTypeException : public arger::ExceptionBase {
-	public:
-		ArgsTypeException(const std::wstring& s) : arger::ExceptionBase{ s } {}
+	struct TypeException : public str::BuildException {
+		template <class... Args>
+		constexpr TypeException(const Args&... args) : str::BuildException{ args... } {}
 	};
 
 	/* exception thrown when malformed or invalid arguments are encountered */
-	class ArgsParsingException : public arger::ExceptionBase {
-	public:
-		ArgsParsingException(const std::wstring& s) : arger::ExceptionBase{ s } {}
+	struct ParsingException : public str::BuildException {
+		template <class... Args>
+		constexpr ParsingException(const Args&... args) : str::BuildException{ args... } {}
 	};
 
 	/* exception thrown when only a message should be printed but no */
-	class ArgPrintMessage : public arger::ExceptionBase {
-	public:
-		ArgPrintMessage(const std::wstring& s) : arger::ExceptionBase{ s } {}
+	struct PrintMessage : public str::BuildException {
+		template <class... Args>
+		constexpr PrintMessage(const Args&... args) : str::BuildException{ args... } {}
 	};
 
 	/* representation of a single argument value (performs primitive type-conversions when accessing values) */
@@ -115,14 +104,14 @@ namespace arger {
 		constexpr uint64_t unum() const {
 			if (std::holds_alternative<uint64_t>(*this))
 				return std::get<uint64_t>(*this);
-			throw arger::ArgsTypeException(L"arger::Value is not an unsigned-number");
+			throw arger::TypeException(L"arger::Value is not an unsigned-number");
 		}
 		constexpr int64_t inum() const {
 			if (std::holds_alternative<uint64_t>(*this))
 				return int64_t(std::get<uint64_t>(*this));
 			if (std::holds_alternative<int64_t>(*this))
 				return std::get<int64_t>(*this);
-			throw arger::ArgsTypeException(L"arger::Value is not a signed-number");
+			throw arger::TypeException(L"arger::Value is not a signed-number");
 		}
 		constexpr double real() const {
 			if (std::holds_alternative<double>(*this))
@@ -131,17 +120,17 @@ namespace arger {
 				return double(std::get<uint64_t>(*this));
 			if (std::holds_alternative<int64_t>(*this))
 				return double(std::get<int64_t>(*this));
-			throw arger::ArgsTypeException(L"arger::Value is not a real");
+			throw arger::TypeException(L"arger::Value is not a real");
 		}
 		constexpr bool boolean() const {
 			if (std::holds_alternative<bool>(*this))
 				return std::get<bool>(*this);
-			throw arger::ArgsTypeException(L"arger::Value is not a boolean");
+			throw arger::TypeException(L"arger::Value is not a boolean");
 		}
 		constexpr const std::wstring& str() const {
 			if (std::holds_alternative<std::wstring>(*this))
 				return std::get<std::wstring>(*this);
-			throw arger::ArgsTypeException(L"arger::Value is not a string");
+			throw arger::TypeException(L"arger::Value is not a string");
 		}
 	};
 
@@ -394,10 +383,6 @@ namespace arger {
 		std::wstring fBuildVersionString(const std::wstring& program) const;
 
 	private:
-		template <class... Args>
-		arger::ArgsParsingException fException(Args&&... args) const {
-			return arger::ArgsParsingException(str::Build<std::wstring>(std::forward<Args>(args)...));
-		}
 		void fParseValue(const std::wstring& name, arger::Value& value, const arger::Type& type) const;
 		void fParseOptional(const std::wstring& arg, const std::wstring& payload, bool fullName, ArgState& s);
 		void fVerifyPositional(ArgState& s);
