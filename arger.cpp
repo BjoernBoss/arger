@@ -42,9 +42,8 @@ std::optional<arger::Value> arger::Parsed::positional(size_t index) const {
 }
 
 
-arger::Arguments::Arguments(std::wstring version, std::wstring desc, std::wstring groupName) {
+arger::Arguments::Arguments(std::wstring version, std::wstring groupName) {
 	pVersion = version;
-	pDescription = desc;
 	pGroupName = str::View{ groupName }.lower();
 }
 
@@ -161,7 +160,7 @@ void arger::Arguments::fBuildHelpUsage(const GroupEntry* current, const std::wst
 	if (current != 0) for (size_t i = 0; i < current->positional.size(); ++i) {
 		std::wstring token = current->positional[i].name;
 
-		if (i + 1 >= current->positional.size() && current->catchAll)
+		if (i + 1 >= current->positional.size() && (current->maximum == 0 || i + 1 < current->maximum))
 			token += L"...";
 		if (i >= current->minimum)
 			token = L"[" + token + L"]";
@@ -218,16 +217,10 @@ void arger::Arguments::fBuildHelpAddOptionals(bool required, const GroupEntry* c
 				temp.append(index++ > 0 ? L"|" : L"").append(grp);
 			temp.append(1, L')');
 		}
-		if (it->second.minimum > 0 || it->second.maximum > 0) {
-			temp.append(L" (");
-			if (it->second.minimum > 0)
-				str::BuildTo(temp, L"At least: ", it->second.minimum, L" times");
-			if (it->second.minimum > 0 && it->second.maximum > 0)
-				temp.append(L"; ");
-			if (it->second.maximum > 0)
-				str::BuildTo(temp, L"At most: ", it->second.maximum, L" times");
-			temp.append(1, L')');
-		}
+
+		/* add the custom usage-limits and write the result out */
+		if (it->second.minimum != 1 || it->second.maximum != 1)
+			temp.append(fBuildHelpLimitString(it->second.minimum, it->second.maximum > 1 ? it->second.maximum : 0));
 		fAddHelpString(temp, s, Arguments::NumCharsHelpLeft, 1);
 
 		/* expand all enum descriptions */
@@ -259,6 +252,18 @@ const wchar_t* arger::Arguments::fBuildHelpArgValueString(const arger::Type& typ
 	if (actual == arger::Primitive::real)
 		return L" [real]";
 	return L"";
+}
+std::wstring arger::Arguments::fBuildHelpLimitString(size_t minimum, size_t maximum) const {
+	if (minimum == 0 && maximum == 0)
+		return L"";
+	if (minimum > 0 && maximum > 0) {
+		if (minimum == maximum)
+			return str::Build<std::wstring>(L" [", minimum, L"x]");
+		return str::Build<std::wstring>(L" [", minimum, L" <= _ <= ", maximum, L"]");
+	}
+	if (minimum > 0)
+		return str::Build<std::wstring>(L" [>= ", minimum, L"]");
+	return str::Build<std::wstring>(L" [<= ", maximum, L"]");
 }
 std::wstring arger::Arguments::fBuildHelpString(const GroupEntry* current, const std::wstring& program) const {
 	HelpState out;
@@ -292,7 +297,10 @@ std::wstring arger::Arguments::fBuildHelpString(const GroupEntry* current, const
 		for (size_t i = 0; i < current->positional.size(); ++i) {
 			fAddHelpNewLine(false, out);
 			fAddHelpString(str::Build<std::wstring>("  ", current->positional[i].name, fBuildHelpArgValueString(current->positional[i].type), L" "), out);
-			fAddHelpString(current->positional[i].description, out, Arguments::NumCharsHelpLeft, 1);
+			std::wstring temp = current->positional[i].description;
+			if (i + 1 >= current->positional.size() && i + 1 < current->maximum)
+				temp.append(fBuildHelpLimitString(std::max<intptr_t>(current->minimum - intptr_t(i), 0), current->maximum - i));
+			fAddHelpString(temp, out, Arguments::NumCharsHelpLeft, 1);
 			fBuildHelpAddEnumDescription(current->positional[i].type, out);
 		}
 	}
@@ -444,7 +452,7 @@ void arger::Arguments::fVerifyPositional(ArgState& s) {
 	/* validate the requirements for the positional arguments and parse their values */
 	for (size_t i = 0; i < s.parsed.pPositional.size(); ++i) {
 		/* check if the argument is out of range */
-		if (s.current->positional.empty() || (i >= s.current->positional.size() && !s.current->catchAll)) {
+		if (s.current->positional.empty() || (s.current->maximum > 0 && i >= s.current->maximum)) {
 			if (s.current->name.empty())
 				throw arger::ParsingException(L"Unrecognized argument [", s.parsed.pPositional[i].str(), L"] encountered.");
 			throw arger::ParsingException(L"Unrecognized argument [", s.parsed.pPositional[i].str(), L"] encountered for ", pGroupName, L" [", s.current->name, L"].");
@@ -455,12 +463,13 @@ void arger::Arguments::fVerifyPositional(ArgState& s) {
 		fParseValue(s.current->positional[index].name, s.parsed.pPositional[i], s.current->positional[index].type);
 	}
 
-	/* check if the minimum required number of parameters has not been reached */
-	if (s.parsed.pPositional.size() >= s.current->minimum)
-		return;
-	else if (s.current->name.empty())
-		throw arger::ParsingException(L"Arguments missing.");
-	throw arger::ParsingException(L"Arguments missing for ", pGroupName, L" [", s.current->name, L"].");
+	/* check if the minimum required number of parameters has not been reached (maximum not necessary to be checked, as it will be checked implicitly by the verification-loop) */
+	if (s.parsed.pPositional.size() < s.current->minimum) {
+		size_t index = std::min<size_t>(s.current->positional.size() - 1, s.parsed.pPositional.size());
+		if (s.current->name.empty())
+			throw arger::ParsingException(L"Argument [", s.current->positional[index].name, L"] missing.");
+		throw arger::ParsingException(L"Argument [", s.current->positional[index].name, L"] missing for ", pGroupName, L" [", s.current->name, L"].");
+	}
 }
 void arger::Arguments::fVerifyOptional(ArgState& s) {
 	/* iterate over the optional arguments and verify them */
@@ -472,17 +481,21 @@ void arger::Arguments::fVerifyOptional(ArgState& s) {
 			continue;
 		}
 
-		/* lookup the option (will result in count = 0 if the argument is a flag) */
+		/* check if this is a flag, in which case nothing more needs to be checked */
+		if (opt.second.payload.empty())
+			continue;
+
+		/* lookup the option */
 		auto it = s.parsed.pOptions.find(opt.first);
 		size_t count = (it == s.parsed.pOptions.end() ? 0 : it->second.size());
 
 		/* check if the optional-argument has been found */
 		if (opt.second.minimum > count)
-			throw arger::ParsingException(L"Argument [", opt.second.name, L"] is required at least ", opt.second.minimum, " times.");
+			throw arger::ParsingException(L"Argument [", opt.second.name, L"] missing.");
 
 		/* check if too many instances were found */
 		if (opt.second.maximum > 0 && count > opt.second.maximum)
-			throw arger::ParsingException(L"Argument [", opt.second.name, L"] can only be specified ", opt.second.maximum, " times.");
+			throw arger::ParsingException(L"Argument [", opt.second.name, L"] can at most be specified ", opt.second.maximum, " times.");
 
 		/* verify the values themselves */
 		for (size_t i = 0; i < count; ++i)
@@ -533,10 +546,8 @@ arger::Parsed arger::Arguments::fParseArgs(std::vector<std::wstring> args) {
 			std::wstring payload;
 			size_t end = next.size();
 			for (size_t i = 1; i < next.size(); ++i) {
-				if (std::isalnum(next[i]) || next[i] == '-' || next[i] == L'_')
-					continue;
 				if (next[i] != L'=')
-					break;
+					continue;
 
 				/* check if the payload is well-formed (--name=payload) and split it off */
 				if (i + 1 >= next.size())
@@ -617,6 +628,9 @@ void arger::Arguments::addGlobal(const arger::Configuration& config) {
 	}
 	for (size_t i = 0; i < config.constraints.size(); ++i)
 		pConstraints.push_back(config.constraints[i]);
+
+	if (!config.description.empty())
+		pDescription = config.description;
 }
 void arger::Arguments::addOption(const std::wstring& name, const arger::Configuration& config) {
 	/* validate the general configuration */
@@ -634,20 +648,25 @@ void arger::Arguments::addOption(const std::wstring& name, const arger::Configur
 	entry.name = name;
 	entry.description = config.description;
 	entry.abbreviation = config.abbreviation;
-	if (entry.helpFlag = config.helpFlag)
-		entry.description = L"Print this help menu.";
-	else if (entry.versionFlag = config.versionFlag)
-		entry.description = L"Print the current program version.";
-	else {
-		entry.users = config.users;
-		entry.constraints = config.constraints;
-		if (!config.payload.empty()) {
-			entry.payload = config.payload;
-			entry.type = config.type;
-			entry.minimum = config.minimum;
-			entry.maximum = (config.maximum == 0 ? 0 : std::max<size_t>(config.minimum, config.maximum));
-		}
-	}
+	entry.helpFlag = config.helpFlag;
+	entry.versionFlag = (!entry.helpFlag && config.versionFlag);
+	if (entry.helpFlag || entry.versionFlag)
+		return;
+	entry.users = config.users;
+	entry.constraints = config.constraints;
+
+	/* check if the option is a flag or an option */
+	if (config.payload.empty())
+		return;
+	entry.payload = config.payload;
+	entry.type = config.type;
+
+	/* configure the minimum and maximum constraints */
+	entry.minimum = (config.minimumSet ? config.minimum : 0);
+	if (config.maximumSet)
+		entry.maximum = (config.maximum == 0 ? 0 : std::max<size_t>(entry.minimum, config.maximum));
+	else
+		entry.maximum = std::max<size_t>(entry.minimum, 1);
 }
 void arger::Arguments::addGroup(const std::wstring& name, const arger::Configuration& config) {
 	/* check if the group has already been defined or a group is being added to no-group configuration/empty group added to groups */
@@ -662,8 +681,6 @@ void arger::Arguments::addGroup(const std::wstring& name, const arger::Configura
 	GroupEntry& entry = pGroups.insert({ name, GroupEntry() }).first->second;
 	entry.name = name;
 	entry.description = config.description;
-	entry.minimum = config.minimum;
-	entry.catchAll = config.lastCatchAll;
 	for (size_t i = 0; i < config.help.size(); ++i) {
 		if (!config.help[i].name.empty())
 			entry.helpContent.push_back(config.help[i]);
@@ -676,6 +693,13 @@ void arger::Arguments::addGroup(const std::wstring& name, const arger::Configura
 		entry.positional.push_back(config.positional[i]);
 	}
 	entry.constraints = config.constraints;
+
+	/* configure the minimum/maximum constraints */
+	entry.minimum = ((config.minimumSet && !entry.positional.empty()) ? config.minimum : entry.positional.size());
+	if (config.maximumSet && !entry.positional.empty())
+		entry.maximum = (config.maximum == 0 ? 0 : std::max<size_t>({ entry.minimum, config.maximum, entry.positional.size() }));
+	else
+		entry.maximum = std::max<size_t>(entry.minimum, entry.positional.size());
 }
 
 arger::Parsed arger::Arguments::parse(int argc, const char* const* argv) {

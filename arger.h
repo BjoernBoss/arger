@@ -180,7 +180,8 @@ namespace arger {
 		wchar_t abbreviation = 0;
 		bool helpFlag = false;
 		bool versionFlag = false;
-		bool lastCatchAll = false;
+		bool minimumSet = false;
+		bool maximumSet = false;
 
 	public:
 		template <class RType>
@@ -208,9 +209,9 @@ namespace arger {
 		};
 	}
 
-	namespace conf {
-		/* [options/groups] add description for the group/option */
-		struct Description : public detail::ConfigBase<conf::Description> {
+	namespace config {
+		/* [global/options/groups] add description for the arguments/group/option */
+		struct Description : public detail::ConfigBase<config::Description> {
 			std::wstring desc;
 			constexpr Description(std::wstring desc) : desc{ desc } {}
 			constexpr void apply(arger::Configuration& config) const {
@@ -218,19 +219,25 @@ namespace arger {
 			}
 		};
 
-		/* [options/groups] configure the required counters (minium greater than 0 implies required; maximum of null implies no maximum) */
-		struct Require : public detail::ConfigBase<conf::Require> {
+		/* [options/groups] configure the minimum and maximum required counters (minimum greater than 0 implies required; maximum
+		*	of 0 implies no maximum; default for options is [0; 1], default for groups is number of positional arguments) */
+		struct Require : public detail::ConfigBase<config::Require> {
 			size_t minimum = 0;
 			size_t maximum = 0;
-			constexpr Require(size_t min = 1, size_t max = 0) : minimum{ min }, maximum{ max } {}
+			bool minimumSet = false;
+			bool maximumSet = false;
+			constexpr Require(size_t min = 1) : minimum{ min }, minimumSet{ true } {}
+			constexpr Require(size_t min, size_t max) : minimum{ min }, maximum{ max }, minimumSet{ true }, maximumSet{ true } {}
 			constexpr void apply(arger::Configuration& config) const {
 				config.minimum = minimum;
+				config.minimumSet = minimumSet;
 				config.maximum = maximum;
+				config.maximumSet = maximumSet;
 			}
 		};
 
 		/* [options] add a shortcut single character to reference this option */
-		struct Abbreviation : public detail::ConfigBase<conf::Abbreviation> {
+		struct Abbreviation : public detail::ConfigBase<config::Abbreviation> {
 			wchar_t chr;
 			constexpr Abbreviation(wchar_t c) : chr{ c } {}
 			constexpr void apply(arger::Configuration& config) const {
@@ -239,7 +246,7 @@ namespace arger {
 		};
 
 		/* [options] add a payload requirement to the option */
-		struct Payload : public detail::ConfigBase<conf::Payload> {
+		struct Payload : public detail::ConfigBase<config::Payload> {
 			std::wstring name;
 			arger::Type type;
 			constexpr Payload(std::wstring name, arger::Type type) : name{ name }, type{ type } {}
@@ -249,17 +256,17 @@ namespace arger {
 			}
 		};
 
-		/* [options] limit the option to a subset of defined groups */
-		struct Limit : public detail::ConfigBase<conf::Limit> {
+		/* [options] bind the option to a subset of defined groups */
+		struct Bind : public detail::ConfigBase<config::Bind> {
 			std::set<std::wstring> users;
-			Limit(std::set<std::wstring> names) : users{ names } {}
+			Bind(std::set<std::wstring> groups) : users{ groups } {}
 			void apply(arger::Configuration& config) const {
 				config.users.insert(users.begin(), users.end());
 			}
 		};
 
 		/* [global/options/groups] define callback-constraints to be executed (all globals or) if one or more of the groups/options have been passed in */
-		struct Constraint : public detail::ConfigBase<conf::Constraint> {
+		struct Constraint : public detail::ConfigBase<config::Constraint> {
 			arger::Constraint constraint;
 			Constraint(arger::Constraint con) : constraint{ con } {}
 			constexpr void apply(arger::Configuration& config) const {
@@ -268,7 +275,7 @@ namespace arger {
 		};
 
 		/* [options] define this as the help-menu option-flag */
-		struct HelpFlag : detail::ConfigBase<conf::HelpFlag> {
+		struct HelpFlag : detail::ConfigBase<config::HelpFlag> {
 			constexpr HelpFlag() {}
 			constexpr void apply(arger::Configuration& config) const {
 				config.helpFlag = true;
@@ -276,23 +283,15 @@ namespace arger {
 		};
 
 		/* [options] define this as the version-menu option-flag */
-		struct VersionFlag : detail::ConfigBase<conf::VersionFlag> {
+		struct VersionFlag : detail::ConfigBase<config::VersionFlag> {
 			constexpr VersionFlag() {}
 			constexpr void apply(arger::Configuration& config) const {
 				config.versionFlag = true;
 			}
 		};
 
-		/* [groups] define the last positional argument of the group to catch any remaining incoming arguments */
-		struct LastCatchAll : detail::ConfigBase<conf::LastCatchAll> {
-			constexpr LastCatchAll() {}
-			constexpr void apply(arger::Configuration& config) const {
-				config.lastCatchAll = true;
-			}
-		};
-
 		/* [groups] add another positional argument */
-		struct Positional : detail::ConfigBase<conf::Positional> {
+		struct Positional : detail::ConfigBase<config::Positional> {
 			detail::Positional positional;
 			constexpr Positional(std::wstring name, const arger::Type& type, std::wstring description = L"") : positional{ name, type, description } {}
 			constexpr void apply(arger::Configuration& config) const {
@@ -301,7 +300,7 @@ namespace arger {
 		};
 
 		/* [global/groups] add another help-string to the given group or the global list */
-		struct Help : detail::ConfigBase<conf::Help> {
+		struct Help : detail::ConfigBase<config::Help> {
 			detail::Help help;
 			constexpr Help(std::wstring name, std::wstring description) : help{ name, description } {}
 			constexpr void apply(arger::Configuration& config) const {
@@ -336,7 +335,7 @@ namespace arger {
 			std::vector<detail::Positional> positional;
 			std::vector<arger::Constraint> constraints;
 			size_t minimum = 0;
-			bool catchAll = false;
+			size_t maximum = 0;
 		};
 		struct HelpState {
 			std::wstring buffer;
@@ -365,7 +364,7 @@ namespace arger {
 		bool pNullGroup = false;
 
 	public:
-		Arguments(std::wstring version, std::wstring desc, std::wstring groupName = L"mode");
+		Arguments(std::wstring version, std::wstring groupName = L"mode");
 
 	private:
 		void fAddHelpNewLine(bool emptyLine, HelpState& s) const;
@@ -379,6 +378,7 @@ namespace arger {
 		void fBuildHelpAddOptionals(bool required, const GroupEntry* current, HelpState& s) const;
 		void fBuildHelpAddEnumDescription(const arger::Type& type, HelpState& s) const;
 		const wchar_t* fBuildHelpArgValueString(const arger::Type& type) const;
+		std::wstring fBuildHelpLimitString(size_t minimum, size_t maximum) const;
 		std::wstring fBuildHelpString(const GroupEntry* current, const std::wstring& program) const;
 		std::wstring fBuildVersionString(const std::wstring& program) const;
 
