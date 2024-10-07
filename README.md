@@ -9,7 +9,7 @@ The simple idea is to define the argument-layout using `arger::Arguments`. Its `
 ## Using the library
 This library only consists of two files. Simply clone the repository, ensure that `./repos` is on the path (or at least that `<ustring/ustring.h>` can be resolved), ensure that [arger.cpp](arger.cpp) is included in the compilation, and include `<arger/arger.h>`. The only further requirement is, that the library is compiled using `C++20`.
 
-	$ git clone https://github.com/BjoernBoss/arger.git
+	$ git clone https://github.com/BjoernBoss/arger.git --recursive
 
 ## Configuration Options
 
