@@ -16,32 +16,6 @@ static std::wstring ParseProgramName(const Type* str, bool defOnError) {
 }
 
 
-bool arger::Parsed::flag(const std::wstring& name) const {
-	return (pFlags.count(name) > 0);
-}
-const std::wstring& arger::Parsed::group() const {
-	return pGroup;
-}
-size_t arger::Parsed::options(const std::wstring& name) const {
-	auto it = pOptions.find(name);
-	return (it == pOptions.end() ? 0 : it->second.size());
-}
-std::optional<arger::Value> arger::Parsed::option(const std::wstring& name, size_t index) const {
-	auto it = pOptions.find(name);
-	if (it == pOptions.end() || index >= it->second.size())
-		return {};
-	return it->second[index];
-}
-size_t arger::Parsed::positionals() const {
-	return pPositional.size();
-}
-std::optional<arger::Value> arger::Parsed::positional(size_t index) const {
-	if (index >= pPositional.size())
-		return {};
-	return pPositional[index];
-}
-
-
 arger::Arguments::Arguments(std::wstring version, std::wstring groupName) {
 	pVersion = version;
 	pGroupName = str::View{ groupName }.lower();
