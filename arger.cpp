@@ -12,7 +12,7 @@ static std::wstring ParseProgramName(const Type* str, bool defOnError) {
 
 	if (begin == view.size())
 		return (defOnError ? L"%unknown%" : L"");
-	return str::View{ view.substr(begin) }.to<std::wstring>();
+	return str::wd::To(view.substr(begin));
 }
 
 
@@ -151,7 +151,7 @@ void arger::Arguments::fBuildHelpUsage(const GroupEntry* current, const std::wst
 			hasOptionals = true;
 			continue;
 		}
-		fAddHelpSpacedToken(str::Build<std::wstring>(L"--", opt.second.name, L"=<", opt.second.payload, L">"), s);
+		fAddHelpSpacedToken(str::wd::Build(L"--", opt.second.name, L"=<", opt.second.payload, L">"), s);
 	}
 	if (hasOptionals)
 		fAddHelpSpacedToken(L"[options...]", s);
@@ -236,7 +236,7 @@ void arger::Arguments::fBuildHelpAddEnumDescription(const arger::Type& type, Hel
 	/* add the separate keys */
 	for (const auto& val : std::get<arger::Enum>(type)) {
 		fAddHelpNewLine(false, s);
-		fAddHelpString(str::Build<std::wstring>(L"- [", val.first, L"]: ", val.second), s, Arguments::NumCharsHelpLeft, 1);
+		fAddHelpString(str::wd::Build(L"- [", val.first, L"]: ", val.second), s, Arguments::NumCharsHelpLeft, 1);
 	}
 }
 const wchar_t* arger::Arguments::fBuildHelpArgValueString(const arger::Type& type) const {
@@ -258,12 +258,12 @@ std::wstring arger::Arguments::fBuildHelpLimitString(size_t minimum, size_t maxi
 		return L"";
 	if (minimum > 0 && maximum > 0) {
 		if (minimum == maximum)
-			return str::Build<std::wstring>(L" [", minimum, L"x]");
-		return str::Build<std::wstring>(L" [", minimum, L" <= _ <= ", maximum, L"]");
+			return str::wd::Build(L" [", minimum, L"x]");
+		return str::wd::Build(L" [", minimum, L" <= _ <= ", maximum, L"]");
 	}
 	if (minimum > 0)
-		return str::Build<std::wstring>(L" [>= ", minimum, L"]");
-	return str::Build<std::wstring>(L" [<= ", maximum, L"]");
+		return str::wd::Build(L" [>= ", minimum, L"]");
+	return str::wd::Build(L" [<= ", maximum, L"]");
 }
 std::wstring arger::Arguments::fBuildHelpString(const GroupEntry* current, const std::wstring& program) const {
 	HelpState out;
@@ -291,12 +291,12 @@ std::wstring arger::Arguments::fBuildHelpString(const GroupEntry* current, const
 		if (pNullGroup)
 			fAddHelpString(L"Positional Arguments: ", out);
 		else
-			fAddHelpString(str::Build<std::wstring>(L"Positional Arguments for ", pGroupName, " [", current->name, "]: "), out);
+			fAddHelpString(str::wd::Build(L"Positional Arguments for ", pGroupName, " [", current->name, "]: "), out);
 
 		/* add the positional arguments descriptions (will automatically be sorted by position) */
 		for (size_t i = 0; i < current->positional.size(); ++i) {
 			fAddHelpNewLine(false, out);
-			fAddHelpString(str::Build<std::wstring>("  ", current->positional[i].name, fBuildHelpArgValueString(current->positional[i].type), L" "), out);
+			fAddHelpString(str::wd::Build("  ", current->positional[i].name, fBuildHelpArgValueString(current->positional[i].type), L" "), out);
 			std::wstring temp = current->positional[i].description;
 			if (i + 1 >= current->positional.size() && i + 1 < current->maximum)
 				temp.append(fBuildHelpLimitString(std::max<intptr_t>(current->minimum - intptr_t(i), 0), current->maximum - i));
@@ -310,7 +310,7 @@ std::wstring arger::Arguments::fBuildHelpString(const GroupEntry* current, const
 		fAddHelpNewLine(true, out);
 		for (const auto& group : pGroups) {
 			fAddHelpNewLine(false, out);
-			fAddHelpString(str::Build<std::wstring>(L"  ", group.second.name), out);
+			fAddHelpString(str::wd::Build(L"  ", group.second.name), out);
 			fAddHelpString(group.second.description, out, Arguments::NumCharsHelpLeft, 1);
 		}
 	}
@@ -345,7 +345,7 @@ std::wstring arger::Arguments::fBuildHelpString(const GroupEntry* current, const
 	return out.buffer;
 }
 std::wstring arger::Arguments::fBuildVersionString(const std::wstring& program) const {
-	return str::Build<std::wstring>(program, L" Version [", pVersion, L"]");
+	return str::wd::Build(program, L" Version [", pVersion, L"]");
 }
 
 void arger::Arguments::fParseValue(const std::wstring& name, arger::Value& value, const arger::Type& type) const {
@@ -707,7 +707,7 @@ arger::Parsed arger::Arguments::parse(int argc, const char* const* argv) {
 
 	/* convert the arguments and parse them */
 	for (size_t i = 0; i < argc; ++i)
-		args.push_back(str::View{ argv[i] }.to<std::wstring>());
+		args.push_back(str::wd::To(argv[i]));
 	return fParseArgs(args);
 }
 arger::Parsed arger::Arguments::parse(int argc, const wchar_t* const* argv) {
@@ -721,9 +721,9 @@ arger::Parsed arger::Arguments::parse(int argc, const wchar_t* const* argv) {
 
 std::wstring arger::HelpHint(int argc, const char* const* argv) {
 	std::wstring program = ParseProgramName(argc == 0 ? 0 : argv[0], true);
-	return str::Build<std::wstring>(L"Try '", program, L" --help' for more information.");
+	return str::wd::Build(L"Try '", program, L" --help' for more information.");
 }
 std::wstring arger::HelpHint(int argc, const wchar_t* const* argv) {
 	std::wstring program = ParseProgramName(argc == 0 ? 0 : argv[0], true);
-	return str::Build<std::wstring>(L"Try '", program, L" --help' for more information.");
+	return str::wd::Build(L"Try '", program, L" --help' for more information.");
 }
