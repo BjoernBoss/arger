@@ -159,4 +159,272 @@ namespace arger {
 			}
 		};
 	}
+
+
+
+	struct _Group;
+	struct _Option;
+
+	namespace detail {
+		struct _Description {
+			std::wstring description;
+		};
+		struct _Help {
+		public:
+			struct Entry {
+				std::wstring name;
+				std::wstring text;
+			};
+
+		public:
+			std::vector<Entry> help;
+		};
+		struct _Constraint {
+			std::vector<arger::Constraint> constraint;
+		};
+		struct _Require {
+			struct {
+				std::optional<size_t> minimum;
+				std::optional<size_t> maximum;
+			} require;
+		};
+		struct _Abbreviation {
+			wchar_t abbreviation = 0;
+		};
+		struct _Payload {
+			struct {
+				std::wstring name;
+				arger::Type type;
+			} payload;
+		};
+		struct _Use {
+			std::set<std::wstring> use;
+		};
+		struct _SpecialPurpose {
+			struct {
+				bool help = false;
+				bool version = false;
+			} specialPurpose;
+		};
+		struct _Positionals {
+		public:
+			struct Entry {
+				std::wstring name;
+				arger::Type type;
+				std::wstring description;
+			};
+
+		public:
+			std::vector<Entry> positionals;
+		};
+		struct _Options {
+			std::vector<arger::_Option> options;
+		};
+		struct _Groups {
+			struct {
+				std::vector<arger::_Group> list;
+				std::wstring name;
+			} groups;
+		};
+
+		struct _Config {};
+
+		template <class Base, class Config>
+		constexpr void ApplyConfigs(Base& base, const Config& config) {
+			config.apply(base);
+		}
+		template <class Base, class Config, class... Configs>
+		constexpr void ApplyConfigs(Base& base, const Config& config, const Configs&... configs) {
+			config.apply(base);
+			ApplyConfigs<Base, Configs...>(base, configs...);
+		}
+
+		struct _Arguments :
+			public detail::_Require,
+			public detail::_Positionals,
+			public detail::_Constraint,
+			public detail::_Groups {
+		};
+	}
+
+	template <class Type, class Base>
+	concept IsConfig = std::is_base_of_v<detail::_Config, Type>&& requires(const Type t, Base b) {
+		t.apply(b);
+	};
+
+	struct _Config :
+		public detail::_Description,
+		public detail::_Help,
+		public detail::_Options,
+		public detail::_Arguments {
+	public:
+		std::wstring version;
+
+	public:
+		constexpr _Config(std::wstring version) : version{ version } {}
+		constexpr _Config(std::wstring version, const arger::IsConfig<arger::_Config> auto&... configs) : version{ version } {
+			detail::ApplyConfigs(*this, configs...);
+		}
+	};
+
+	struct _Group :
+		public detail::_Config,
+		public detail::_Description,
+		public detail::_Help,
+		public detail::_Use,
+		public detail::_Arguments {
+	public:
+		std::wstring name;
+		std::wstring id;
+
+	public:
+		_Group(std::wstring name, std::wstring id) : name{ name }, id{ id } {}
+		constexpr _Group(std::wstring name, std::wstring id, const arger::IsConfig<arger::_Group> auto&... configs) : name{ name }, id{ id } {
+			detail::ApplyConfigs(*this, configs...);
+		}
+		constexpr void apply(detail::_Groups& base) const {
+			base.groups.list.push_back(*this);
+		}
+	};
+
+	struct _Option :
+		public detail::_Config,
+		public detail::_Description,
+		public detail::_Constraint,
+		public detail::_Require,
+		public detail::_Abbreviation,
+		public detail::_Payload,
+		public detail::_SpecialPurpose {
+	public:
+		std::wstring name;
+
+	public:
+		_Option(std::wstring name) : name{ name } {}
+		constexpr _Option(std::wstring name, const arger::IsConfig<arger::_Option> auto&... configs) : name{ name } {
+			detail::ApplyConfigs(*this, configs...);
+		}
+		constexpr void apply(detail::_Options& base) const {
+			base.options.push_back(*this);
+		}
+	};
+
+	struct _Description : public detail::_Config {
+	public:
+		std::wstring desc;
+
+	public:
+		constexpr _Description(std::wstring desc) : desc{ desc } {}
+		constexpr void apply(detail::_Description& base) const {
+			base.description = desc;
+		}
+	};
+
+	struct _Help : public detail::_Config {
+	public:
+		detail::_Help::Entry entry;
+
+	public:
+		constexpr _Help(std::wstring name, std::wstring text) : entry{ name, text } {}
+		constexpr void apply(detail::_Help& base) const {
+			base.help.push_back(entry);
+		}
+	};
+
+	struct _Constraint : public detail::_Config {
+	public:
+		arger::Constraint constraint;
+
+	public:
+		_Constraint(arger::Constraint constraint) : constraint{ constraint } {}
+		constexpr void apply(detail::_Constraint& base) const {
+			base.constraint.push_back(constraint);
+		}
+	};
+
+	struct _Require : public detail::_Config {
+	public:
+		size_t minimum = 0;
+		std::optional<size_t> maximum;
+
+	public:
+		constexpr _Require(size_t min = 1) : minimum{ min } {}
+		constexpr _Require(size_t min, size_t max) : minimum{ min }, maximum{ max } {}
+		constexpr void apply(detail::_Require& base) const {
+			base.require.minimum = minimum;
+			base.require.maximum = maximum;
+		}
+	};
+
+	struct _Abbreviation : public detail::_Config {
+	public:
+		wchar_t chr = 0;
+
+	public:
+		constexpr _Abbreviation(wchar_t c) : chr{ c } {}
+		constexpr void apply(detail::_Abbreviation& base) const {
+			base.abbreviation = chr;
+		}
+	};
+
+	struct _Payload : public detail::_Config {
+	public:
+		std::wstring name;
+		arger::Type type;
+
+	public:
+		constexpr _Payload(std::wstring name, arger::Type type) : name{ name }, type{ type } {}
+		constexpr void apply(detail::_Payload& base) const {
+			base.payload.name = name;
+			base.payload.type = type;
+		}
+	};
+
+	struct _Use : public detail::_Config {
+	public:
+		std::set<std::wstring> options;
+
+	public:
+		_Use(const auto&... options) : options{ options... } {}
+		void apply(detail::_Use& base) const {
+			base.use.insert(options.begin(), options.end());
+		}
+	};
+
+	struct _HelpFlag : detail::_Config {
+	public:
+		constexpr _HelpFlag() {}
+		constexpr void apply(detail::_SpecialPurpose& base) const {
+			base.specialPurpose.help = true;
+		}
+	};
+
+	struct _VersionFlag : detail::_Config {
+	public:
+		constexpr _VersionFlag() {}
+		constexpr void apply(detail::_SpecialPurpose& base) const {
+			base.specialPurpose.version = true;
+		}
+	};
+
+	struct _GroupName : detail::_Config {
+	public:
+		std::wstring name;
+
+	public:
+		constexpr _GroupName(std::wstring name) : name{ name } {}
+		constexpr void apply(detail::_Groups& base) const {
+			base.groups.name = name;
+		}
+	};
+
+	struct _Positional : public detail::_Config {
+	public:
+		detail::_Positionals::Entry entry;
+
+	public:
+		constexpr _Positional(std::wstring name, arger::Type type, std::wstring description) : entry{ name, type, description } {}
+		constexpr void apply(detail::_Positionals& base) const {
+			base.positionals.push_back(entry);
+		}
+	};
 }
