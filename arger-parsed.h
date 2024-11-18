@@ -5,12 +5,17 @@
 #include "arger-common.h"
 
 namespace arger {
+	namespace detail {
+		class Parser;
+	}
+
 	/* representation of a single argument value (performs primitive type-conversions when accessing values) */
 	struct Value : private std::variant<uint64_t, int64_t, double, bool, std::wstring> {
 	private:
 		using Parent = std::variant<uint64_t, int64_t, double, bool, std::wstring>;
 
 	public:
+		constexpr Value() : Parent{ 0llu } {}
 		constexpr Value(arger::Value&&) = default;
 		constexpr Value(const arger::Value&) = default;
 		constexpr arger::Value& operator=(arger::Value&&) = default;
@@ -95,18 +100,19 @@ namespace arger {
 	/* represents the parsed results of the arguments */
 	class Parsed {
 		friend class arger::Arguments;
+		friend class detail::Parser;
 	private:
 		std::set<std::wstring> pFlags;
 		std::map<std::wstring, std::vector<arger::Value>> pOptions;
 		std::vector<arger::Value> pPositional;
-		std::wstring pGroup;
+		std::wstring pGroupId;
 
 	public:
 		bool flag(const std::wstring& name) const {
-			return (pFlags.count(name) > 0);
+			return pFlags.contains(name);
 		}
-		const std::wstring& group() const {
-			return pGroup;
+		constexpr const std::wstring& groupId() const {
+			return pGroupId;
 		}
 
 	public:
@@ -120,10 +126,10 @@ namespace arger {
 				return {};
 			return it->second[index];
 		}
-		size_t positionals() const {
+		constexpr size_t positionals() const {
 			return pPositional.size();
 		}
-		std::optional<arger::Value> positional(size_t index) const {
+		constexpr std::optional<arger::Value> positional(size_t index) const {
 			if (index >= pPositional.size())
 				return {};
 			return pPositional[index];

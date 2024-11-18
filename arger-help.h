@@ -18,10 +18,16 @@ namespace arger {
 
 		public:
 			constexpr BaseBuilder(const std::wstring& firstArg, const arger::_Config& config) : pConfig{ config } {
+				if (config.program.empty())
+					throw arger::ConfigException{ L"Program must not be empty." };
+
+				/* check if the first argument contains a valid program-name */
 				std::wstring_view view{ firstArg };
 				size_t begin = view.size();
 				while (begin > 0 && view[begin - 1] != L'/' && view[begin - 1] != L'\\')
 					--begin;
+
+				/* setup the final program name */
 				pProgram = (begin == view.size() ? config.program : std::wstring{ view.substr(begin) });
 			}
 
@@ -187,15 +193,10 @@ namespace arger {
 
 		private:
 			constexpr void fRecGroupUsage(const detail::ValidGroup* selected, const detail::ValidArguments* self) {
-				/* add the tokens of all parents */
-				if (selected != 0)
-					fRecGroupUsage(selected->parent, selected->super);
-
-				/* add the exact name or name of the group */
-				if (selected)
-					fAddSpacedToken(selected->group->name);
-				else
-					fAddSpacedToken(str::wd::Build(L'[', self->groupName, L']'));
+				if (selected == 0)
+					return;
+				fRecGroupUsage(selected->parent, selected->super);
+				fAddSpacedToken(selected->group->name);
 			}
 			constexpr void fRecGroupDescription(const detail::ValidGroup* selected) {
 				/* add the description of all parents */
@@ -207,7 +208,7 @@ namespace arger {
 
 				/* add the newline, description header and description itself */
 				fAddNewLine(true);
-				fAddString(str::wd::Build(str::View{ selected->group->name }.title(), L" description: "));
+				fAddString(str::wd::Build(str::View{ selected->super->groupName }.title(), L": ", selected->group->name));
 				fAddString(selected->group->description, 4);
 			}
 			constexpr void fRecHelpStrings(const detail::ValidGroup* selected) {
@@ -228,6 +229,8 @@ namespace arger {
 
 				/* add the already selected groups and potentially upcoming group-name */
 				fRecGroupUsage(pSelected, topMost);
+				if (topMost->incomplete)
+					fAddSpacedToken(str::wd::Build(L'[', topMost->groupName, L']'));
 
 				/* add all required options (must all consume a payload, as flags are never required) */
 				bool hasOptionals = false;
@@ -245,7 +248,7 @@ namespace arger {
 					fAddSpacedToken(L"[options...]");
 
 				/* add the positional parameter for the topmost argument-object */
-				if (topMost->positionals) {
+				if (!topMost->incomplete) {
 					for (size_t i = 0; i < topMost->args->positionals.size(); ++i) {
 						std::wstring token = topMost->args->positionals[i].name;
 
@@ -286,7 +289,7 @@ namespace arger {
 					/* construct the description text (add the users, if the optional argument is not a
 					*	general purpose argument, and there are still groups available to be selected) */
 					temp = option.option->description;
-					if (option.restricted && option.users.contains(pSelected) && topMost->groups) {
+					if (option.restricted && option.users.contains(pSelected) && topMost->incomplete) {
 						temp += L" (Used for: ";
 						size_t index = 0;
 						for (const auto& group : topMost->sub) {
@@ -321,14 +324,25 @@ namespace arger {
 				/* add the group description */
 				fRecGroupDescription(pSelected);
 
-				/* add the positional arguments or sub-groups */
+				/* add the description of all sub-groups */
 				const detail::ValidArguments* topMost = (pSelected == 0 ? static_cast<const detail::ValidArguments*>(&pConfig) : pSelected);
-				if (topMost->positionals) {
+				if (topMost->incomplete) {
+					fAddNewLine(true);
+					fAddString(str::wd::Build(L"Options for [", topMost->groupName, L"]:"));
+					for (const auto& [name, group] : topMost->sub) {
+						fAddNewLine(false);
+						fAddString(str::wd::Build(L"  ", name));
+						fAddString(group.group->description, detail::NumCharsHelpLeft, 1);
+					}
+				}
+
+				/* add the positional arguments */
+				else if (!topMost->args->positionals.empty()) {
 					fAddNewLine(true);
 					if (pSelected == 0)
 						fAddString(L"Positional Arguments: ");
 					else
-						fAddString(str::wd::Build(L"Positional Arguments for ", topMost->groupName, " [", pSelected->group->name, "]: "));
+						fAddString(str::wd::Build(L"Positional Arguments for ", topMost->super->groupName, " [", pSelected->group->name, "]: "));
 
 					/* add the positional arguments descriptions (will automatically be sorted by position) */
 					for (size_t i = 0; i < topMost->args->positionals.size(); ++i) {
@@ -347,16 +361,6 @@ namespace arger {
 					}
 				}
 
-				/* add the description of all sub-groups */
-				else {
-					fAddNewLine(true);
-					fAddString(str::wd::Build(L"Options for [", topMost->groupName, L"]:"));
-					for (const auto& [name, group] : topMost->sub) {
-						fAddNewLine(false);
-						fAddString(str::wd::Build(L"  ", name));
-						fAddString(group.group->description, detail::NumCharsHelpLeft, 1);
-					}
-				}
 
 				/* check if there are optional/required arguments */
 				bool optArgs = false, reqArgs = false;

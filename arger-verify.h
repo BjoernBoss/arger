@@ -15,8 +15,7 @@ namespace arger::detail {
 		std::wstring groupName;
 		size_t minimum = 0;
 		size_t maximum = 0;
-		bool groups = false;
-		bool positionals = false;
+		bool incomplete = false;
 		bool nestedPositionals = false;
 	};
 	struct ValidOption {
@@ -39,7 +38,7 @@ namespace arger::detail {
 		std::wstring_view id;
 	};
 
-	inline void ValidateArguments(const detail::_Arguments& arguments, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidGroup* self, const detail::ValidArguments* super);
+	inline void ValidateArguments(const detail::_Arguments& arguments, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidGroup* self, detail::ValidArguments* super);
 	inline constexpr void ValidateHelp(const detail::_Help& help, const std::wstring& who) {
 		for (size_t i = 0; i < help.help.size(); ++i) {
 			if (help.help[i].name.empty() || help.help[i].text.empty())
@@ -53,6 +52,8 @@ namespace arger::detail {
 	inline void ValidateOption(const arger::_Option& option, detail::ValidConfig& state) {
 		if (option.name.empty())
 			throw arger::ConfigException{ L"Option name must not be empty." };
+		if (option.name.starts_with(L"-"))
+			throw arger::ConfigException{ L"Option name must not start with a hypen." };
 
 		/* check if the name is unique */
 		if (state.options.contains(option.name))
@@ -83,29 +84,33 @@ namespace arger::detail {
 		else
 			entry.maximum = std::max<size_t>(entry.minimum, 1);
 	}
-	inline void ValidateGroup(const arger::_Group& group, detail::ValidConfig& state, detail::ValidGroup* parent) {
+	inline void ValidateGroup(const arger::_Group& group, detail::ValidConfig& state, detail::ValidGroup* parent, detail::ValidArguments* super) {
 		if (group.name.empty())
 			throw arger::ConfigException{ L"Group name must not be empty." };
+		if (group.name.starts_with(L"-"))
+			throw arger::ConfigException{ L"Group name must not start with a hypen." };
 		const std::wstring& id = (group.id.empty() ? group.name : group.id);
 
 		/* validate the name's uniqueness */
-		std::map<std::wstring, detail::ValidGroup>& super = (parent == 0 ? static_cast<detail::ValidArguments&>(state) : *parent).sub;
-		if (super.contains(group.name))
+		if (super->sub.contains(group.name))
 			throw arger::ConfigException{ L"Group with name [", group.name, L"] already exists for given groups-set." };
-		detail::ValidGroup& entry = super[group.name];
+		detail::ValidGroup& entry = super->sub[group.name];
 		entry.group = &group;
 		entry.id = id;
 		entry.parent = parent;
+		entry.super = super;
 
 		/* validate the arguments */
-		detail::ValidateArguments(group, state, entry, &entry, &entry);
+		detail::ValidateArguments(group, state, entry, &entry, super);
 
 		/* check if the group-id is unique (only necessary if it does not contain sub-groups itself) */
-		if (!entry.groups) {
+		if (!entry.incomplete) {
 			if (state.groupIds.contains(id))
 				throw arger::ConfigException{ L"Group with id [", id, L"] already exists." };
 			state.groupIds[id] = &entry;
 		}
+		else
+			entry.id = {};
 
 		/* validate the usages and register this group and all parents to them */
 		for (const auto& option : entry.group->use) {
@@ -131,12 +136,10 @@ namespace arger::detail {
 		/* validate the help attributes */
 		detail::ValidateHelp(group, str::wd::Build(L"group [", id, L"]"));
 	}
-	inline void ValidateArguments(const detail::_Arguments& arguments, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidGroup* self, const detail::ValidArguments* super) {
+	inline void ValidateArguments(const detail::_Arguments& arguments, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidGroup* self, detail::ValidArguments* super) {
 		entry.args = &arguments;
-		entry.groups = !arguments.groups.list.empty();
-		entry.positionals = !arguments.positionals.empty();
-		entry.super = super;
-		entry.nestedPositionals = entry.positionals;
+		entry.incomplete = !arguments.groups.list.empty();
+		entry.nestedPositionals = !arguments.positionals.empty();
 
 		/* validate and configure the group name */
 		if (arguments.groups.name.empty())
@@ -145,21 +148,21 @@ namespace arger::detail {
 			entry.groupName = str::View{ arguments.groups.name }.lower();
 
 		/* validate the groups */
-		if (entry.positionals && entry.groups) {
+		if (entry.incomplete && !arguments.positionals.empty()) {
 			if (self == 0)
 				throw arger::ConfigException{ L"Arguments cannot have positional arguments and sub-groups." };
 			throw arger::ConfigException{ L"Group [", self->id, L"] cannot have positional arguments and sub-groups." };
 		}
-		if (entry.groups) {
+		if (entry.incomplete) {
 			for (const auto& sub : arguments.groups.list)
-				detail::ValidateGroup(sub, state, self);
+				detail::ValidateGroup(sub, state, self, (self == 0 ? super : self));
 			for (const auto& sub : entry.sub)
 				entry.nestedPositionals = (entry.nestedPositionals || sub.second.nestedPositionals);
 			return;
 		}
 
 		/* configure the limits */
-		entry.minimum = ((arguments.require.minimum.has_value() && entry.positionals) ? *arguments.require.minimum : arguments.positionals.size());
+		entry.minimum = ((arguments.require.minimum.has_value() && !arguments.positionals.empty()) ? *arguments.require.minimum : arguments.positionals.size());
 		if (arguments.require.maximum.has_value())
 			entry.maximum = (*arguments.require.maximum == 0 ? 0 : std::max<size_t>({ entry.minimum, *arguments.require.maximum, arguments.positionals.size() }));
 		else

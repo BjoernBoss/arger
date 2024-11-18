@@ -180,7 +180,7 @@ namespace arger {
 			std::vector<Entry> help;
 		};
 		struct _Constraint {
-			std::vector<arger::Constraint> constraint;
+			std::vector<arger::Constraint> constraints;
 		};
 		struct _Require {
 			struct {
@@ -338,7 +338,7 @@ namespace arger {
 	public:
 		_Constraint(arger::Constraint constraint) : constraint{ constraint } {}
 		constexpr void apply(detail::_Constraint& base) const {
-			base.constraint.push_back(constraint);
+			base.constraints.push_back(constraint);
 		}
 	};
 
