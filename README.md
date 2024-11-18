@@ -257,7 +257,7 @@ Options for [test-setting]:
                                  description
 
 Required arguments:
-  -p, --path=<file-path>        This is some path option [>= 1]
+  -p, --path=<file-path>        This is some path option (Used for: get|set)
 
 Optional arguments:
   -h, --help                    Print this help menu.
