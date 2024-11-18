@@ -148,8 +148,8 @@ namespace arger {
 				if (pParsed.pPositional.size() < topMost->minimum) {
 					size_t index = std::min<size_t>(topMost->args->positionals.size() - 1, pParsed.pPositional.size());
 					if (pSelected == 0)
-						throw arger::ParsingException{ L"Argument [", topMost->args->positionals[index].name, L"] missing." };
-					throw arger::ParsingException{ L"Argument [", topMost->args->positionals[index].name, L"] missing for ", topMost->super->groupName, L" [", pSelected->group->name, L"]." };
+						throw arger::ParsingException{ L"Argument [", topMost->args->positionals[index].name, L"] is missing." };
+					throw arger::ParsingException{ L"Argument [", topMost->args->positionals[index].name, L"] is missing for ", topMost->super->groupName, L" [", pSelected->group->name, L"]." };
 				}
 			}
 			void fVerifyOptional() {
@@ -160,7 +160,7 @@ namespace arger {
 					/* check if the current group is not a user of the optional argument (restricted can
 					*	only be true if groups exist and the null-group is contained at all times) */
 					if (option.restricted && !option.users.contains(pSelected)) {
-						if (option.payload ? pParsed.pFlags.contains(name) : pParsed.pOptions.contains(name))
+						if ((option.payload ? pParsed.pOptions.contains(name) : pParsed.pFlags.contains(name)))
 							throw arger::ParsingException{ L"Argument [", name, L"] not meant for ", topMost->super->groupName, L" [", pSelected->group->name, L"]." };
 						continue;
 					}
@@ -175,7 +175,7 @@ namespace arger {
 
 					/* check if the optional-argument has been found */
 					if (option.minimum > count)
-						throw arger::ParsingException{ L"Argument [", name, L"] missing." };
+						throw arger::ParsingException{ L"Argument [", name, L"] is missing." };
 
 					/* check if too many instances were found */
 					if (option.maximum > 0 && count > option.maximum)
