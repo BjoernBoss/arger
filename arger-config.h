@@ -95,6 +95,7 @@ namespace arger {
 		t.apply(b);
 	};
 
+	/* general arger-configuration to be parsed */
 	struct Config :
 		public detail::Description,
 		public detail::Help,
@@ -111,6 +112,8 @@ namespace arger {
 		}
 	};
 
+	/* general sub-group of options for a configuration/group
+	*	 Note: can only have sub-groups or positional arguments */
 	struct Group :
 		public detail::Config,
 		public detail::Description,
@@ -131,6 +134,7 @@ namespace arger {
 		}
 	};
 
+	/* general optional flag/payload */
 	struct Option :
 		public detail::Config,
 		public detail::Description,
@@ -152,6 +156,7 @@ namespace arger {
 		}
 	};
 
+	/* description to the corresponding object */
 	struct Description : public detail::Config {
 	public:
 		std::wstring desc;
@@ -163,6 +168,7 @@ namespace arger {
 		}
 	};
 
+	/* add help-string to the corresponding object */
 	struct Help : public detail::Config {
 	public:
 		detail::Help::Entry entry;
@@ -174,6 +180,7 @@ namespace arger {
 		}
 	};
 
+	/* add a constraint to be executed if the corresponding object is selected via the arguments */
 	struct Constraint : public detail::Config {
 	public:
 		arger::Checker constraint;
@@ -185,6 +192,10 @@ namespace arger {
 		}
 	};
 
+	/* add a minimum/maximum requirement [maximum=0 implies no maximum]
+	*	- [Option]: are only acknowledged for non-flags with a default of [min: 0, max: 1]
+	*	- [Otherwise]: constrains the number of positional arguments with a default of [min = max = number-of-positionals];
+	*		if greater than number of positional arguments, last type is used as catch-all */
 	struct Require : public detail::Config {
 	public:
 		size_t minimum = 0;
@@ -199,6 +210,7 @@ namespace arger {
 		}
 	};
 
+	/* add an abbreviation character for an option to allow it to be accessible as, for example, -x */
 	struct Abbreviation : public detail::Config {
 	public:
 		wchar_t chr = 0;
@@ -210,6 +222,7 @@ namespace arger {
 		}
 	};
 
+	/* add a payload to an option with a given name and of a given type */
 	struct Payload : public detail::Config {
 	public:
 		std::wstring name;
@@ -223,6 +236,7 @@ namespace arger {
 		}
 	};
 
+	/* add usage-constraints to let the corresponding options only be used by groups, which add them as usage (by default every group/argument can use all options) */
 	struct Use : public detail::Config {
 	public:
 		std::set<std::wstring> options;
@@ -234,6 +248,7 @@ namespace arger {
 		}
 	};
 
+	/* mark this flag as being the help-indicating flag, which triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
 	struct HelpFlag : detail::Config {
 	public:
 		constexpr HelpFlag() {}
@@ -242,6 +257,7 @@ namespace arger {
 		}
 	};
 
+	/* mark this flag as being the version-indicating flag, which triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
 	struct VersionFlag : detail::Config {
 	public:
 		constexpr VersionFlag() {}
@@ -250,6 +266,7 @@ namespace arger {
 		}
 	};
 
+	/* setup the descriptive name for the sub-groups to be used (the default name is 'mode') */
 	struct GroupName : detail::Config {
 	public:
 		std::wstring name;
@@ -261,6 +278,8 @@ namespace arger {
 		}
 	};
 
+	/* add an additional positional argument to the configuration/group using the given name, type, and description
+	*	 Note: can only have sub-groups or positional arguments */
 	struct Positional : public detail::Config {
 	public:
 		detail::Positionals::Entry entry;

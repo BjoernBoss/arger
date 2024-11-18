@@ -72,6 +72,8 @@ namespace arger::detail {
 		/* validate the special-purpose flags */
 		if (option.specialPurpose.help && option.specialPurpose.version)
 			throw arger::ConfigException{ L"Option [", option.name, L"] cannot be help and version special purpose at once." };
+		if ((option.specialPurpose.help || option.specialPurpose.version) && entry.payload)
+			throw arger::ConfigException{ L"Option [", option.name, L"] cannot be a special purpose flag and carry a payload." };
 
 		/* validate the payload */
 		if (entry.payload)
