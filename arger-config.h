@@ -258,11 +258,12 @@ namespace arger {
 		public detail::_Options,
 		public detail::_Arguments {
 	public:
+		std::wstring program;
 		std::wstring version;
 
 	public:
-		constexpr _Config(std::wstring version) : version{ version } {}
-		constexpr _Config(std::wstring version, const arger::IsConfig<arger::_Config> auto&... configs) : version{ version } {
+		constexpr _Config(std::wstring program, std::wstring version) : program{ program }, version{ version } {}
+		constexpr _Config(std::wstring program, std::wstring version, const arger::IsConfig<arger::_Config> auto&... configs) : program{ program }, version{ version } {
 			detail::ApplyConfigs(*this, configs...);
 		}
 	};
