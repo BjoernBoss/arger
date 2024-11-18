@@ -4,6 +4,7 @@
 
 #include "arger-parsed.h"
 #include "arger-config.h"
+#include "arger-verify.h"
 
 namespace arger {
 	class Arguments {
@@ -95,6 +96,31 @@ namespace arger {
 		arger::Parsed parse(int argc, const char* const* argv);
 		arger::Parsed parse(int argc, const wchar_t* const* argv);
 	};
+
+	static inline arger::Parsed Parse(int argc, const char* const* argv, const arger::_Config& config) {
+		std::vector<std::wstring> args;
+
+		/* validate the configuration */
+		detail::ValidState state;
+		detail::ValidateConfig(config, state);
+
+		/* convert the arguments and parse them */
+		for (size_t i = 0; i < argc; ++i)
+			args.push_back(str::wd::To(argv[i]));
+		return {};
+	}
+	static inline arger::Parsed Parse(int argc, const wchar_t* const* argv, const arger::_Config& config) {
+		std::vector<std::wstring> args;
+
+		/* validate the configuration */
+		detail::ValidState state;
+		detail::ValidateConfig(config, state);
+
+		/* convert the arguments and parse them */
+		for (size_t i = 0; i < argc; ++i)
+			args.emplace_back(argv[i]);
+		return {};
+	}
 
 	std::wstring HelpHint(int argc, const char* const* argv);
 	std::wstring HelpHint(int argc, const wchar_t* const* argv);

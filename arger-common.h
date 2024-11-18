@@ -28,6 +28,12 @@ namespace arger {
 
 	using Constraint = std::function<std::wstring(const arger::Parsed&)>;
 
+	/* exception thrown when a malformed argument-configuration is used */
+	struct ConfigException : public str::BuildException {
+		template <class... Args>
+		constexpr ConfigException(const Args&... args) : str::BuildException{ args... } {}
+	};
+
 	/* exception thrown when accessing an arger::Value as a certain type, which it is not */
 	struct TypeException : public str::BuildException {
 		template <class... Args>
