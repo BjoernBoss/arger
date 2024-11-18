@@ -26,7 +26,7 @@ namespace arger {
 	using Enum = std::map<std::wstring, std::wstring>;
 	using Type = std::variant<arger::Primitive, arger::Enum>;
 
-	using Constraint = std::function<std::wstring(const arger::Parsed&)>;
+	using Checker = std::function<std::wstring(const arger::Parsed&)>;
 
 	/* exception thrown when a malformed argument-configuration is used */
 	struct ConfigException : public str::BuildException {

@@ -13,11 +13,11 @@ namespace arger {
 
 		class BaseBuilder {
 		private:
-			const arger::_Config& pConfig;
+			const arger::Config& pConfig;
 			std::wstring pProgram;
 
 		public:
-			constexpr BaseBuilder(const std::wstring& firstArg, const arger::_Config& config) : pConfig{ config } {
+			constexpr BaseBuilder(const std::wstring& firstArg, const arger::Config& config) : pConfig{ config } {
 				if (config.program.empty())
 					throw arger::ConfigException{ L"Program must not be empty." };
 
@@ -182,7 +182,7 @@ namespace arger {
 					return L" [real]";
 				return L"";
 			}
-			constexpr void fHelpContent(const detail::_Help& help) {
+			constexpr void fHelpContent(const detail::Help& help) {
 				/* iterate over the help-content and append it to the help-buffer */
 				for (size_t i = 0; i < help.help.size(); ++i) {
 					fAddNewLine(true);
@@ -346,7 +346,7 @@ namespace arger {
 
 					/* add the positional arguments descriptions (will automatically be sorted by position) */
 					for (size_t i = 0; i < topMost->args->positionals.size(); ++i) {
-						const detail::_Positionals::Entry& positional = topMost->args->positionals[i];
+						const detail::Positionals::Entry& positional = topMost->args->positionals[i];
 						fAddNewLine(false);
 
 						/* add the name and corresponding type and description */
@@ -395,10 +395,10 @@ namespace arger {
 		};
 	}
 
-	inline constexpr std::wstring HelpHint(int argc, const char* const* argv, const arger::_Config& config) {
+	inline constexpr std::wstring HelpHint(int argc, const char* const* argv, const arger::Config& config) {
 		return detail::BaseBuilder{ str::wd::To(argc == 0 ? "" : argv[0]), config }.buildHelpHintString();
 	}
-	inline constexpr std::wstring HelpHint(int argc, const wchar_t* const* argv, const arger::_Config& config) {
+	inline constexpr std::wstring HelpHint(int argc, const wchar_t* const* argv, const arger::Config& config) {
 		return detail::BaseBuilder{ (argc == 0 ? L"" : argv[0]), config }.buildHelpHintString();
 	}
 }

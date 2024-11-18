@@ -143,12 +143,13 @@ namespace arger {
 					fParseValue(topMost->args->positionals[index].name, pParsed.pPositional[i], topMost->args->positionals[index].type);
 				}
 
-				/* check if the minimum required number of parameters has not been reached (maximum not necessary to be checked, as it will be checked implicitly by the verification-loop) */
-				if (pParsed.pPositional.size() < pSelected->minimum) {
-					size_t index = std::min<size_t>(pSelected->group->positionals.size() - 1, pParsed.pPositional.size());
+				/* check if the minimum required number of parameters has not been reached
+				*	(maximum not necessary to be checked, as it will be checked implicitly by the verification-loop) */
+				if (pParsed.pPositional.size() < topMost->minimum) {
+					size_t index = std::min<size_t>(topMost->args->positionals.size() - 1, pParsed.pPositional.size());
 					if (pSelected == 0)
-						throw arger::ParsingException{ L"Argument [", pSelected->group->positionals[index].name, L"] missing." };
-					throw arger::ParsingException{ L"Argument [", pSelected->group->positionals[index].name, L"] missing for ", topMost->super->groupName, L" [", pSelected->group->name, L"]." };
+						throw arger::ParsingException{ L"Argument [", topMost->args->positionals[index].name, L"] missing." };
+					throw arger::ParsingException{ L"Argument [", topMost->args->positionals[index].name, L"] missing for ", topMost->super->groupName, L" [", pSelected->group->name, L"]." };
 				}
 			}
 			void fVerifyOptional() {
@@ -198,7 +199,7 @@ namespace arger {
 			}
 
 		public:
-			arger::Parsed parse(const arger::_Config& config) {
+			arger::Parsed parse(const arger::Config& config) {
 				const detail::ValidArguments* topMost = static_cast<const detail::ValidArguments*>(&pConfig);
 
 				/* validate and pre-process the configuration */
@@ -300,7 +301,7 @@ namespace arger {
 		};
 	}
 
-	inline arger::Parsed Parse(int argc, const char* const* argv, const arger::_Config& config) {
+	inline arger::Parsed Parse(int argc, const char* const* argv, const arger::Config& config) {
 		/* convert the arguments */
 		std::vector<std::wstring> args;
 		for (size_t i = 0; i < argc; ++i)
@@ -309,7 +310,7 @@ namespace arger {
 		/* parse the actual arguments based on the configuration */
 		return detail::Parser{ args }.parse(config);
 	}
-	inline arger::Parsed Parse(int argc, const wchar_t* const* argv, const arger::_Config& config) {
+	inline arger::Parsed Parse(int argc, const wchar_t* const* argv, const arger::Config& config) {
 		/* convert the arguments */
 		std::vector<std::wstring> args;
 		for (size_t i = 0; i < argc; ++i)
