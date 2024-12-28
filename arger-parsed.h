@@ -15,11 +15,11 @@ namespace arger {
 		using Parent = std::variant<uint64_t, int64_t, double, bool, std::wstring>;
 
 	public:
-		constexpr Value() : Parent{ 0llu } {}
-		constexpr Value(arger::Value&&) = default;
-		constexpr Value(const arger::Value&) = default;
-		constexpr arger::Value& operator=(arger::Value&&) = default;
-		constexpr arger::Value& operator=(const arger::Value&) = default;
+		Value() : Parent{ 0llu } {}
+		Value(arger::Value&&) = default;
+		Value(const arger::Value&) = default;
+		arger::Value& operator=(arger::Value&&) = default;
+		arger::Value& operator=(const arger::Value&) = default;
 
 	public:
 		constexpr Value(uint64_t v) : Parent{ v } {}
@@ -129,7 +129,7 @@ namespace arger {
 		constexpr size_t positionals() const {
 			return pPositional.size();
 		}
-		constexpr std::optional<arger::Value> positional(size_t index) const {
+		std::optional<arger::Value> positional(size_t index) const {
 			if (index >= pPositional.size())
 				return {};
 			return pPositional[index];

@@ -106,10 +106,8 @@ namespace arger {
 		std::wstring version;
 
 	public:
-		constexpr Config(std::wstring program, std::wstring version) : program{ program }, version{ version } {}
-		constexpr Config(std::wstring program, std::wstring version, const arger::IsConfig<arger::Config> auto&... configs) : program{ program }, version{ version } {
-			detail::ApplyConfigs(*this, configs...);
-		}
+		constexpr Config(std::wstring program, std::wstring version);
+		constexpr Config(std::wstring program, std::wstring version, const arger::IsConfig<arger::Config> auto&... configs);
 	};
 
 	/* general sub-group of options for a configuration/group
@@ -125,10 +123,8 @@ namespace arger {
 		std::wstring id;
 
 	public:
-		Group(std::wstring name, std::wstring id) : name{ name }, id{ id } {}
-		constexpr Group(std::wstring name, std::wstring id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ id } {
-			detail::ApplyConfigs(*this, configs...);
-		}
+		Group(std::wstring name, std::wstring id);
+		constexpr Group(std::wstring name, std::wstring id, const arger::IsConfig<arger::Group> auto&... configs);
 		constexpr void apply(detail::Groups& base) const {
 			base.groups.list.push_back(*this);
 		}
@@ -147,14 +143,27 @@ namespace arger {
 		std::wstring name;
 
 	public:
-		Option(std::wstring name) : name{ name } {}
-		constexpr Option(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs) : name{ name } {
-			detail::ApplyConfigs(*this, configs...);
-		}
+		Option(std::wstring name);
+		constexpr Option(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs);
 		constexpr void apply(detail::Options& base) const {
 			base.options.push_back(*this);
 		}
 	};
+
+	constexpr arger::Config::Config(std::wstring program, std::wstring version) : program{ program }, version{ version } {}
+	constexpr arger::Config::Config(std::wstring program, std::wstring version, const arger::IsConfig<arger::Config> auto&... configs) : program{ program }, version{ version } {
+		detail::ApplyConfigs(*this, configs...);
+	}
+
+	arger::Group::Group(std::wstring name, std::wstring id) : name{ name }, id{ id } {}
+	constexpr arger::Group::Group(std::wstring name, std::wstring id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ id } {
+		detail::ApplyConfigs(*this, configs...);
+	}
+
+	arger::Option::Option(std::wstring name) : name{ name } {}
+	constexpr arger::Option::Option(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs) : name{ name } {
+		detail::ApplyConfigs(*this, configs...);
+	}
 
 	/* description to the corresponding object */
 	struct Description : public detail::Config {
@@ -229,7 +238,7 @@ namespace arger {
 		arger::Type type;
 
 	public:
-		constexpr Payload(std::wstring name, arger::Type type) : name{ name }, type{ type } {}
+		Payload(std::wstring name, arger::Type type) : name{ name }, type{ type } {}
 		constexpr void apply(detail::Payload& base) const {
 			base.payload.name = name;
 			base.payload.type = type;
@@ -285,7 +294,7 @@ namespace arger {
 		detail::Positionals::Entry entry;
 
 	public:
-		constexpr Positional(std::wstring name, arger::Type type, std::wstring description) : entry{ name, type, description } {}
+		Positional(std::wstring name, arger::Type type, std::wstring description) : entry{ name, type, description } {}
 		constexpr void apply(detail::Positionals& base) const {
 			base.positionals.push_back(entry);
 		}

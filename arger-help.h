@@ -157,7 +157,7 @@ namespace arger {
 					return str::wd::Build(L" [>= ", minimum, L"]");
 				return str::wd::Build(L" [<= ", maximum, L"]");
 			}
-			constexpr void fEnumDescription(const arger::Type& type) {
+			void fEnumDescription(const arger::Type& type) {
 				/* check if this is an enum to be added */
 				if (!std::holds_alternative<arger::Enum>(type))
 					return;
