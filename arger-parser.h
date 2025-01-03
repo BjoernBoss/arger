@@ -11,7 +11,7 @@ namespace arger {
 	namespace detail {
 		class Parser {
 		private:
-			std::vector<std::wstring> pArgs;
+			const std::vector<std::wstring>& pArgs;
 			detail::ValidConfig pConfig;
 			const detail::ValidGroup* pSelected = 0;
 			arger::Parsed pParsed;
@@ -22,7 +22,7 @@ namespace arger {
 			bool pPositionalLocked = false;
 
 		public:
-			Parser(std::vector<std::wstring> args) : pArgs{ args } {}
+			Parser(const std::vector<std::wstring>& args) : pArgs{ args } {}
 
 		private:
 			void fParseOptional(const std::wstring& arg, const std::wstring& payload, bool fullName, bool hasPayload) {
@@ -351,41 +351,13 @@ namespace arger {
 		};
 	}
 
-	inline arger::Parsed Parse(int argc, const char* const* argv, const arger::Config& config) {
-		/* convert the arguments */
-		std::vector<std::wstring> args;
-		for (size_t i = 0; i < argc; ++i)
-			args.push_back(str::wd::To(argv[i]));
-
-		/* parse the actual arguments based on the configuration */
-		return detail::Parser{ args }.parse(config, false);
-	}
-	inline arger::Parsed Parse(int argc, const wchar_t* const* argv, const arger::Config& config) {
-		/* convert the arguments */
-		std::vector<std::wstring> args;
-		for (size_t i = 0; i < argc; ++i)
-			args.emplace_back(argv[i]);
-
-		/* parse the actual arguments based on the configuration */
+	/* parse the arguments as standard program arguments */
+	inline arger::Parsed Parse(const std::vector<std::wstring>& args, const arger::Config& config) {
 		return detail::Parser{ args }.parse(config, false);
 	}
 
-	inline arger::Parsed Menu(int argc, const char* const* argv, const arger::Config& config) {
-		/* convert the arguments */
-		std::vector<std::wstring> args;
-		for (size_t i = 0; i < argc; ++i)
-			args.push_back(str::wd::To(argv[i]));
-
-		/* parse the actual arguments based on the configuration */
-		return detail::Parser{ args }.parse(config, true);
-	}
-	inline arger::Parsed Menu(int argc, const wchar_t* const* argv, const arger::Config& config) {
-		/* convert the arguments */
-		std::vector<std::wstring> args;
-		for (size_t i = 0; i < argc; ++i)
-			args.emplace_back(argv[i]);
-
-		/* parse the actual arguments based on the configuration */
+	/* parse the arguments as menu-input arguments */
+	inline arger::Parsed Menu(const std::vector<std::wstring>& args, const arger::Config& config) {
 		return detail::Parser{ args }.parse(config, true);
 	}
 }

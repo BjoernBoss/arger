@@ -429,10 +429,8 @@ namespace arger {
 		};
 	}
 
-	inline constexpr std::wstring HelpHint(int argc, const char* const* argv, const arger::Config& config) {
-		return detail::BaseBuilder{ str::wd::To(argc == 0 ? "" : argv[0]), config, false }.buildHelpHintString();
-	}
-	inline constexpr std::wstring HelpHint(int argc, const wchar_t* const* argv, const arger::Config& config) {
-		return detail::BaseBuilder{ (argc == 0 ? L"" : argv[0]), config, false }.buildHelpHintString();
+	/* construct help-hint suggesting to use '--help' */
+	inline constexpr std::wstring HelpHint(const std::vector<std::wstring>& args, const arger::Config& config) {
+		return detail::BaseBuilder{ (args.empty() ? L"" : args[0]), config, false }.buildHelpHintString();
 	}
 }
