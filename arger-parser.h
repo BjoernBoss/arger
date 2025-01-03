@@ -97,9 +97,9 @@ namespace arger {
 					/* check if this is a flag and mark it as seen and check if its a special purpose argument */
 					if (!entry->payload) {
 						pParsed.pFlags.insert(entry->option->name);
-						if (entry->option->specialPurpose.help)
+						if (entry->option->flagHelp)
 							pPrintHelp = true;
-						else if (entry->option->specialPurpose.version)
+						else if (entry->option->flagVersion)
 							pPrintVersion = true;
 						continue;
 					}
@@ -199,14 +199,14 @@ namespace arger {
 			}
 
 		public:
-			arger::Parsed parse(const arger::Config& config) {
+			arger::Parsed parse(const arger::Config& config, bool menu) {
 				const detail::ValidArguments* topMost = static_cast<const detail::ValidArguments*>(&pConfig);
 
 				/* validate and pre-process the configuration */
-				detail::ValidateConfig(config, pConfig);
+				detail::ValidateConfig(config, pConfig, menu);
 
-				/* parse the program name */
-				detail::BaseBuilder base{ pArgs.empty() ? L"" : pArgs[pIndex++], config };
+				/* extract the program name */
+				detail::BaseBuilder base{ pArgs.empty() || menu ? L"" : pArgs[pIndex++], config, menu };
 
 				/* iterate over the arguments and parse them based on the definitions */
 				size_t dirtyGroup = pArgs.size();
@@ -260,11 +260,25 @@ namespace arger {
 					pParsed.pPositional.emplace_back(arger::Value{ next });
 				}
 
-				/* check if the version or help should be printed */
+				/* check if the top-most group is a help special purpose argument,
+				*	in which case the selection will also be reset (must be only one layer low) */
+				if (pSelected != 0) {
+					if (pSelected->group->flagHelp) {
+						pPrintHelp = true;
+						pSelected = 0;
+					}
+					else if (pSelected->group->flagVersion) {
+						pPrintVersion = true;
+						pSelected = 0;
+					}
+				}
+
+				/* check if the help or version should be printed */
+				std::wstring print = (pPrintVersion ? base.buildVersionString() : L"");
 				if (pPrintHelp)
-					throw arger::PrintMessage{ detail::HelpBuilder{ base, pConfig, pSelected }.buildHelpString() };
-				if (pPrintVersion)
-					throw arger::PrintMessage{ base.buildVersionString() };
+					print.append(print.empty() ? L"" : L"\n\n").append(detail::HelpBuilder{ base, pConfig, pSelected }.buildHelpString(menu));
+				if (!print.empty())
+					throw arger::PrintMessage{ print };
 
 				/* verify the group selection */
 				if (dirtyGroup < pArgs.size())
@@ -308,7 +322,7 @@ namespace arger {
 			args.push_back(str::wd::To(argv[i]));
 
 		/* parse the actual arguments based on the configuration */
-		return detail::Parser{ args }.parse(config);
+		return detail::Parser{ args }.parse(config, false);
 	}
 	inline arger::Parsed Parse(int argc, const wchar_t* const* argv, const arger::Config& config) {
 		/* convert the arguments */
@@ -317,6 +331,25 @@ namespace arger {
 			args.emplace_back(argv[i]);
 
 		/* parse the actual arguments based on the configuration */
-		return detail::Parser{ args }.parse(config);
+		return detail::Parser{ args }.parse(config, false);
+	}
+
+	inline arger::Parsed Menu(int argc, const char* const* argv, const arger::Config& config) {
+		/* convert the arguments */
+		std::vector<std::wstring> args;
+		for (size_t i = 0; i < argc; ++i)
+			args.push_back(str::wd::To(argv[i]));
+
+		/* parse the actual arguments based on the configuration */
+		return detail::Parser{ args }.parse(config, true);
+	}
+	inline arger::Parsed Menu(int argc, const wchar_t* const* argv, const arger::Config& config) {
+		/* convert the arguments */
+		std::vector<std::wstring> args;
+		for (size_t i = 0; i < argc; ++i)
+			args.emplace_back(argv[i]);
+
+		/* parse the actual arguments based on the configuration */
+		return detail::Parser{ args }.parse(config, true);
 	}
 }

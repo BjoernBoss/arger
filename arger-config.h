@@ -11,6 +11,12 @@ namespace arger {
 	namespace detail {
 		struct Config {};
 
+		struct Version {
+			std::wstring version;
+		};
+		struct Program {
+			std::wstring program;
+		};
 		struct Description {
 			std::wstring description;
 		};
@@ -46,10 +52,8 @@ namespace arger {
 			std::set<std::wstring> use;
 		};
 		struct SpecialPurpose {
-			struct {
-				bool help = false;
-				bool version = false;
-			} specialPurpose;
+			bool flagHelp = false;
+			bool flagVersion = false;
 		};
 		struct Positionals {
 		public:
@@ -100,14 +104,12 @@ namespace arger {
 		public detail::Description,
 		public detail::Help,
 		public detail::Options,
-		public detail::Arguments {
+		public detail::Arguments,
+		public detail::Version,
+		public detail::Program {
 	public:
-		std::wstring program;
-		std::wstring version;
-
-	public:
-		constexpr Config(std::wstring program, std::wstring version);
-		constexpr Config(std::wstring program, std::wstring version, const arger::IsConfig<arger::Config> auto&... configs);
+		constexpr Config();
+		constexpr Config(const arger::IsConfig<arger::Config> auto&... configs);
 	};
 
 	/* general sub-group of options for a configuration/group
@@ -117,7 +119,8 @@ namespace arger {
 		public detail::Description,
 		public detail::Help,
 		public detail::Use,
-		public detail::Arguments {
+		public detail::Arguments,
+		public detail::SpecialPurpose {
 	public:
 		std::wstring name;
 		std::wstring id;
@@ -150,8 +153,8 @@ namespace arger {
 		}
 	};
 
-	constexpr arger::Config::Config(std::wstring program, std::wstring version) : program{ program }, version{ version } {}
-	constexpr arger::Config::Config(std::wstring program, std::wstring version, const arger::IsConfig<arger::Config> auto&... configs) : program{ program }, version{ version } {
+	constexpr arger::Config::Config() {}
+	constexpr arger::Config::Config(const arger::IsConfig<arger::Config> auto&... configs) {
 		detail::ApplyConfigs(*this, configs...);
 	}
 
@@ -164,6 +167,30 @@ namespace arger {
 	constexpr arger::Option::Option(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs) : name{ name } {
 		detail::ApplyConfigs(*this, configs...);
 	}
+
+	/* version for the current configuration */
+	struct Version : public detail::Config {
+	public:
+		std::wstring version;
+
+	public:
+		constexpr Version(std::wstring version) : version{ version } {}
+		constexpr void apply(detail::Version& base) const {
+			base.version = version;
+		}
+	};
+
+	/* default alternative program name for the configuration */
+	struct Program : public detail::Config {
+	public:
+		std::wstring program;
+
+	public:
+		constexpr Program(std::wstring program) : program{ program } {}
+		constexpr void apply(detail::Program& base) const {
+			base.program = program;
+		}
+	};
 
 	/* description to the corresponding object */
 	struct Description : public detail::Config {
@@ -257,12 +284,12 @@ namespace arger {
 		}
 	};
 
-	/* mark this flag as being the help-indicating flag, which triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
+	/* mark this flag/group as being the help-indicating flag, which triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
 	struct HelpFlag : detail::Config {
 	public:
 		constexpr HelpFlag() {}
 		constexpr void apply(detail::SpecialPurpose& base) const {
-			base.specialPurpose.help = true;
+			base.flagHelp = true;
 		}
 	};
 
@@ -271,7 +298,7 @@ namespace arger {
 	public:
 		constexpr VersionFlag() {}
 		constexpr void apply(detail::SpecialPurpose& base) const {
-			base.specialPurpose.version = true;
+			base.flagVersion = true;
 		}
 	};
 

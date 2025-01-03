@@ -17,7 +17,9 @@ namespace arger {
 			std::wstring pProgram;
 
 		public:
-			constexpr BaseBuilder(const std::wstring& firstArg, const arger::Config& config) : pConfig{ config } {
+			constexpr BaseBuilder(const std::wstring& firstArg, const arger::Config& config, bool menu) : pConfig{ config } {
+				if (menu)
+					return;
 				if (config.program.empty())
 					throw arger::ConfigException{ L"Program must not be empty." };
 
@@ -33,7 +35,7 @@ namespace arger {
 
 		public:
 			constexpr std::wstring buildVersionString() const {
-				return str::wd::Build(pProgram, L" Version [", pConfig.version, L"]");
+				return str::wd::Build(pProgram, L" Version [", pConfig.version, L']');
 			}
 			constexpr std::wstring buildHelpHintString() const {
 				return str::wd::Build(L"Try '", pProgram, L" --help' for more information.");
@@ -56,7 +58,9 @@ namespace arger {
 
 		private:
 			constexpr void fAddNewLine(bool emptyLine) {
-				if (pBuffer.empty() || pBuffer.back() != L'\n')
+				if (pBuffer.empty())
+					return;
+				if (pBuffer.back() != L'\n')
 					pBuffer.push_back(L'\n');
 				if (emptyLine)
 					pBuffer.push_back(L'\n');
@@ -149,13 +153,13 @@ namespace arger {
 				if (minimum > 0 && maximum > 0) {
 					if (minimum == maximum)
 						return str::wd::Build(L" [", minimum, L"x]");
-					return str::wd::Build(L" [", minimum, L" <= _ <= ", maximum, L"]");
+					return str::wd::Build(L" [", minimum, L" <= _ <= ", maximum, L']');
 				}
 
 				/* construct the one-sided limit string */
 				if (minimum > 0)
-					return str::wd::Build(L" [>= ", minimum, L"]");
-				return str::wd::Build(L" [<= ", maximum, L"]");
+					return str::wd::Build(L" [>= ", minimum, L']');
+				return str::wd::Build(L" [<= ", maximum, L']');
 			}
 			void fEnumDescription(const arger::Type& type) {
 				/* check if this is an enum to be added */
@@ -219,13 +223,13 @@ namespace arger {
 			}
 
 		private:
-			void fBuildUsage() {
+			void fBuildUsage(bool menu) {
 				const detail::ValidArguments* topMost = (pSelected == 0 ? static_cast<const detail::ValidArguments*>(&pConfig) : pSelected);
 
 				/* add the example-usage descriptive line */
-				fAddNewLine(true);
-				fAddToken(L"Usage: ");
-				fAddToken(pBase.program());
+				fAddToken(menu ? L"Input>" : L"Usage: ");
+				if (!menu)
+					fAddToken(pBase.program());
 
 				/* add the already selected groups and potentially upcoming group-name */
 				fRecGroupUsage(pSelected, topMost);
@@ -255,7 +259,7 @@ namespace arger {
 						if (i + 1 >= topMost->args->positionals.size() && (topMost->maximum == 0 || i + 1 < topMost->maximum))
 							token += L"...";
 						if (i >= topMost->minimum)
-							token = L"[" + token + L"]";
+							token = L"[" + token + L']';
 						fAddSpacedToken(token);
 					}
 				}
@@ -310,16 +314,15 @@ namespace arger {
 			}
 
 		public:
-			std::wstring buildHelpString() {
-				/* add the initial version line and program description */
-				fAddToken(pBase.buildVersionString());
+			std::wstring buildHelpString(bool menu) {
+				/* add the example-usage descriptive line */
+				fBuildUsage(menu);
+
+				/* add the program description */
 				if (!pConfig.config->description.empty()) {
 					fAddNewLine(true);
 					fAddString(pConfig.config->description, 4);
 				}
-
-				/* add the example-usage descriptive line */
-				fBuildUsage();
 
 				/* add the group description */
 				fRecGroupDescription(pSelected);
@@ -361,7 +364,6 @@ namespace arger {
 					}
 				}
 
-
 				/* check if there are optional/required arguments */
 				bool optArgs = false, reqArgs = false;
 				for (const auto& entry : pConfig.options) {
@@ -396,9 +398,9 @@ namespace arger {
 	}
 
 	inline constexpr std::wstring HelpHint(int argc, const char* const* argv, const arger::Config& config) {
-		return detail::BaseBuilder{ str::wd::To(argc == 0 ? "" : argv[0]), config }.buildHelpHintString();
+		return detail::BaseBuilder{ str::wd::To(argc == 0 ? "" : argv[0]), config, false }.buildHelpHintString();
 	}
 	inline constexpr std::wstring HelpHint(int argc, const wchar_t* const* argv, const arger::Config& config) {
-		return detail::BaseBuilder{ (argc == 0 ? L"" : argv[0]), config }.buildHelpHintString();
+		return detail::BaseBuilder{ (argc == 0 ? L"" : argv[0]), config, false }.buildHelpHintString();
 	}
 }

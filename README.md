@@ -4,7 +4,9 @@
 
 Small header-only library written in `C++20` to add simple argument parsing to C++. This library adds support for optional flags/arguments, as well as sub-commands (called `group`), and positional arguments. Grouping hereby describes the practice of having sub-commands as the corresponding next primary argument. An example for this would be `git`, where the first argument is the actual sub-command to be executed.
 
-The simple idea is to define the argument-layout using `arger::Config`. The `parse(int argc, const char* const* argv, const arger::Config& config)` will then produce a `arger::Parsed` structure, which contains the final results.
+The simple idea is to define the argument-layout using `arger::Config`. The `arger::Parse(int argc, const argv, const arger::Config& config)` method will then produce a `arger::Parsed` structure, which contains the final results.
+
+For convenience, there also exists `arger::Menu(int argc, const argv, const arger::Config& config)`, which is designed to be used in command-line style menus. It will therefore not require, nor print any program information.
 
 ## Using the library
 This library is a header only library. Simply clone the repository, ensure that `./repos` is on the path (or at least that `<ustring/ustring.h>` can be resolved), and include `<arger/arger.h>`.
@@ -51,10 +53,10 @@ arger::Payload(std::wstring name, arger::Type type);
 /* add usage-constraints to let the corresponding options only be used by groups, which add them as usage (by default every group/argument can use all options) */
 arger::Use(const auto&... options);
 
-/* mark this flag as being the help-indicating flag, which triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
+/* mark this flag or group as being the help-indicating flag, which triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
 arger::HelpFlag();
 
-/* mark this flag as being the version-indicating flag, which triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
+/* mark this flag or group as being the version-indicating flag, which triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
 arger::VersionFlag();
 
 /* setup the descriptive name for the sub-groups to be used (the default name is 'mode') */
@@ -72,7 +74,9 @@ This simple example shows the configuration for a simple command line mode, with
 The following example configuration:
 
 ```C++
-arger::Config config{ L"test.exe", L"1.0.1",
+arger::Config config{
+	arger::Program{ L"test.exe" },
+	arger::Version{ L"1.0.1" },
 	arger::Help{ L"Some Description", L"This is the indepth description." },
 	arger::Description{ L"Some test program" },
 	arger::Option{ L"test",
@@ -83,6 +87,11 @@ arger::Config config{ L"test.exe", L"1.0.1",
 		arger::Abbreviation{ L'h' },
 		arger::HelpFlag{},
 		arger::Description{ L"Print this help menu." }
+	},
+	arger::Option{ L"version",
+		arger::Abbreviation{ L'v' },
+		arger::VersionFlag{},
+		arger::Description{ L"Print the program version." }
 	},
 	arger::Option{ L"path",
 		arger::Abbreviation{ L'p' },
@@ -123,12 +132,10 @@ catch (const arger::PrintMessage& msg) {
 
 Constructs the following help-page:
 ```
-$ ./test.exe --help
-test.exe Version [1.0.1]
+$ ./bin.exe --help
+Usage: bin.exe --path=<file-path> [options...] first second [third...]
 
     Some test program
-
-Usage: test.exe --path=<file-path> [options...] first second [third...]
 
 Positional Arguments:
   first [uint]                  First Argument
@@ -144,23 +151,30 @@ Optional arguments:
                                 - [abc]: This is the description of option abc
                                 - [def]: This is the description of option def
   -t, --test                    This is the description of the test flag.
+  -v, --version                 Print the program version.
 
 Some Description                This is the indepth description.
+```
+
+An example for the version:
+```
+$ ./bin.exe -v
+bin.exe Version [1.0.1]
 ```
 
 And examples of potential errors:
 
 ```
-$ ./test.exe 51 false --path=/foo/bar
+$ ./bin.exe 51 false --path=/foo/bar
 Argument must be less than 50
 
-Try 'test.exe --help' for more information.
+Try 'bin.exe --help' for more information.
 ```
 ```
-$ ./test.exe 12 true --mode=ghi -tp=/foo/bar -- test1 test2 --mode=50
+$ ./bin.exe 12 true --mode=ghi -tp=/foo/bar -- test1 test2 --mode=50
 Invalid enum for argument [mode] encountered.
 
-Try 'test.exe --help' for more information.
+Try 'bin.exe --help' for more information.
 ```
 
 
@@ -171,7 +185,9 @@ To setup the sub-command line mode, add all sub-commands as groups using `arger:
 The following example configuration:
 
 ```C++
-arger::Config config{ L"test.exe", L"1.0.1",
+arger::Config config{
+	arger::Program{ L"test.exe" },
+	arger::Version{ L"1.0.1" },
 	arger::Help{ L"Some Description", L"This is the indepth description." },
 	arger::GroupName{ L"test-setting" },
 	arger::Description{ L"Some test program" },
@@ -242,12 +258,10 @@ catch (const arger::PrintMessage& msg) {
 
 Constructs the following help-page:
 ```
-$ ./test.exe --help
-test.exe Version [1.0.1]
+$ ./bin.exe --help
+Usage: bin.exe [test-setting] --path=<file-path> [options...] [params...]
 
     Some test program
-
-Usage: test.exe [test-setting] --path=<file-path> [options...] [params...]
 
 Options for [test-setting]:
   get                           Get something in the test program. But this is just a demo
@@ -270,12 +284,10 @@ Some Description                This is the indepth description.
 ```
 
 ```
-$ ./test.exe read -h
-test.exe Version [1.0.1]
+$ ./bin.exe read -h
+Usage: bin.exe read [options...] argument...
 
     Some test program
-
-Usage: test.exe read [options...] argument...
 
 Positional Arguments for test-setting [read]:
   argument [enum]               First Argument [2x]
@@ -297,20 +309,20 @@ Read-Help                       This is a help-description only shown for read.
 And examples of potential errors:
 
 ```
-$ ./test.exe
+$ ./bin.exe
 Test-Setting missing.
 
-Try 'test.exe --help' for more information.
+Try 'bin.exe --help' for more information.
 ```
 ```
-$ ./test.exe set 50
+$ ./bin.exe set 50
 Argument [path] is missing.
 
-Try 'test.exe --help' for more information.
+Try 'bin.exe --help' for more information.
 ```
 ```
-$ ./test.exe read -p 50 a b
+$ ./bin.exe read -p 50 a b
 Argument [path] not meant for test-setting [read].
 
-Try 'test.exe --help' for more information.
+Try 'bin.exe --help' for more information.
 ```

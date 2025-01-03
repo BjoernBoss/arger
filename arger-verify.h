@@ -38,7 +38,7 @@ namespace arger::detail {
 		std::wstring_view id;
 	};
 
-	inline void ValidateArguments(const detail::Arguments& arguments, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidGroup* self, detail::ValidArguments* super);
+	inline void ValidateArguments(const arger::Config& config, const detail::Arguments& arguments, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidGroup* self, detail::ValidArguments* super);
 	inline constexpr void ValidateHelp(const detail::Help& help, const std::wstring& who) {
 		for (size_t i = 0; i < help.help.size(); ++i) {
 			if (help.help[i].name.empty() || help.help[i].text.empty())
@@ -49,7 +49,16 @@ namespace arger::detail {
 		if (std::holds_alternative<arger::Enum>(type) && std::get<arger::Enum>(type).empty())
 			throw arger::ConfigException{ L"Enum of ", who, L" must not be empty." };
 	}
-	inline void ValidateOption(const arger::Option& option, detail::ValidConfig& state) {
+	inline constexpr void ValidateFlags(const arger::Config& config, const detail::SpecialPurpose& flags, const std::wstring& who, bool payload) {
+		if (flags.flagHelp && flags.flagVersion)
+			throw arger::ConfigException{ who, L" cannot be help and version special purpose at once." };
+		if (flags.flagVersion && config.version.empty())
+			throw arger::ConfigException{ who, L" cannot be a version special purpose flag if no version has been set." };
+		if ((flags.flagHelp || flags.flagVersion) && payload)
+			throw arger::ConfigException{ who, L" cannot be a special purpose flag and carry a payload/require arguments." };
+
+	}
+	inline void ValidateOption(const arger::Config& config, const arger::Option& option, detail::ValidConfig& state) {
 		if (option.name.empty())
 			throw arger::ConfigException{ L"Option name must not be empty." };
 		if (option.name.starts_with(L"-"))
@@ -69,11 +78,8 @@ namespace arger::detail {
 			state.abbreviations[option.abbreviation] = &entry;
 		}
 
-		/* validate the special-purpose flags */
-		if (option.specialPurpose.help && option.specialPurpose.version)
-			throw arger::ConfigException{ L"Option [", option.name, L"] cannot be help and version special purpose at once." };
-		if ((option.specialPurpose.help || option.specialPurpose.version) && entry.payload)
-			throw arger::ConfigException{ L"Option [", option.name, L"] cannot be a special purpose flag and carry a payload." };
+		/* validate the special-purpose attributes */
+		ValidateFlags(config, option, str::wd::Build(L"Option [", option.name, L']'), entry.payload);
 
 		/* validate the payload */
 		if (entry.payload)
@@ -86,7 +92,7 @@ namespace arger::detail {
 		else
 			entry.maximum = std::max<size_t>(entry.minimum, 1);
 	}
-	inline void ValidateGroup(const arger::Group& group, detail::ValidConfig& state, detail::ValidGroup* parent, detail::ValidArguments* super) {
+	inline void ValidateGroup(const arger::Config& config, const arger::Group& group, detail::ValidConfig& state, detail::ValidGroup* parent, detail::ValidArguments* super) {
 		if (group.name.empty())
 			throw arger::ConfigException{ L"Group name must not be empty." };
 		if (group.name.starts_with(L"-"))
@@ -102,8 +108,15 @@ namespace arger::detail {
 		entry.parent = parent;
 		entry.super = super;
 
+		/* validate the special-purpose attributes */
+		if (group.flagHelp || group.flagVersion) {
+			ValidateFlags(config, group, str::wd::Build(L"Group with id [", id, L']'), !group.positionals.empty() || !group.groups.list.empty());
+			if (parent != 0)
+				throw arger::ConfigException{ L"Group with id [", id, L"] can only have a help special purpose flag assigned if its a root group." };
+		}
+
 		/* validate the arguments */
-		detail::ValidateArguments(group, state, entry, &entry, super);
+		detail::ValidateArguments(config, group, state, entry, &entry, super);
 
 		/* check if the group-id is unique (only necessary if it does not contain sub-groups itself) */
 		if (!entry.incomplete) {
@@ -138,7 +151,7 @@ namespace arger::detail {
 		/* validate the help attributes */
 		detail::ValidateHelp(group, str::wd::Build(L"group [", id, L"]"));
 	}
-	inline void ValidateArguments(const detail::Arguments& arguments, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidGroup* self, detail::ValidArguments* super) {
+	inline void ValidateArguments(const arger::Config& config, const detail::Arguments& arguments, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidGroup* self, detail::ValidArguments* super) {
 		entry.args = &arguments;
 		entry.incomplete = !arguments.groups.list.empty();
 		entry.nestedPositionals = !arguments.positionals.empty();
@@ -157,7 +170,7 @@ namespace arger::detail {
 		}
 		if (entry.incomplete) {
 			for (const auto& sub : arguments.groups.list)
-				detail::ValidateGroup(sub, state, self, (self == 0 ? super : self));
+				detail::ValidateGroup(config, sub, state, self, (self == 0 ? super : self));
 			for (const auto& sub : entry.sub)
 				entry.nestedPositionals = (entry.nestedPositionals || sub.second.nestedPositionals);
 			return;
@@ -177,11 +190,11 @@ namespace arger::detail {
 			detail::ValidateType(arguments.positionals[i].type, (self == 0 ? L"arguments" : str::wd::Build(L"groups [", self->id, L"] positional [", i, L"]")));
 		}
 	}
-	inline void ValidateConfig(const arger::Config& config, detail::ValidConfig& state) {
-		if (config.program.empty())
-			throw arger::ConfigException{ L"Program must not be empty." };
-		if (config.version.empty())
-			throw arger::ConfigException{ L"Version must not be empty." };
+	inline void ValidateConfig(const arger::Config& config, detail::ValidConfig& state, bool menu) {
+		if (menu && !config.program.empty())
+			throw arger::ConfigException{ L"Menu cannot have a program name." };
+		if (!menu && config.program.empty())
+			throw arger::ConfigException{ L"Configuration must have a program name." };
 		state.config = &config;
 
 		/* validate the help attributes */
@@ -190,8 +203,8 @@ namespace arger::detail {
 		/* validate the options and arguments (validate the options before the arguments,
 		*	as the arguments-usages will require the options to be already set) */
 		for (const auto& option : config.options)
-			detail::ValidateOption(option, state);
-		detail::ValidateArguments(config, state, state, 0, &state);
+			detail::ValidateOption(config, option, state);
+		detail::ValidateArguments(config, config, state, state, 0, &state);
 
 		/* finalize the options by adding the null-group */
 		for (auto& option : state.options) {
