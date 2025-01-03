@@ -55,26 +55,26 @@ namespace arger::detail {
 			const arger::Enum& allowed = std::get<arger::Enum>(type);
 			if (value.isStr() && allowed.count(value.str()) != 0)
 				return;
-			throw arger::ParsingException{ L"Default value of ", who, L" must be a valid enum for the given type." };
+			throw arger::ConfigException{ L"Default value of ", who, L" must be a valid enum for the given type." };
 		}
 
 		/* validate the expected default type (value automatically performs conversion) */
 		switch (std::get<arger::Primitive>(type)) {
 		case arger::Primitive::boolean:
 			if (!value.isBool())
-				throw arger::ParsingException{ L"Default value of ", who, L" is expected to be a boolean." };
+				throw arger::ConfigException{ L"Default value of ", who, L" is expected to be a boolean." };
 			break;
 		case arger::Primitive::real:
 			if (!value.isReal())
-				throw arger::ParsingException{ L"Default value of ", who, L" is expected to be a real." };
+				throw arger::ConfigException{ L"Default value of ", who, L" is expected to be a real." };
 			break;
 		case arger::Primitive::inum:
 			if (!value.isINum())
-				throw arger::ParsingException{ L"Default value of ", who, L" is expected to be a signed integer." };
+				throw arger::ConfigException{ L"Default value of ", who, L" is expected to be a signed integer." };
 			break;
 		case arger::Primitive::unum:
 			if (!value.isUNum())
-				throw arger::ParsingException{ L"Default value of ", who, L" is expected to be an unsigned integer." };
+				throw arger::ConfigException{ L"Default value of ", who, L" is expected to be an unsigned integer." };
 			break;
 		case arger::Primitive::any:
 			break;
