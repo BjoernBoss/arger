@@ -169,8 +169,32 @@ namespace arger {
 				/* add the separate keys */
 				for (const auto& val : std::get<arger::Enum>(type)) {
 					fAddNewLine(false);
-					fAddString(str::wd::Build(L"- [", val.first, L"]: ", val.second), detail::NumCharsHelpLeft, 1);
+					fAddString(str::wd::Build(L"- [", val.first, L"]: ", val.second), detail::NumCharsHelpLeft);
 				}
+			}
+			void fDefaultDescription(const arger::Value* begin, const arger::Value* end) {
+				/* construct the list of all default values */
+				std::wstring temp = L"Defaults to: (";
+				for (const arger::Value* it = begin; it != end; ++it) {
+					temp.append(it == begin ? L"[" : L", [");
+
+					if (it->isStr())
+						temp.append(it->str());
+					else if (it->isUNum())
+						str::IntTo(temp, it->unum());
+					else if (it->isINum())
+						str::IntTo(temp, it->inum());
+					else if (it->isReal())
+						str::FloatTo(temp, it->real());
+					else
+						temp.append(it->boolean() ? L"true" : L"false");
+					temp.append(1, L']');
+				}
+				temp.append(1, L')');
+
+				/* write the line out */
+				fAddNewLine(false);
+				fAddString(temp, detail::NumCharsHelpLeft);
 			}
 			constexpr const wchar_t* fTypeString(const arger::Type& type) {
 				if (std::holds_alternative<arger::Enum>(type))
@@ -308,8 +332,12 @@ namespace arger {
 						temp.append(fLimitString(option.minimum, option.maximum > 1 ? option.maximum : 0));
 					fAddString(temp, detail::NumCharsHelpLeft, 1);
 
-					/* expand all enum descriptions */
+					/* add the enum value description */
 					fEnumDescription(option.option->payload.type);
+
+					/* add the default values */
+					if (!option.option->payload.defValue.empty())
+						fDefaultDescription(&option.option->payload.defValue.front(), &option.option->payload.defValue.back() + 1);
 				}
 			}
 
@@ -357,10 +385,14 @@ namespace arger {
 						std::wstring temp = positional.description;
 						if (i + 1 >= topMost->args->positionals.size() && i + 1 < topMost->maximum)
 							temp.append(fLimitString(std::max<intptr_t>(topMost->minimum - intptr_t(i), 0), topMost->maximum - i));
+						fAddString(temp, detail::NumCharsHelpLeft, 1);
 
 						/* add the enum value description */
-						fAddString(temp, detail::NumCharsHelpLeft, 1);
 						fEnumDescription(positional.type);
+
+						/* add the default values */
+						if (positional.defValue.has_value())
+							fDefaultDescription(&positional.defValue.value(), &positional.defValue.value() + 1);
 					}
 				}
 

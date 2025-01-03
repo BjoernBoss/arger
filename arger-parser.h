@@ -15,6 +15,7 @@ namespace arger {
 			detail::ValidConfig pConfig;
 			const detail::ValidGroup* pSelected = 0;
 			arger::Parsed pParsed;
+			std::wstring pDeferred;
 			size_t pIndex = 0;
 			bool pPrintHelp = false;
 			bool pPrintVersion = false;
@@ -24,11 +25,76 @@ namespace arger {
 			Parser(std::vector<std::wstring> args) : pArgs{ args } {}
 
 		private:
-			constexpr void fParseValue(const std::wstring& name, arger::Value& value, const arger::Type& type) const {
+			void fParseOptional(const std::wstring& arg, const std::wstring& payload, bool fullName, bool hasPayload) {
+				bool payloadUsed = false;
+
+				/* iterate over the list of optional abbreviations/single full-name and process them */
+				for (size_t i = 0; i < arg.size(); ++i) {
+					detail::ValidOption* entry = 0;
+
+					/* resolve the optional-argument entry, depending on it being a short abbreviation, or a full name */
+					if (fullName) {
+						auto it = pConfig.options.find(arg);
+						if (it == pConfig.options.end()) {
+							if (pDeferred.empty())
+								str::BuildTo(pDeferred, L"Unknown optional argument [", arg, L"] encountered.");
+
+							/* continue parsing, as the special purpose flags might still occur */
+							continue;
+						}
+						entry = &it->second;
+						i = arg.size();
+					}
+					else {
+						auto it = pConfig.abbreviations.find(arg[i]);
+						if (it == pConfig.abbreviations.end()) {
+							if (pDeferred.empty())
+								str::BuildTo(pDeferred, L"Unknown optional argument-abbreviation [", arg[i], L"] encountered.");
+
+							/* continue parsing, as the special purpose flags might still occur */
+							continue;
+						}
+						entry = it->second;
+					}
+
+					/* check if this is a flag and mark it as seen and check if its a special purpose argument */
+					if (!entry->payload) {
+						pParsed.pFlags.insert(entry->option->name);
+						if (entry->option->flagHelp)
+							pPrintHelp = true;
+						else if (entry->option->flagVersion)
+							pPrintVersion = true;
+						continue;
+					}
+
+					/* check if the payload has already been consumed */
+					if (payloadUsed || (!hasPayload && pIndex >= pArgs.size())) {
+						if (pDeferred.empty())
+							str::BuildTo(pDeferred, L"Value [", entry->payload, L"] missing for optional argument [", entry->option->name, L"].");
+
+						/* continue parsing, as the special purpose flags might still occur */
+						continue;
+					}
+					payloadUsed = true;
+
+					/* write the value as raw string into the buffer (dont perform any validations or limit checks for now) */
+					auto it = pParsed.pOptions.find(entry->option->name);
+					if (it == pParsed.pOptions.end())
+						it = pParsed.pOptions.insert({ entry->option->name, {} }).first;
+					it->second.emplace_back(arger::Value{ hasPayload ? payload : pArgs[pIndex++] });
+				}
+
+				/* check if a payload was supplied but not consumed */
+				if (hasPayload && !payloadUsed && pDeferred.empty())
+					str::BuildTo(pDeferred, L"Value [", payload, L"] not used by optional arguments.");
+			}
+
+		private:
+			constexpr void fVerifyValue(const std::wstring& name, arger::Value& value, const arger::Type& type) const {
 				/* check if an enum was expected */
 				if (std::holds_alternative<arger::Enum>(type)) {
-					const arger::Enum& expected = std::get<arger::Enum>(type);
-					if (expected.count(value.str()) != 0)
+					const arger::Enum& allowed = std::get<arger::Enum>(type);
+					if (allowed.count(value.str()) != 0)
 						return;
 					throw arger::ParsingException{ L"Invalid enum for argument [", name, L"] encountered." };
 				}
@@ -72,56 +138,6 @@ namespace arger {
 					break;
 				}
 			}
-			void fParseOptional(const std::wstring& arg, const std::wstring& payload, bool fullName) {
-				bool payloadUsed = false;
-
-				/* iterate over the list of optional abbreviations/single full-name and process them */
-				for (size_t i = 0; i < arg.size(); ++i) {
-					detail::ValidOption* entry = 0;
-
-					/* resolve the optional-argument entry, depending on it being a short abbreviation, or a full name */
-					if (fullName) {
-						auto it = pConfig.options.find(arg);
-						if (it == pConfig.options.end())
-							throw arger::ParsingException{ L"Unknown optional argument [", arg, L"] encountered." };
-						entry = &it->second;
-						i = arg.size();
-					}
-					else {
-						auto it = pConfig.abbreviations.find(arg[i]);
-						if (it == pConfig.abbreviations.end())
-							throw arger::ParsingException{ L"Unknown optional argument-abbreviation [", arg[i], L"] encountered." };
-						entry = it->second;
-					}
-
-					/* check if this is a flag and mark it as seen and check if its a special purpose argument */
-					if (!entry->payload) {
-						pParsed.pFlags.insert(entry->option->name);
-						if (entry->option->flagHelp)
-							pPrintHelp = true;
-						else if (entry->option->flagVersion)
-							pPrintVersion = true;
-						continue;
-					}
-
-					/* check if the payload has already been consumed */
-					if (payloadUsed || (payload.empty() && pIndex >= pArgs.size()))
-						throw arger::ParsingException{ L"Value [", entry->payload, L"] missing for optional argument [", entry->option->name, L"]." };
-					payloadUsed = true;
-
-					/* write the value as raw string into the buffer (dont perform any validations or limit checks for now) */
-					auto it = pParsed.pOptions.find(entry->option->name);
-					if (it == pParsed.pOptions.end())
-						it = pParsed.pOptions.insert({ entry->option->name, {} }).first;
-					it->second.emplace_back(arger::Value{ payload.empty() ? pArgs[pIndex++] : payload });
-				}
-
-				/* check if a payload was supplied but not consumed */
-				if (!payload.empty() && !payloadUsed)
-					throw arger::ParsingException{ L"Value [", payload, L"] not used by optional arguments." };
-			}
-
-		private:
 			constexpr void fVerifyPositional() {
 				const detail::ValidArguments* topMost = (pSelected == 0 ? static_cast<const detail::ValidArguments*>(&pConfig) : pSelected);
 
@@ -137,10 +153,20 @@ namespace arger {
 							throw arger::ParsingException{ L"Unrecognized argument [", pParsed.pPositional[i].str(), L"] encountered." };
 						throw arger::ParsingException{ L"Unrecognized argument [", pParsed.pPositional[i].str(), L"] encountered for ", topMost->super->groupName, L" [", pSelected->group->name, L"]." };
 					}
-
-					/* parse the argument */
 					size_t index = std::min<size_t>(i, topMost->args->positionals.size() - 1);
-					fParseValue(topMost->args->positionals[index].name, pParsed.pPositional[i], topMost->args->positionals[index].type);
+
+					/* check if the default value should be used and otherwise validate the argument (default will already be validated) */
+					if (pParsed.pPositional[i].str().empty() && topMost->args->positionals[index].defValue.has_value())
+						pParsed.pPositional[i] = topMost->args->positionals[index].defValue.value();
+					else
+						fVerifyValue(topMost->args->positionals[index].name, pParsed.pPositional[i], topMost->args->positionals[index].type);
+				}
+
+				/* fill up on default values (will already be validated) */
+				for (size_t i = pParsed.pPositional.size(); i < topMost->args->positionals.size(); ++i) {
+					if (!topMost->args->positionals[i].defValue.has_value())
+						break;
+					pParsed.pPositional.push_back(topMost->args->positionals[i].defValue.value());
 				}
 
 				/* check if the minimum required number of parameters has not been reached
@@ -173,6 +199,12 @@ namespace arger {
 					auto it = pParsed.pOptions.find(name);
 					size_t count = (it == pParsed.pOptions.end() ? 0 : it->second.size());
 
+					/* check if the default values should be assigned (are already validated by the verifying-step) */
+					if (count == 0 && !option.option->payload.defValue.empty()) {
+						pParsed.pOptions.insert({ name, {} }).first->second = option.option->payload.defValue;
+						continue;
+					}
+
 					/* check if the optional-argument has been found */
 					if (option.minimum > count)
 						throw arger::ParsingException{ L"Argument [", name, L"] is missing." };
@@ -183,7 +215,7 @@ namespace arger {
 
 					/* verify the values themselves */
 					for (size_t i = 0; i < count; ++i)
-						fParseValue(name, it->second[i], option.option->payload.type);
+						fVerifyValue(name, it->second[i], option.option->payload.type);
 				}
 			}
 			void fRecCheckConstraints(const detail::ValidArguments* args) {
@@ -223,13 +255,13 @@ namespace arger {
 						/* check if a payload is baked into the string */
 						std::wstring payload;
 						size_t end = next.size();
+						bool hasPayload = false;
 						for (size_t i = 1; i < next.size(); ++i) {
 							if (next[i] != L'=')
 								continue;
 
-							/* check if the payload is well-formed (--name=payload) and split it off */
-							if (i + 1 >= next.size())
-								throw arger::ParsingException{ L"Malformed payload assigned to optional argument [", next, L"]." };
+							/* extract the payload and mark the actual end of the optional argument */
+							hasPayload = true;
 							payload = next.substr(i + 1);
 							end = i;
 							break;
@@ -237,7 +269,7 @@ namespace arger {
 
 						/* parse the single long or multiple short arguments */
 						size_t hypenCount = (next.size() > 2 && next[1] == L'-' ? 2 : 1);
-						fParseOptional(next.substr(hypenCount, end - hypenCount), payload, (hypenCount == 2));
+						fParseOptional(next.substr(hypenCount, end - hypenCount), payload, (hypenCount == 2), hasPayload);
 						continue;
 					}
 
@@ -283,6 +315,10 @@ namespace arger {
 				/* verify the group selection */
 				if (dirtyGroup < pArgs.size())
 					throw arger::ParsingException{ L"Unknown ", topMost->groupName, L" [", pArgs[dirtyGroup], L"] encountered." };
+
+				/* check if a deferred error can be thrown */
+				if (!pDeferred.empty())
+					throw arger::ParsingException{ pDeferred };
 
 				/* verify the positional arguments */
 				fVerifyPositional();

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "arger-common.h"
+#include "arger-value.h"
 
 namespace arger {
 	struct Group;
@@ -44,6 +45,7 @@ namespace arger {
 		};
 		struct Payload {
 			struct {
+				std::vector<arger::Value> defValue;
 				std::wstring name;
 				arger::Type type;
 			} payload;
@@ -58,6 +60,7 @@ namespace arger {
 		struct Positionals {
 		public:
 			struct Entry {
+				std::optional<arger::Value> defValue;
 				std::wstring name;
 				arger::Type type;
 				std::wstring description;
@@ -113,7 +116,7 @@ namespace arger {
 	};
 
 	/* general sub-group of options for a configuration/group
-	*	 Note: can only have sub-groups or positional arguments */
+	*	 Note: Groups/Configs can can only have sub-groups or positional arguments */
 	struct Group :
 		public detail::Config,
 		public detail::Description,
@@ -258,15 +261,18 @@ namespace arger {
 		}
 	};
 
-	/* add a payload to an option with a given name and of a given type */
+	/* add a payload to an option with a given name and of a given type, and optional default values (must meet the requirement-counts) */
 	struct Payload : public detail::Config {
 	public:
+		std::vector<arger::Value> defValue;
 		std::wstring name;
 		arger::Type type;
 
 	public:
-		Payload(std::wstring name, arger::Type type) : name{ name }, type{ type } {}
+		Payload(std::wstring name, arger::Type type, std::vector<arger::Value> defValue = {}) : defValue{ defValue }, name{ name }, type{ type } {}
+		Payload(std::wstring name, arger::Type type, arger::Value defValue) : defValue{ defValue }, name{ name }, type{ type } {}
 		constexpr void apply(detail::Payload& base) const {
+			base.payload.defValue = defValue;
 			base.payload.name = name;
 			base.payload.type = type;
 		}
@@ -314,14 +320,16 @@ namespace arger {
 		}
 	};
 
-	/* add an additional positional argument to the configuration/group using the given name, type, and description
-	*	 Note: can only have sub-groups or positional arguments */
+	/* add an additional positional argument to the configuration/group using the given name, type, description, and optional default value (must meet the requirement-counts)
+	*	Note: Groups/Configs can can only have sub-groups or positional arguments
+	*	Note: Default values will be used, when no argument is given, or the argument string is empty */
 	struct Positional : public detail::Config {
 	public:
 		detail::Positionals::Entry entry;
 
 	public:
-		Positional(std::wstring name, arger::Type type, std::wstring description) : entry{ name, type, description } {}
+		Positional(std::wstring name, arger::Type type, std::wstring description) : entry{ std::nullopt, name, type, description } {}
+		Positional(std::wstring name, arger::Type type, std::wstring description, arger::Value defValue) : entry{ defValue, name, type, description } {}
 		constexpr void apply(detail::Positionals& base) const {
 			base.positionals.push_back(entry);
 		}

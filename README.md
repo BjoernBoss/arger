@@ -20,14 +20,20 @@ The following configurations are defined:
 
 ```C++
 /* general arger-configuration to be parsed */
-arger::Config(std::wstring program, std::wstring version, const arger::IsConfig<arger::Config> auto&... configs);
+arger::Config(const arger::IsConfig<arger::Config> auto&... configs);
 
 /* general sub-group of options for a configuration/group
-*	 Note: can only have sub-groups or positional arguments */
-arger::Group(std::wstring name, std::wstring id);
+*	 Note: Groups/Configs can can only have sub-groups or positional arguments */
+arger::Group(std::wstring name, std::wstring id, const arger::IsConfig<arger::Group> auto&... configs);
 
 /* general optional flag/payload */
-arger::Option(std::wstring name);
+arger::Option(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs);
+
+/* version for the current configuration */
+arger::Version(std::wstring version);
+
+/* default alternative program name for the configuration */
+arger::Program(std::wstring program);
 
 /* description to the corresponding object */
 arger::Description(std::wstring desc);
@@ -47,24 +53,27 @@ arger::Require(size_t min, size_t max);
 /* add an abbreviation character for an option to allow it to be accessible as, for example, -x */
 arger::Abbreviation(wchar_t c);
 
-/* add a payload to an option with a given name and of a given type */
-arger::Payload(std::wstring name, arger::Type type);
+/* add a payload to an option with a given name and of a given type, and optional default values (must meet the requirement-counts) */
+arger::Payload(std::wstring name, arger::Type type, arger::Value defValue);
+arger::Payload(std::wstring name, arger::Type type, std::vector<arger::Value> defValue = {});
 
 /* add usage-constraints to let the corresponding options only be used by groups, which add them as usage (by default every group/argument can use all options) */
 arger::Use(const auto&... options);
 
-/* mark this flag or group as being the help-indicating flag, which triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
+/* mark this flag/group as being the help-indicating flag, which triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
 arger::HelpFlag();
 
-/* mark this flag or group as being the version-indicating flag, which triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
+/* mark this flag as being the version-indicating flag, which triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
 arger::VersionFlag();
 
 /* setup the descriptive name for the sub-groups to be used (the default name is 'mode') */
 arger::GroupName(std::wstring name);
 
-/* add an additional positional argument to the configuration/group using the given name, type, and description
-*	 Note: can only have sub-groups or positional arguments */
+/* add an additional positional argument to the configuration/group using the given name, type, description, and optional default value (must meet the requirement-counts)
+*	Note: Groups/Configs can can only have sub-groups or positional arguments
+*	Note: Default values will be used, when no argument is given, or the argument string is empty */
 arger::Positional(std::wstring name, arger::Type type, std::wstring description);
+arger::Positional(std::wstring name, arger::Type type, std::wstring description, arger::Value defValue);
 ```
 
 ## Common Command Line Mode
@@ -104,7 +113,8 @@ arger::Config config{
 			arger::Enum{
 				{ L"abc", L"This is the description of option abc" },
 				{ L"def", L"This is the description of option def" }
-			}
+			},
+			arger::Value{ L"def" }
 		},
 		arger::Description{ L"Example of an enum" }
 	},
@@ -150,6 +160,7 @@ Optional arguments:
   --mode=<test-mode> [enum]     Example of an enum
                                 - [abc]: This is the description of option abc
                                 - [def]: This is the description of option def
+                                Defaults to: ([def])
   -t, --test                    This is the description of the test flag.
   -v, --version                 Print the program version.
 
@@ -211,7 +222,8 @@ arger::Config config{
 			arger::Enum{
 				{ L"abc", L"This is the description of option abc" },
 				{ L"def", L"This is the description of option def" }
-			}
+			},
+			arger::Value{ L"def" }
 		},
 		arger::Description{ L"Example of an enum" }
 	},
@@ -278,6 +290,7 @@ Optional arguments:
   --mode=<test-mode> [enum]     Example of an enum
                                 - [abc]: This is the description of option abc
                                 - [def]: This is the description of option def
+                                Defaults to: ([def])
   -t, --test                    This is the description of the test flag.
 
 Some Description                This is the indepth description.
@@ -299,6 +312,7 @@ Optional arguments:
   --mode=<test-mode> [enum]     Example of an enum
                                 - [abc]: This is the description of option abc
                                 - [def]: This is the description of option def
+                                Defaults to: ([def])
   -t, --test                    This is the description of the test flag.
 
 Some Description                This is the indepth description.

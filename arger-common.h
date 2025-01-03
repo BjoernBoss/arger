@@ -15,6 +15,9 @@
 namespace arger {
 	class Parsed;
 	class Arguments;
+	namespace detail {
+		class Parser;
+	}
 
 	enum class Primitive : uint8_t {
 		any,

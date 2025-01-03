@@ -49,6 +49,37 @@ namespace arger::detail {
 		if (std::holds_alternative<arger::Enum>(type) && std::get<arger::Enum>(type).empty())
 			throw arger::ConfigException{ L"Enum of ", who, L" must not be empty." };
 	}
+	inline constexpr void ValidateDefValue(const arger::Type& type, const arger::Value& value, const std::wstring& who) {
+		/* check if the value must be an enum */
+		if (std::holds_alternative<arger::Enum>(type)) {
+			const arger::Enum& allowed = std::get<arger::Enum>(type);
+			if (value.isStr() && allowed.count(value.str()) != 0)
+				return;
+			throw arger::ParsingException{ L"Default value of ", who, L" must be a valid enum for the given type." };
+		}
+
+		/* validate the expected default type (value automatically performs conversion) */
+		switch (std::get<arger::Primitive>(type)) {
+		case arger::Primitive::boolean:
+			if (!value.isBool())
+				throw arger::ParsingException{ L"Default value of ", who, L" is expected to be a boolean." };
+			break;
+		case arger::Primitive::real:
+			if (!value.isReal())
+				throw arger::ParsingException{ L"Default value of ", who, L" is expected to be a real." };
+			break;
+		case arger::Primitive::inum:
+			if (!value.isINum())
+				throw arger::ParsingException{ L"Default value of ", who, L" is expected to be a signed integer." };
+			break;
+		case arger::Primitive::unum:
+			if (!value.isUNum())
+				throw arger::ParsingException{ L"Default value of ", who, L" is expected to be an unsigned integer." };
+			break;
+		case arger::Primitive::any:
+			break;
+		}
+	}
 	inline constexpr void ValidateFlags(const arger::Config& config, const detail::SpecialPurpose& flags, const std::wstring& who, bool payload) {
 		if (flags.flagHelp && flags.flagVersion)
 			throw arger::ConfigException{ who, L" cannot be help and version special purpose at once." };
@@ -79,11 +110,12 @@ namespace arger::detail {
 		}
 
 		/* validate the special-purpose attributes */
-		ValidateFlags(config, option, str::wd::Build(L"Option [", option.name, L']'), entry.payload);
+		std::wstring whoSelf = str::wd::Build(L"option [", option.name, L']');
+		ValidateFlags(config, option, whoSelf, entry.payload);
 
 		/* validate the payload */
 		if (entry.payload)
-			detail::ValidateType(option.payload.type, str::wd::Build(L"option [", option.name, L"]"));
+			detail::ValidateType(option.payload.type, whoSelf);
 
 		/* configure the limits */
 		entry.minimum = option.require.minimum.value_or(0);
@@ -91,6 +123,16 @@ namespace arger::detail {
 			entry.maximum = (*option.require.maximum == 0 ? 0 : std::max<size_t>(entry.minimum, *option.require.maximum));
 		else
 			entry.maximum = std::max<size_t>(entry.minimum, 1);
+
+		/* validate the default-values */
+		if (entry.payload && !option.payload.defValue.empty()) {
+			if (option.payload.defValue.size() < entry.minimum)
+				throw arger::ConfigException{ L"Default values for option [", option.name, L"] must not violate its own minimum requirements" };
+			if (entry.maximum > 0 && option.payload.defValue.size() > entry.maximum)
+				throw arger::ConfigException{ L"Default values for option [", option.name, L"] must not violate its own maximum requirements" };
+			for (const auto& value : option.payload.defValue)
+				detail::ValidateDefValue(option.payload.type, value, whoSelf);
+		}
 	}
 	inline void ValidateGroup(const arger::Config& config, const arger::Group& group, detail::ValidConfig& state, detail::ValidGroup* parent, detail::ValidArguments* super) {
 		if (group.name.empty())
@@ -185,9 +227,15 @@ namespace arger::detail {
 
 		/* validate the positionals */
 		for (size_t i = 0; i < arguments.positionals.size(); ++i) {
+			/* validate the name and type */
 			if (arguments.positionals[i].name.empty())
 				throw arger::ConfigException{ L"Positional argument [", i, L"] of ", (self == 0 ? L"arguments" : str::wd::Build(L"group [", self->id, L"]")), L" must not have an empty name." };
-			detail::ValidateType(arguments.positionals[i].type, (self == 0 ? L"arguments" : str::wd::Build(L"groups [", self->id, L"] positional [", i, L"]")));
+			std::wstring whoSelf = (self == 0 ? str::wd::Build(L"arguments positional [", i, L']') : str::wd::Build(L"groups [", self->id, L"] positional [", i, L']'));
+			detail::ValidateType(arguments.positionals[i].type, whoSelf);
+
+			/* validate the default-value */
+			if (arguments.positionals[i].defValue.has_value())
+				detail::ValidateDefValue(arguments.positionals[i].type, arguments.positionals[i].defValue.value(), whoSelf);
 		}
 	}
 	inline void ValidateConfig(const arger::Config& config, detail::ValidConfig& state, bool menu) {
