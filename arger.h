@@ -72,18 +72,18 @@ namespace arger {
 	}
 
 	/* convenience functions for standard program arguments parsing */
-	inline arger::Parsed Parse(const str::IsStr auto& line, const arger::Config& config) {
-		return arger::Parse(arger::Prepare(line), config);
+	inline arger::Parsed Parse(const str::IsStr auto& line, const arger::Config& config, size_t lineLength = arger::NumCharsHelp) {
+		return arger::Parse(arger::Prepare(line), config, lineLength);
 	}
-	inline arger::Parsed Parse(int argc, const str::IsChar auto* const* argv, const arger::Config& config) {
-		return arger::Parse(arger::Prepare(argc, argv), config);
+	inline arger::Parsed Parse(int argc, const str::IsChar auto* const* argv, const arger::Config& config, size_t lineLength = arger::NumCharsHelp) {
+		return arger::Parse(arger::Prepare(argc, argv), config, lineLength);
 	}
 
 	/* convenience functions for menu-input arguments parsing */
-	inline arger::Parsed Menu(const str::IsStr auto& line, const arger::Config& config) {
-		return arger::Menu(arger::Prepare(line), config);
+	inline arger::Parsed Menu(const str::IsStr auto& line, const arger::Config& config, size_t lineLength = arger::NumCharsHelp) {
+		return arger::Menu(arger::Prepare(line), config, lineLength);
 	}
-	inline arger::Parsed Menu(int argc, const str::IsChar auto* const* argv, const arger::Config& config) {
-		return arger::Menu(arger::Prepare(argc, argv), config);
+	inline arger::Parsed Menu(int argc, const str::IsChar auto* const* argv, const arger::Config& config, size_t lineLength = arger::NumCharsHelp) {
+		return arger::Menu(arger::Prepare(argc, argv), config, lineLength);
 	}
 }

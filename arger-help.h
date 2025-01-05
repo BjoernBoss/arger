@@ -7,9 +7,10 @@
 #include "arger-verify.h"
 
 namespace arger {
+	static constexpr size_t NumCharsHelp = 100;
+
 	namespace detail {
 		static constexpr size_t NumCharsHelpLeft = 32;
-		static constexpr size_t NumCharsHelp = 100;
 
 		class BaseBuilder {
 		private:
@@ -52,9 +53,12 @@ namespace arger {
 			const detail::ValidGroup* pSelected = 0;
 			const detail::ValidConfig& pConfig;
 			const detail::BaseBuilder& pBase;
+			size_t pNumChars = 0;
 
 		public:
-			constexpr HelpBuilder(const detail::BaseBuilder& base, const detail::ValidConfig& config, const detail::ValidGroup* selected) : pBase{ base }, pConfig{ config }, pSelected{ selected } {}
+			constexpr HelpBuilder(const detail::BaseBuilder& base, const detail::ValidConfig& config, const detail::ValidGroup* selected, size_t numChars) : pBase{ base }, pConfig{ config }, pSelected{ selected } {
+				pNumChars = std::max(detail::NumCharsHelpLeft + 8, numChars);
+			}
 
 		private:
 			constexpr void fAddNewLine(bool emptyLine) {
@@ -67,7 +71,7 @@ namespace arger {
 				pPosition = 0;
 			}
 			constexpr void fAddToken(const std::wstring& add) {
-				if (pPosition > 0 && pPosition + add.size() > detail::NumCharsHelp) {
+				if (pPosition > 0 && pPosition + add.size() > pNumChars) {
 					pBuffer.push_back(L'\n');
 					pPosition = 0;
 				}
@@ -77,7 +81,7 @@ namespace arger {
 			}
 			constexpr void fAddSpacedToken(const std::wstring& add) {
 				if (pPosition > 0) {
-					if (pPosition + 1 + add.size() > detail::NumCharsHelp) {
+					if (pPosition + 1 + add.size() > pNumChars) {
 						pBuffer.push_back(L'\n');
 						pPosition = 0;
 					}
@@ -118,7 +122,7 @@ namespace arger {
 						/* check if the whitespace token should be replaced with a line-break, if the printable character
 						*	does not start at the beginning of the line but exceeds the line limit, and otherwise flush
 						*	the whitespace (this ensures that user-placed whitespace after a new-line will be respected) */
-						if ((pPosition > offset || tokenWhite.size() > 0) && pPosition + tokenWhite.size() + tokenPrint.size() > detail::NumCharsHelp)
+						if ((pPosition > offset || tokenWhite.size() > 0) && pPosition + tokenWhite.size() + tokenPrint.size() > pNumChars)
 							pBuffer.append(1, L'\n').append(pPosition = offset, L' ');
 						else {
 							pBuffer.append(tokenWhite);
@@ -174,9 +178,9 @@ namespace arger {
 			}
 			void fDefaultDescription(const arger::Value* begin, const arger::Value* end) {
 				/* construct the list of all default values */
-				std::wstring temp = L"Defaults to: (";
+				std::wstring temp = L"Defaults to: [";
 				for (const arger::Value* it = begin; it != end; ++it) {
-					temp.append(it == begin ? L"[" : L", [");
+					temp.append(it == begin ? L"" : L", ");
 
 					if (it->isStr())
 						temp.append(it->str());
@@ -188,9 +192,8 @@ namespace arger {
 						str::FloatTo(temp, it->real());
 					else
 						temp.append(it->boolean() ? L"true" : L"false");
-					temp.append(1, L']');
 				}
-				temp.append(1, L')');
+				temp.append(1, L']');
 
 				/* write the line out */
 				fAddNewLine(false);
@@ -314,20 +317,8 @@ namespace arger {
 						temp.append(L"=<").append(option.option->payload.name).append(1, L'>').append(fTypeString(option.option->payload.type));
 					fAddString(temp);
 
-					/* construct the description text (add the users, if the optional argument is not a
-					*	general purpose argument, and there are still groups available to be selected) */
+					/* add the description text and custom usage-limits and write the result out */
 					temp = option.option->description;
-					if (option.restricted && option.users.contains(pSelected) && topMost->incomplete) {
-						temp += L" (Used for: ";
-						size_t index = 0;
-						for (const auto& group : topMost->sub) {
-							if (option.users.contains(&group.second))
-								temp.append(index++ > 0 ? L"|" : L"").append(group.first);
-						}
-						temp.append(1, L')');
-					}
-
-					/* add the custom usage-limits and write the result out */
 					if (option.minimum != 1 || option.maximum != 1)
 						temp.append(fLimitString(option.minimum, option.maximum > 1 ? option.maximum : 0));
 					fAddString(temp, detail::NumCharsHelpLeft, 1);
@@ -338,6 +329,19 @@ namespace arger {
 					/* add the default values */
 					if (!option.option->payload.defValue.empty())
 						fDefaultDescription(&option.option->payload.defValue.front(), &option.option->payload.defValue.back() + 1);
+
+					/* add the usages (if the optional argument is not a general purpose
+					*	argument and there are still groups available to be selected) */
+					if (option.restricted && option.users.contains(pSelected) && topMost->incomplete) {
+						fAddNewLine(false);
+						temp = L"Used for: ";
+						size_t index = 0;
+						for (const auto& group : topMost->sub) {
+							if (option.users.contains(&group.second))
+								temp.append(index++ > 0 ? L"|" : L"").append(group.first);
+						}
+						fAddString(temp, detail::NumCharsHelpLeft);
+					}
 				}
 			}
 

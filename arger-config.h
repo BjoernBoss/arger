@@ -115,28 +115,8 @@ namespace arger {
 		constexpr Config(const arger::IsConfig<arger::Config> auto&... configs);
 	};
 
-	/* general sub-group of options for a configuration/group
-	*	 Note: Groups/Configs can can only have sub-groups or positional arguments */
-	struct Group :
-		public detail::Config,
-		public detail::Description,
-		public detail::Help,
-		public detail::Use,
-		public detail::Arguments,
-		public detail::SpecialPurpose {
-	public:
-		std::wstring name;
-		std::wstring id;
-
-	public:
-		Group(std::wstring name, std::wstring id);
-		constexpr Group(std::wstring name, std::wstring id, const arger::IsConfig<arger::Group> auto&... configs);
-		constexpr void apply(detail::Groups& base) const {
-			base.groups.list.push_back(*this);
-		}
-	};
-
-	/* general optional flag/payload */
+	/* general optional flag/payload
+	*	Note: if passed to a group, it is implicitly only bound to that group */
 	struct Option :
 		public detail::Config,
 		public detail::Description,
@@ -156,18 +136,40 @@ namespace arger {
 		}
 	};
 
+	/* general sub-group of options for a configuration/group
+	*	 Note: Groups/Configs can can only have sub-groups or positional arguments */
+	struct Group :
+		public detail::Config,
+		public detail::Description,
+		public detail::Help,
+		public detail::Use,
+		public detail::Arguments,
+		public detail::SpecialPurpose,
+		public detail::Options {
+	public:
+		std::wstring name;
+		std::wstring id;
+
+	public:
+		Group(std::wstring name, std::wstring id);
+		constexpr Group(std::wstring name, std::wstring id, const arger::IsConfig<arger::Group> auto&... configs);
+		constexpr void apply(detail::Groups& base) const {
+			base.groups.list.push_back(*this);
+		}
+	};
+
 	constexpr arger::Config::Config() {}
 	constexpr arger::Config::Config(const arger::IsConfig<arger::Config> auto&... configs) {
 		detail::ApplyConfigs(*this, configs...);
 	}
 
-	arger::Group::Group(std::wstring name, std::wstring id) : name{ name }, id{ id } {}
-	constexpr arger::Group::Group(std::wstring name, std::wstring id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ id } {
+	arger::Option::Option(std::wstring name) : name{ name } {}
+	constexpr arger::Option::Option(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs) : name{ name } {
 		detail::ApplyConfigs(*this, configs...);
 	}
 
-	arger::Option::Option(std::wstring name) : name{ name } {}
-	constexpr arger::Option::Option(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs) : name{ name } {
+	arger::Group::Group(std::wstring name, std::wstring id) : name{ name }, id{ id } {}
+	constexpr arger::Group::Group(std::wstring name, std::wstring id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ id } {
 		detail::ApplyConfigs(*this, configs...);
 	}
 
@@ -246,6 +248,14 @@ namespace arger {
 		constexpr void apply(detail::Require& base) const {
 			base.require.minimum = minimum;
 			base.require.maximum = maximum;
+		}
+
+	public:
+		static arger::Require AtLeast(size_t min) {
+			return{ min, 0 };
+		}
+		static arger::Require Any() {
+			return{ 0, 0 };
 		}
 	};
 

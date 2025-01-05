@@ -25,6 +25,7 @@ namespace arger::detail {
 		size_t maximum = 0;
 		bool payload = false;
 		bool restricted = false;
+		bool anyUsers = false;
 	};
 	struct ValidConfig : public detail::ValidArguments {
 		std::map<std::wstring, detail::ValidOption> options;
@@ -89,7 +90,7 @@ namespace arger::detail {
 			throw arger::ConfigException{ who, L" cannot be a special purpose flag and carry a payload/require arguments." };
 
 	}
-	inline void ValidateOption(const arger::Config& config, const arger::Option& option, detail::ValidConfig& state) {
+	inline void ValidateOption(const arger::Config& config, const arger::Option& option, detail::ValidConfig& state, bool anyUsers) {
 		if (option.name.empty())
 			throw arger::ConfigException{ L"Option name must not be empty." };
 		if (option.name.starts_with(L"-"))
@@ -101,6 +102,7 @@ namespace arger::detail {
 		detail::ValidOption& entry = state.options[option.name];
 		entry.option = &option;
 		entry.payload = !option.payload.name.empty();
+		entry.anyUsers = anyUsers;
 
 		/* check if the abbreviation is unique */
 		if (option.abbreviation != 0) {
@@ -169,18 +171,27 @@ namespace arger::detail {
 		else
 			entry.id = {};
 
-		/* validate the usages and register this group and all parents to them */
-		for (const auto& option : entry.group->use) {
-			auto it = state.options.find(option);
-			if (it == state.options.end())
-				throw arger::ConfigException{ L"Group [", entry.id, L"] uses undefined option [", option, L"]." };
+		/* handler to register usage of an option */
+		auto addUsage = [&](const std::wstring& name, bool onlyUsage) {
+			auto it = state.options.find(name);
+			if (it == state.options.end() || (!onlyUsage && !it->second.anyUsers))
+				throw arger::ConfigException{ L"Group [", entry.id, L"] uses undefined option [", name, L"]." };
 
 			const detail::ValidGroup* walker = &entry;
 			while (walker != 0) {
 				it->second.users.insert(walker);
 				walker = walker->parent;
-			}
+			}};
+
+		/* register all only-usage options */
+		for (const auto& option : group.options) {
+			detail::ValidateOption(config, option, state, false);
+			addUsage(option.name, true);
 		}
+
+		/* validate and register the remaining usages */
+		for (const auto& option : entry.group->use)
+			addUsage(option, false);
 
 		/* register this group to all options used by parents of this group */
 		const detail::ValidGroup* walker = entry.parent;
@@ -251,7 +262,7 @@ namespace arger::detail {
 		/* validate the options and arguments (validate the options before the arguments,
 		*	as the arguments-usages will require the options to be already set) */
 		for (const auto& option : config.options)
-			detail::ValidateOption(config, option, state);
+			detail::ValidateOption(config, option, state, true);
 		detail::ValidateArguments(config, config, state, state, 0, &state);
 
 		/* finalize the options by adding the null-group */

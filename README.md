@@ -26,7 +26,8 @@ arger::Config(const arger::IsConfig<arger::Config> auto&... configs);
 *	 Note: Groups/Configs can can only have sub-groups or positional arguments */
 arger::Group(std::wstring name, std::wstring id, const arger::IsConfig<arger::Group> auto&... configs);
 
-/* general optional flag/payload */
+/* general optional flag/payload
+*	Note: if passed to a group, it is implicitly only bound to that group */
 arger::Option(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs);
 
 /* version for the current configuration */

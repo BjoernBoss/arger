@@ -231,7 +231,7 @@ namespace arger {
 			}
 
 		public:
-			arger::Parsed parse(const arger::Config& config, bool menu) {
+			arger::Parsed parse(const arger::Config& config, size_t lineLength, bool menu) {
 				const detail::ValidArguments* topMost = static_cast<const detail::ValidArguments*>(&pConfig);
 
 				/* validate and pre-process the configuration */
@@ -308,7 +308,7 @@ namespace arger {
 				/* check if the help or version should be printed */
 				std::wstring print = (pPrintVersion ? base.buildVersionString() : L"");
 				if (pPrintHelp)
-					print.append(print.empty() ? L"" : L"\n\n").append(detail::HelpBuilder{ base, pConfig, pSelected }.buildHelpString(menu));
+					print.append(print.empty() ? L"" : L"\n\n").append(detail::HelpBuilder{ base, pConfig, pSelected, lineLength }.buildHelpString(menu));
 				if (!print.empty())
 					throw arger::PrintMessage{ print };
 
@@ -352,12 +352,12 @@ namespace arger {
 	}
 
 	/* parse the arguments as standard program arguments */
-	inline arger::Parsed Parse(const std::vector<std::wstring>& args, const arger::Config& config) {
-		return detail::Parser{ args }.parse(config, false);
+	inline arger::Parsed Parse(const std::vector<std::wstring>& args, const arger::Config& config, size_t lineLength = arger::NumCharsHelp) {
+		return detail::Parser{ args }.parse(config, lineLength, false);
 	}
 
 	/* parse the arguments as menu-input arguments */
-	inline arger::Parsed Menu(const std::vector<std::wstring>& args, const arger::Config& config) {
-		return detail::Parser{ args }.parse(config, true);
+	inline arger::Parsed Menu(const std::vector<std::wstring>& args, const arger::Config& config, size_t lineLength = arger::NumCharsHelp) {
+		return detail::Parser{ args }.parse(config, lineLength, true);
 	}
 }
