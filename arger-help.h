@@ -367,6 +367,8 @@ namespace arger {
 					for (const auto& [name, group] : topMost->sub) {
 						fAddNewLine(false);
 						fAddString(str::wd::Build(L"  ", name));
+						if (group.group->abbreviation != 0)
+							fAddString(str::wd::Build(L", ", group.group->abbreviation));
 						fAddString(group.group->description, detail::NumCharsHelpLeft, 1);
 					}
 				}
@@ -375,7 +377,7 @@ namespace arger {
 				else if (!topMost->args->positionals.empty()) {
 					fAddNewLine(true);
 					if (pSelected == 0)
-						fAddString(L"Positional Arguments: ");
+						fAddString(L"Positional Arguments:");
 					else
 						fAddString(str::wd::Build(L"Positional Arguments for ", topMost->super->groupName, " [", pSelected->group->name, "]: "));
 

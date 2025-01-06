@@ -51,7 +51,7 @@ arger::Constraint(arger::Checker constraint);
 *		if greater than number of positional arguments, last type is used as catch-all */
 arger::Require(size_t min, size_t max);
 
-/* add an abbreviation character for an option to allow it to be accessible as, for example, -x */
+/* add an abbreviation character for an option or group to allow it to be accessible as single letters or, for example, -x */
 arger::Abbreviation(wchar_t c);
 
 /* add a payload to an option with a given name and of a given type, and optional default values (must meet the requirement-counts) */

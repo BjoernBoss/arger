@@ -145,6 +145,7 @@ namespace arger {
 		public detail::Use,
 		public detail::Arguments,
 		public detail::SpecialPurpose,
+		public detail::Abbreviation,
 		public detail::Options {
 	public:
 		std::wstring name;
@@ -259,7 +260,7 @@ namespace arger {
 		}
 	};
 
-	/* add an abbreviation character for an option to allow it to be accessible as, for example, -x */
+	/* add an abbreviation character for an option or group to allow it to be accessible as single letters or, for example, -x */
 	struct Abbreviation : public detail::Config {
 	public:
 		wchar_t chr = 0;

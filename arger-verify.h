@@ -12,6 +12,7 @@ namespace arger::detail {
 		const detail::Arguments* args = 0;
 		const detail::ValidArguments* super = 0;
 		std::map<std::wstring, detail::ValidGroup> sub;
+		std::map<wchar_t, detail::ValidGroup*> abbreviations;
 		std::wstring groupName;
 		size_t minimum = 0;
 		size_t maximum = 0;
@@ -151,6 +152,13 @@ namespace arger::detail {
 		entry.id = id;
 		entry.parent = parent;
 		entry.super = super;
+
+		/* check if the abbreviation is unique */
+		if (group.abbreviation != 0) {
+			if (super->abbreviations.contains(group.abbreviation))
+				throw arger::ConfigException{ L"Abbreviation [", group.abbreviation, L"] for group with id [", id, L"] already exists." };
+			super->abbreviations[group.abbreviation] = &entry;
+		}
 
 		/* validate the special-purpose attributes */
 		if (group.flagHelp || group.flagVersion) {

@@ -70,7 +70,7 @@ namespace arger {
 					/* check if the payload has already been consumed */
 					if (payloadUsed || (!hasPayload && pIndex >= pArgs.size())) {
 						if (pDeferred.empty())
-							str::BuildTo(pDeferred, L"Value [", entry->payload, L"] missing for optional argument [", entry->option->name, L"].");
+							str::BuildTo(pDeferred, L"Value [", entry->option->payload.name, L"] missing for optional argument [", entry->option->name, L"].");
 
 						/* continue parsing, as the special purpose flags might still occur */
 						continue;
@@ -282,6 +282,15 @@ namespace arger {
 						if (it != topMost->sub.end()) {
 							topMost = (pSelected = &it->second);
 							continue;
+						}
+
+						/* check if an abbreviation matches */
+						if (next.length() == 1) {
+							auto at = topMost->abbreviations.find(next[0]);
+							if (at != topMost->abbreviations.end()) {
+								topMost = (pSelected = at->second);
+								continue;
+							}
 						}
 						dirtyGroup = pIndex - 1;
 					}
