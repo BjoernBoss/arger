@@ -31,27 +31,33 @@ namespace arger {
 
 	using Checker = std::function<std::wstring(const arger::Parsed&)>;
 
-	/* exception thrown when a malformed argument-configuration is used */
-	struct ConfigException : public str::BuildException {
+	/* exception thrown when using the library in an invalid way */
+	struct Exception : public str::BuildException {
 		template <class... Args>
-		constexpr ConfigException(const Args&... args) : str::BuildException{ args... } {}
+		constexpr Exception(const Args&... args) : str::BuildException{ args... } {}
+	};
+
+	/* exception thrown when a malformed argument-configuration is used */
+	struct ConfigException : public arger::Exception {
+		template <class... Args>
+		constexpr ConfigException(const Args&... args) : arger::Exception{ args... } {}
 	};
 
 	/* exception thrown when accessing an arger::Value as a certain type, which it is not */
-	struct TypeException : public str::BuildException {
+	struct TypeException : public arger::Exception {
 		template <class... Args>
-		constexpr TypeException(const Args&... args) : str::BuildException{ args... } {}
+		constexpr TypeException(const Args&... args) : arger::Exception{ args... } {}
 	};
 
 	/* exception thrown when malformed or invalid arguments are encountered */
-	struct ParsingException : public str::BuildException {
+	struct ParsingException : public arger::Exception {
 		template <class... Args>
-		constexpr ParsingException(const Args&... args) : str::BuildException{ args... } {}
+		constexpr ParsingException(const Args&... args) : arger::Exception{ args... } {}
 	};
 
 	/* exception thrown when only a message should be printed but no */
-	struct PrintMessage : public str::BuildException {
+	struct PrintMessage : public arger::Exception {
 		template <class... Args>
-		constexpr PrintMessage(const Args&... args) : str::BuildException{ args... } {}
+		constexpr PrintMessage(const Args&... args) : arger::Exception{ args... } {}
 	};
 }
