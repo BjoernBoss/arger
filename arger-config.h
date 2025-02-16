@@ -164,12 +164,12 @@ namespace arger {
 		detail::ApplyConfigs(*this, configs...);
 	}
 
-	arger::Option::Option(std::wstring name) : name{ name } {}
+	inline arger::Option::Option(std::wstring name) : name{ name } {}
 	constexpr arger::Option::Option(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs) : name{ name } {
 		detail::ApplyConfigs(*this, configs...);
 	}
 
-	arger::Group::Group(std::wstring name, std::wstring id) : name{ name }, id{ id } {}
+	inline arger::Group::Group(std::wstring name, std::wstring id) : name{ name }, id{ id } {}
 	constexpr arger::Group::Group(std::wstring name, std::wstring id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ id } {
 		detail::ApplyConfigs(*this, configs...);
 	}
