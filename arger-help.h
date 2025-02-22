@@ -250,6 +250,21 @@ namespace arger {
 			}
 
 		private:
+			bool fCheckOptionPrint(const detail::ValidOption* option, bool menu) const {
+				/* in normal mode, check if the argument is excluded by the current selected group, based on the usage-requirements */
+				if (!menu)
+					return detail::CheckUsage(option, pSelected);
+
+				/* in menu-mode, print only flags, which are only available because a parent uses it,
+				*	and for the special case of the root, only print it if no other groups exist */
+				if (pSelected == 0)
+					return pConfig.sub.empty();
+				for (const auto& user : option->users) {
+					if (detail::CheckParent(user, pSelected))
+						return true;
+				}
+				return false;
+			}
 			void fBuildUsage(bool menu) {
 				const detail::ValidArguments* topMost = (pSelected == 0 ? static_cast<const detail::ValidArguments*>(&pConfig) : pSelected);
 
@@ -267,7 +282,7 @@ namespace arger {
 				bool hasOptionals = false;
 				for (const auto& [name, option] : pConfig.options) {
 					/* check if the entry can be skipped for this group */
-					if (option.restricted && !option.users.contains(pSelected))
+					if (!detail::CheckUsage(&option, pSelected))
 						continue;
 					if (option.minimum == 0) {
 						hasOptionals = true;
@@ -295,7 +310,7 @@ namespace arger {
 				else if (topMost->nestedPositionals)
 					fAddSpacedToken(L"[params...]");
 			}
-			void fBuildOptionals(bool required) {
+			void fBuildOptionals(bool required, bool menu) {
 				const detail::ValidArguments* topMost = (pSelected == 0 ? static_cast<const detail::ValidArguments*>(&pConfig) : pSelected);
 
 				/* iterate over the optionals and add the corresponding type */
@@ -303,8 +318,8 @@ namespace arger {
 					if ((option.minimum > 0) != required)
 						continue;
 
-					/* check if the argument is excluded by the current selected group, based on the usage-requirements */
-					if (option.restricted && !option.users.contains(pSelected))
+					/* check if the option can be discarded based on the selection */
+					if (!fCheckOptionPrint(&option, menu))
 						continue;
 					fAddNewLine(false);
 
@@ -330,17 +345,23 @@ namespace arger {
 					if (!option.option->payload.defValue.empty())
 						fDefaultDescription(&option.option->payload.defValue.front(), &option.option->payload.defValue.back() + 1);
 
-					/* add the usages (if the optional argument is not a general purpose
-					*	argument and there are still groups available to be selected) */
-					if (option.restricted && option.users.contains(pSelected) && topMost->incomplete) {
-						fAddNewLine(false);
-						temp = L"Used for: ";
-						size_t index = 0;
-						for (const auto& group : topMost->sub) {
-							if (option.users.contains(&group.second))
-								temp.append(index++ > 0 ? L"|" : L"").append(group.first);
+					/* add the usages (if groups still need to be selected and not all are users) */
+					if (topMost->incomplete) {
+						size_t users = 0;
+						for (const auto& [name, group] : topMost->sub) {
+							if (detail::CheckUsage(&option, &group))
+								++users;
 						}
-						fAddString(temp, detail::NumCharsHelpLeft);
+						if (users != topMost->sub.size()) {
+							fAddNewLine(false);
+							temp = L"Used for: ";
+							size_t index = 0;
+							for (const auto& group : topMost->sub) {
+								if (option.users.contains(&group.second))
+									temp.append(index++ > 0 ? L"|" : L"").append(group.first);
+							}
+							fAddString(temp, detail::NumCharsHelpLeft);
+						}
 					}
 				}
 			}
@@ -405,7 +426,7 @@ namespace arger {
 				/* check if there are optional/required arguments */
 				bool optArgs = false, reqArgs = false;
 				for (const auto& entry : pConfig.options) {
-					if (!entry.second.restricted || entry.second.users.contains(pSelected))
+					if (fCheckOptionPrint(&entry.second, menu))
 						(entry.second.minimum > 0 ? reqArgs : optArgs) = true;
 				}
 
@@ -413,14 +434,14 @@ namespace arger {
 				if (reqArgs) {
 					fAddNewLine(true);
 					fAddString(L"Required arguments:");
-					fBuildOptionals(true);
+					fBuildOptionals(true, menu);
 				}
 
 				/* add the optional argument descriptions (will automatically be sorted lexicographically) */
 				if (optArgs) {
 					fAddNewLine(true);
 					fAddString(L"Optional arguments:");
-					fBuildOptionals(false);
+					fBuildOptionals(false, menu);
 				}
 
 				/* add all of the global help descriptions and the help-content of the selected groups */

@@ -183,13 +183,9 @@ namespace arger {
 
 				/* iterate over the optional arguments and verify them */
 				for (auto& [name, option] : pConfig.options) {
-					/* check if the current group is not a user of the optional argument (restricted can
-					*	only be true if groups exist and the null-group is contained at all times) */
-					if (option.restricted && !option.users.contains(pSelected)) {
-						if ((option.payload ? pParsed.pOptions.contains(name) : pParsed.pFlags.contains(name)))
-							throw arger::ParsingException{ L"Argument [", name, L"] not meant for ", topMost->super->groupName, L" [", pSelected->group->name, L"]." };
-						continue;
-					}
+					/* check if the current option can be used by the selected group or any of its ancestors */
+					if (!detail::CheckUsage(&option, pSelected) && (option.payload ? pParsed.pOptions.contains(name) : pParsed.pFlags.contains(name)))
+						throw arger::ParsingException{ L"Argument [", name, L"] not meant for ", topMost->super->groupName, L" [", pSelected->group->name, L"]." };
 
 					/* check if this is a flag, in which case nothing more needs to be checked */
 					if (!option.payload)
@@ -242,8 +238,35 @@ namespace arger {
 
 				/* iterate over the arguments and parse them based on the definitions */
 				size_t dirtyGroup = pArgs.size();
+				bool canHaveGroupFlag = true;
 				while (pIndex < pArgs.size()) {
 					const std::wstring& next = pArgs[pIndex++];
+
+					/* check if its the version or help group (only if the last entry was
+					*	part of a group-selection or the top-most group is still incomplete) */
+					if (canHaveGroupFlag || topMost->incomplete) {
+						if (pConfig.helpGroup != 0) {
+							if (next == pConfig.helpGroup->group->name) {
+								pPrintHelp = true;
+								continue;
+							}
+							if (next.size() == 1 && pConfig.helpGroup->group->abbreviation == next[0] && next[0] != 0) {
+								pPrintHelp = true;
+								continue;
+							}
+						}
+						if (pConfig.versionGroup != 0) {
+							if (next == pConfig.versionGroup->group->name) {
+								pPrintVersion = true;
+								continue;
+							}
+							if (next.size() == 1 && pConfig.versionGroup->group->abbreviation == next[0] && next[0] != 0) {
+								pPrintVersion = true;
+								continue;
+							}
+						}
+					}
+					canHaveGroupFlag = false;
 
 					/* check if its an optional argument or positional-lock */
 					if (!pPositionalLocked && !next.empty() && next[0] == L'-') {
@@ -281,14 +304,16 @@ namespace arger {
 						/* check if a group has been found */
 						if (it != topMost->sub.end()) {
 							topMost = (pSelected = &it->second);
+							canHaveGroupFlag = true;
 							continue;
 						}
 
 						/* check if an abbreviation matches */
-						if (next.length() == 1) {
+						if (next.size() == 1) {
 							auto at = topMost->abbreviations.find(next[0]);
 							if (at != topMost->abbreviations.end()) {
 								topMost = (pSelected = at->second);
+								canHaveGroupFlag = true;
 								continue;
 							}
 						}
@@ -299,19 +324,6 @@ namespace arger {
 					*	limit checks for now, but defer it until the help/version string have been potentially
 					*	printed, in order for help to be printed without the arguments being valid) */
 					pParsed.pPositional.emplace_back(arger::Value{ next });
-				}
-
-				/* check if the top-most group is a help special purpose argument,
-				*	in which case the selection will also be reset (must be only one layer low) */
-				if (pSelected != 0) {
-					if (pSelected->group->flagHelp) {
-						pPrintHelp = true;
-						pSelected = 0;
-					}
-					else if (pSelected->group->flagVersion) {
-						pPrintVersion = true;
-						pSelected = 0;
-					}
 				}
 
 				/* check if the help or version should be printed */

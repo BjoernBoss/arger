@@ -22,23 +22,60 @@ namespace arger::detail {
 	struct ValidOption {
 		const arger::Option* option = 0;
 		std::set<const detail::ValidGroup*> users;
+		const detail::ValidGroup* owner = 0;
 		size_t minimum = 0;
 		size_t maximum = 0;
 		bool payload = false;
-		bool restricted = false;
-		bool anyUsers = false;
 	};
 	struct ValidConfig : public detail::ValidArguments {
 		std::map<std::wstring, detail::ValidOption> options;
 		std::map<wchar_t, detail::ValidOption*> abbreviations;
 		std::map<std::wstring, detail::ValidGroup*> groupIds;
 		const arger::Config* config = 0;
+		detail::ValidGroup* helpGroup = 0;
+		detail::ValidGroup* versionGroup = 0;
 	};
 	struct ValidGroup : public detail::ValidArguments {
 		const arger::Group* group = 0;
 		const detail::ValidGroup* parent = 0;
 		std::wstring_view id;
+		size_t depth = 0;
 	};
+
+	inline bool CheckParent(const detail::ValidGroup* parent, const detail::ValidGroup* child) {
+		if (parent == 0)
+			return true;
+		if (child == 0)
+			return false;
+
+		/* check if the child can be above the parent */
+		if (child->depth < parent->depth)
+			return false;
+
+		/* find the parent in the ancestor-chain of the child */
+		while (child != 0) {
+			if (child == parent)
+				return true;
+			child = child->parent;
+		}
+		return false;
+	}
+	inline bool CheckAncestors(const detail::ValidGroup* a, const detail::ValidGroup* b) {
+		if (a == 0 || b == 0)
+			return true;
+
+		/* find the other group in the younger of the two groups */
+		if (a->depth < b->depth)
+			return detail::CheckParent(a, b);
+		return detail::CheckParent(b, a);
+	}
+	inline bool CheckUsage(const detail::ValidOption* option, const detail::ValidGroup* group) {
+		for (const auto& user : option->users) {
+			if (detail::CheckAncestors(user, group))
+				return true;
+		}
+		return false;
+	}
 
 	inline void ValidateArguments(const arger::Config& config, const detail::Arguments& arguments, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidGroup* self, detail::ValidArguments* super);
 	inline constexpr void ValidateHelp(const detail::Help& help, const std::wstring& who) {
@@ -89,11 +126,10 @@ namespace arger::detail {
 			throw arger::ConfigException{ who, L" cannot be a version special purpose flag if no version has been set." };
 		if ((flags.flagHelp || flags.flagVersion) && payload)
 			throw arger::ConfigException{ who, L" cannot be a special purpose flag and carry a payload/require arguments." };
-
 	}
-	inline void ValidateOption(const arger::Config& config, const arger::Option& option, detail::ValidConfig& state, bool anyUsers) {
-		if (option.name.empty())
-			throw arger::ConfigException{ L"Option name must not be empty." };
+	inline void ValidateOption(const arger::Config& config, const arger::Option& option, detail::ValidConfig& state, const detail::ValidGroup* owner) {
+		if (option.name.size() <= 1)
+			throw arger::ConfigException{ L"Option name must at least be two characters long." };
 		if (option.name.starts_with(L"-"))
 			throw arger::ConfigException{ L"Option name must not start with a hypen." };
 
@@ -103,7 +139,11 @@ namespace arger::detail {
 		detail::ValidOption& entry = state.options[option.name];
 		entry.option = &option;
 		entry.payload = !option.payload.name.empty();
-		entry.anyUsers = anyUsers;
+		entry.owner = owner;
+
+		/* add the owner as first user of the group */
+		if (owner != 0)
+			entry.users.insert(owner);
 
 		/* check if the abbreviation is unique */
 		if (option.abbreviation != 0) {
@@ -138,8 +178,8 @@ namespace arger::detail {
 		}
 	}
 	inline void ValidateGroup(const arger::Config& config, const arger::Group& group, detail::ValidConfig& state, detail::ValidGroup* parent, detail::ValidArguments* super) {
-		if (group.name.empty())
-			throw arger::ConfigException{ L"Group name must not be empty." };
+		if (group.name.size() <= 1)
+			throw arger::ConfigException{ L"Group name must at least be two characters long." };
 		if (group.name.starts_with(L"-"))
 			throw arger::ConfigException{ L"Group name must not start with a hypen." };
 		const std::wstring& id = (group.id.empty() ? group.name : group.id);
@@ -152,6 +192,7 @@ namespace arger::detail {
 		entry.id = id;
 		entry.parent = parent;
 		entry.super = super;
+		entry.depth = (parent == 0 ? 0 : parent->depth + 1);
 
 		/* check if the abbreviation is unique */
 		if (group.abbreviation != 0) {
@@ -162,9 +203,21 @@ namespace arger::detail {
 
 		/* validate the special-purpose attributes */
 		if (group.flagHelp || group.flagVersion) {
-			ValidateFlags(config, group, str::wd::Build(L"Group with id [", id, L']'), !group.positionals.empty() || !group.groups.list.empty());
+			detail::ValidateFlags(config, group, str::wd::Build(L"Group with id [", id, L']'), !group.positionals.empty() || !group.groups.list.empty());
 			if (parent != 0)
-				throw arger::ConfigException{ L"Group with id [", id, L"] can only have a help special purpose flag assigned if its a root group." };
+				throw arger::ConfigException{ L"Group with id [", id, L"] can only have a special purpose group assigned if its a root group." };
+
+			/* update the global configuration */
+			if (group.flagHelp) {
+				if (state.helpGroup != 0)
+					throw arger::ConfigException{ L"Group with id [", id, L"] cannot have be a special purpose help group as [", state.helpGroup->id, L"] already has it assigned." };
+				state.helpGroup = &entry;
+			}
+			if (group.flagVersion) {
+				if (state.versionGroup != 0)
+					throw arger::ConfigException{ L"Group with id [", id, L"] cannot have a special purpose version group as [", state.versionGroup->id, L"] already has it assigned." };
+				state.versionGroup = &entry;
+			}
 		}
 
 		/* validate the arguments */
@@ -179,35 +232,9 @@ namespace arger::detail {
 		else
 			entry.id = {};
 
-		/* handler to register usage of an option */
-		auto addUsage = [&](const std::wstring& name, bool onlyUsage) {
-			auto it = state.options.find(name);
-			if (it == state.options.end() || (!onlyUsage && !it->second.anyUsers))
-				throw arger::ConfigException{ L"Group [", entry.id, L"] uses undefined option [", name, L"]." };
-
-			const detail::ValidGroup* walker = &entry;
-			while (walker != 0) {
-				it->second.users.insert(walker);
-				walker = walker->parent;
-			}};
-
-		/* register all only-usage options */
-		for (const auto& option : group.options) {
-			detail::ValidateOption(config, option, state, false);
-			addUsage(option.name, true);
-		}
-
-		/* validate and register the remaining usages */
-		for (const auto& option : entry.group->use)
-			addUsage(option, false);
-
-		/* register this group to all options used by parents of this group */
-		const detail::ValidGroup* walker = entry.parent;
-		while (walker != 0) {
-			for (const auto& option : walker->group->use)
-				state.options.at(option).users.insert(&entry);
-			walker = walker->parent;
-		}
+		/* register all new options */
+		for (const auto& option : group.options)
+			detail::ValidateOption(config, option, state, &entry);
 
 		/* validate the help attributes */
 		detail::ValidateHelp(group, str::wd::Build(L"group [", id, L"]"));
@@ -257,6 +284,40 @@ namespace arger::detail {
 				detail::ValidateDefValue(arguments.positionals[i].type, arguments.positionals[i].defValue.value(), whoSelf);
 		}
 	}
+	inline void ValidateFinalizedGroups(detail::ValidConfig& state, const detail::ValidGroup& group) {
+		/* validate the name and abbreviation relative to help/version groups */
+		if (state.helpGroup != 0 && state.helpGroup != &group) {
+			if (state.helpGroup->group->name == group.group->name)
+				throw arger::ConfigException{ L"Group [", group.id, L"] cannot share a name with the special purpose help group." };;
+			if (state.helpGroup->group->abbreviation == group.group->abbreviation && group.group->abbreviation != 0)
+				throw arger::ConfigException{ L"Group [", group.id, L"] cannot share an abbreviation with the special purpose help group." };;
+		}
+		if (state.versionGroup != 0 && state.versionGroup != &group) {
+			if (state.versionGroup->group->name == group.group->name)
+				throw arger::ConfigException{ L"Group [", group.id, L"] cannot share a name with the special purpose version group." };;
+			if (state.versionGroup->group->abbreviation == group.group->abbreviation && group.group->abbreviation != 0)
+				throw arger::ConfigException{ L"Group [", group.id, L"] cannot share an abbreviation with the special purpose version group." };;
+		}
+
+		/* validate that used options are defined and usable */
+		for (const auto& option : group.group->use) {
+			/* check if the used option exists */
+			auto it = state.options.find(option);
+			if (it == state.options.end())
+				throw arger::ConfigException{ L"Group [", group.id, L"] uses undefined option [", option, L"]." };
+
+			/* check if the used option can be used by this group */
+			if (!detail::CheckParent(it->second.owner, &group))
+				throw arger::ConfigException{ L"Group [", group.id, L"] cannot use option [", option, L"] from another group." };
+
+			/* add itself to the users of the group */
+			it->second.users.insert(&group);
+		}
+
+		/* validate all children */
+		for (const auto& [_, child] : group.sub)
+			detail::ValidateFinalizedGroups(state, child);
+	}
 	inline void ValidateConfig(const arger::Config& config, detail::ValidConfig& state, bool menu) {
 		if (menu && !config.program.empty())
 			throw arger::ConfigException{ L"Menu cannot have a program name." };
@@ -267,16 +328,19 @@ namespace arger::detail {
 		/* validate the help attributes */
 		detail::ValidateHelp(config, L"arguments");
 
-		/* validate the options and arguments (validate the options before the arguments,
-		*	as the arguments-usages will require the options to be already set) */
+		/* validate the options and arguments */
 		for (const auto& option : config.options)
-			detail::ValidateOption(config, option, state, true);
+			detail::ValidateOption(config, option, state, 0);
 		detail::ValidateArguments(config, config, state, state, 0, &state);
 
-		/* finalize the options by adding the null-group */
-		for (auto& option : state.options) {
-			option.second.restricted = !option.second.users.empty();
-			option.second.users.insert(0);
+		/* post-validate all groups after all groups and flags have been loaded */
+		for (const auto& [_, group] : state.sub)
+			detail::ValidateFinalizedGroups(state, group);
+
+		/* finalize all options by adding the root-group to all non-restricted options */
+		for (auto& [name, option] : state.options) {
+			if (option.users.empty())
+				option.users.insert(0);
 		}
 	}
 }
