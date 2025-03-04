@@ -6,7 +6,7 @@ Small header-only library written in `C++20` to add simple argument parsing to C
 
 The simple idea is to define the argument-layout using `arger::Config`. The `arger::Parse(int argc, const argv, const arger::Config& config)` method will then produce a `arger::Parsed` structure, which contains the final results.
 
-For convenience, there also exists `arger::Menu(int argc, const argv, const arger::Config& config)`, which is designed to be used in command-line style menus. It will therefore not require, nor print any program information.
+For convenience, there also exists `arger::Menu(int argc, const argv, const arger::Config& config)`, which is designed to be used in command-line style menus. It will therefore not require, nor print any program information and redesign the help menu to fit a command-line style menu. It will also turn the help and version entries from options to group keys, which can be used at any time.
 
 ## Using the library
 This library is a header only library. Simply clone the repository, ensure that `./repos` is on the path (or at least that `<ustring/ustring.h>` can be resolved), and include `<arger/arger.h>`.
@@ -27,8 +27,14 @@ arger::Config(const arger::IsConfig<arger::Config> auto&... configs);
 arger::Group(std::wstring name, std::wstring id, const arger::IsConfig<arger::Group> auto&... configs);
 
 /* general optional flag/payload
-*	Note: if passed to a group, it is implicitly only bound to that group */
+*	Note: if passed to a group, it is implicitly only bound to that group - but all names and abbreviations must be unique */
 arger::Option(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs);
+
+/* configure the key to be used as option for argument mode and any group name for menu mode, which triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
+arger::HelpEntry(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs);
+
+/* configure the key to be used as option for argument mode and any group name for menu mode, which triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
+arger::VersionEntry(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs);
 
 /* version for the current configuration */
 arger::Version(std::wstring version);
@@ -51,7 +57,7 @@ arger::Constraint(arger::Checker constraint);
 *		if greater than number of positional arguments, last type is used as catch-all */
 arger::Require(size_t min, size_t max);
 
-/* add an abbreviation character for an option or group to allow it to be accessible as single letters or, for example, -x */
+/* add an abbreviation character for an option, group, or help/version entry to allow it to be accessible as single letters or, for example, -x */
 arger::Abbreviation(wchar_t c);
 
 /* add a payload to an option with a given name and of a given type, and optional default values (must meet the requirement-counts) */
@@ -93,14 +99,12 @@ arger::Config config{
 		arger::Abbreviation{ L't' },
 		arger::Description{ L"This is the description of the test flag." }
 	},
-	arger::Option{ L"help",
+	arger::HelpEntry{ L"help",
 		arger::Abbreviation{ L'h' },
-		arger::HelpFlag{},
 		arger::Description{ L"Print this help menu." }
 	},
-	arger::Option{ L"version",
+	arger::VersionEntry{ L"version",
 		arger::Abbreviation{ L'v' },
-		arger::VersionFlag{},
 		arger::Description{ L"Print the program version." }
 	},
 	arger::Option{ L"path",
@@ -207,9 +211,8 @@ arger::Config config{
 		arger::Abbreviation{ L't' },
 		arger::Description{ L"This is the description of the test flag." }
 	},
-	arger::Option{ L"help",
+	arger::HelpEntry{ L"help",
 		arger::Abbreviation{ L'h' },
-		arger::HelpFlag{},
 		arger::Description{ L"Print this help menu." }
 	},
 	arger::Option{ L"path",

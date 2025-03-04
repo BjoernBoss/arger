@@ -25,45 +25,66 @@ namespace arger {
 			Parser(const std::vector<std::wstring>& args) : pArgs{ args } {}
 
 		private:
-			void fParseOptional(const std::wstring& arg, const std::wstring& payload, bool fullName, bool hasPayload) {
+			void fParseOptional(const std::wstring& arg, const std::wstring& payload, bool fullName, bool hasPayload, bool menu) {
 				bool payloadUsed = false;
 
+				/* check if it could be the help menu */
+				size_t i = 0;
+				if (fullName && !menu) {
+					if (pConfig.help != 0 && pConfig.help->name == arg) {
+						pPrintHelp = true;
+						i = arg.size();
+					}
+					else if (pConfig.version != 0 && pConfig.version->name == arg) {
+						pPrintVersion = true;
+						i = arg.size();
+					}
+				}
+
 				/* iterate over the list of optional abbreviations/single full-name and process them */
-				for (size_t i = 0; i < arg.size(); ++i) {
+				for (; i < arg.size(); ++i) {
 					detail::ValidOption* entry = 0;
 
-					/* resolve the optional-argument entry, depending on it being a short abbreviation, or a full name */
+					/* resolve the optional-argument entry if its a full name */
 					if (fullName) {
 						auto it = pConfig.options.find(arg);
 						if (it == pConfig.options.end()) {
 							if (pDeferred.empty())
 								str::BuildTo(pDeferred, L"Unknown optional argument [", arg, L"] encountered.");
 
-							/* continue parsing, as the special purpose flags might still occur */
+							/* continue parsing, as the special entries might still occur */
 							continue;
 						}
 						entry = &it->second;
 						i = arg.size();
 					}
+
+					/* check if its one of the special entries */
+					else if (!menu && pConfig.help != 0 && pConfig.help->abbreviation == arg[i]) {
+						pPrintHelp = true;
+						continue;
+					}
+					else if (!menu && pConfig.version != 0 && pConfig.version->abbreviation == arg[i]) {
+						pPrintVersion = true;
+						continue;
+					}
+
+					/* check if its an option abbreviation */
 					else {
 						auto it = pConfig.abbreviations.find(arg[i]);
 						if (it == pConfig.abbreviations.end()) {
 							if (pDeferred.empty())
 								str::BuildTo(pDeferred, L"Unknown optional argument-abbreviation [", arg[i], L"] encountered.");
 
-							/* continue parsing, as the special purpose flags might still occur */
+							/* continue parsing, as the special entries might still occur */
 							continue;
 						}
 						entry = it->second;
 					}
 
-					/* check if this is a flag and mark it as seen and check if its a special purpose argument */
+					/* check if this is a flag and mark it as seen */
 					if (!entry->payload) {
 						pParsed.pFlags.insert(entry->option->name);
-						if (entry->option->flagHelp)
-							pPrintHelp = true;
-						else if (entry->option->flagVersion)
-							pPrintVersion = true;
 						continue;
 					}
 
@@ -72,7 +93,7 @@ namespace arger {
 						if (pDeferred.empty())
 							str::BuildTo(pDeferred, L"Value [", entry->option->payload.name, L"] missing for optional argument [", entry->option->name, L"].");
 
-						/* continue parsing, as the special purpose flags might still occur */
+						/* continue parsing, as the special entries might still occur */
 						continue;
 					}
 					payloadUsed = true;
@@ -238,35 +259,23 @@ namespace arger {
 
 				/* iterate over the arguments and parse them based on the definitions */
 				size_t dirtyGroup = pArgs.size();
-				bool canHaveGroupFlag = true;
+				bool canHaveSpecialEntries = true;
 				while (pIndex < pArgs.size()) {
 					const std::wstring& next = pArgs[pIndex++];
 
 					/* check if its the version or help group (only if the last entry was
 					*	part of a group-selection or the top-most group is still incomplete) */
-					if (canHaveGroupFlag || topMost->incomplete) {
-						if (pConfig.helpGroup != 0) {
-							if (next == pConfig.helpGroup->group->name) {
-								pPrintHelp = true;
-								continue;
-							}
-							if (next.size() == 1 && pConfig.helpGroup->group->abbreviation == next[0] && next[0] != 0) {
-								pPrintHelp = true;
-								continue;
-							}
+					if (menu && (canHaveSpecialEntries || topMost->incomplete)) {
+						if (pConfig.help != 0 && (next.size() != 1 ? (next == pConfig.help->name) : (pConfig.help->abbreviation == next[0] && next[0] != 0))) {
+							pPrintHelp = true;
+							continue;
 						}
-						if (pConfig.versionGroup != 0) {
-							if (next == pConfig.versionGroup->group->name) {
-								pPrintVersion = true;
-								continue;
-							}
-							if (next.size() == 1 && pConfig.versionGroup->group->abbreviation == next[0] && next[0] != 0) {
-								pPrintVersion = true;
-								continue;
-							}
+						if (pConfig.version != 0 && (next.size() != 1 ? (next == pConfig.version->name) : (pConfig.version->abbreviation == next[0] && next[0] != 0))) {
+							pPrintVersion = true;
+							continue;
 						}
 					}
-					canHaveGroupFlag = false;
+					canHaveSpecialEntries = false;
 
 					/* check if its an optional argument or positional-lock */
 					if (!pPositionalLocked && !next.empty() && next[0] == L'-') {
@@ -292,7 +301,7 @@ namespace arger {
 
 						/* parse the single long or multiple short arguments */
 						size_t hypenCount = (next.size() > 2 && next[1] == L'-' ? 2 : 1);
-						fParseOptional(next.substr(hypenCount, end - hypenCount), payload, (hypenCount == 2), hasPayload);
+						fParseOptional(next.substr(hypenCount, end - hypenCount), payload, (hypenCount == 2), hasPayload, menu);
 						continue;
 					}
 
@@ -304,7 +313,7 @@ namespace arger {
 						/* check if a group has been found */
 						if (it != topMost->sub.end()) {
 							topMost = (pSelected = &it->second);
-							canHaveGroupFlag = true;
+							canHaveSpecialEntries = true;
 							continue;
 						}
 
@@ -313,7 +322,7 @@ namespace arger {
 							auto at = topMost->abbreviations.find(next[0]);
 							if (at != topMost->abbreviations.end()) {
 								topMost = (pSelected = at->second);
-								canHaveGroupFlag = true;
+								canHaveSpecialEntries = true;
 								continue;
 							}
 						}

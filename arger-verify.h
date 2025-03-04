@@ -32,8 +32,8 @@ namespace arger::detail {
 		std::map<wchar_t, detail::ValidOption*> abbreviations;
 		std::map<std::wstring, detail::ValidGroup*> groupIds;
 		const arger::Config* config = 0;
-		detail::ValidGroup* helpGroup = 0;
-		detail::ValidGroup* versionGroup = 0;
+		const detail::SpecialEntry* help = 0;
+		const detail::SpecialEntry* version = 0;
 	};
 	struct ValidGroup : public detail::ValidArguments {
 		const arger::Group* group = 0;
@@ -77,7 +77,7 @@ namespace arger::detail {
 		return false;
 	}
 
-	inline void ValidateArguments(const arger::Config& config, const detail::Arguments& arguments, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidGroup* self, detail::ValidArguments* super);
+	inline void ValidateArguments(const arger::Config& config, const detail::Arguments& arguments, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidGroup* self, detail::ValidArguments* super, bool menu);
 	inline constexpr void ValidateHelp(const detail::Help& help, const std::wstring& who) {
 		for (size_t i = 0; i < help.help.size(); ++i) {
 			if (help.help[i].name.empty() || help.help[i].text.empty())
@@ -119,15 +119,21 @@ namespace arger::detail {
 			break;
 		}
 	}
-	inline constexpr void ValidateFlags(const arger::Config& config, const detail::SpecialPurpose& flags, const std::wstring& who, bool payload) {
-		if (flags.flagHelp && flags.flagVersion)
-			throw arger::ConfigException{ who, L" cannot be help and version special purpose at once." };
-		if (flags.flagVersion && config.version.empty())
-			throw arger::ConfigException{ who, L" cannot be a version special purpose flag if no version has been set." };
-		if ((flags.flagHelp || flags.flagVersion) && payload)
-			throw arger::ConfigException{ who, L" cannot be a special purpose flag and carry a payload/require arguments." };
+	inline constexpr void ValidateSpecialEntry(const detail::ValidConfig& state, const std::wstring& name, wchar_t abbreviation, const std::wstring& who) {
+		if (state.help != 0) {
+			if (name == state.help->name)
+				throw arger::ConfigException{ who, L" with name [", name, L"] clashes with help entry name." };
+			if (abbreviation != 0 && abbreviation == state.help->abbreviation)
+				throw arger::ConfigException{ who, L" abbreviation [", abbreviation, L"] clashes with help entry abbreviation." };
+		}
+		if (state.version != 0) {
+			if (name == state.version->name)
+				throw arger::ConfigException{ who, L" with name [", name, L"] clashes with version entry name." };
+			if (abbreviation != 0 && abbreviation == state.version->abbreviation)
+				throw arger::ConfigException{ who, L" abbreviation [", abbreviation, L"] clashes with version entry abbreviation." };
+		}
 	}
-	inline void ValidateOption(const arger::Config& config, const arger::Option& option, detail::ValidConfig& state, const detail::ValidGroup* owner) {
+	inline void ValidateOption(const arger::Config& config, const arger::Option& option, detail::ValidConfig& state, const detail::ValidGroup* owner, bool menu) {
 		if (option.name.size() <= 1)
 			throw arger::ConfigException{ L"Option name must at least be two characters long." };
 		if (option.name.starts_with(L"-"))
@@ -152,11 +158,12 @@ namespace arger::detail {
 			state.abbreviations[option.abbreviation] = &entry;
 		}
 
-		/* validate the special-purpose attributes */
-		std::wstring whoSelf = str::wd::Build(L"option [", option.name, L']');
-		ValidateFlags(config, option, whoSelf, entry.payload);
+		/* check if the name or abbreviation clashes with the help/version entries */
+		if (!menu)
+			detail::ValidateSpecialEntry(state, option.name, option.abbreviation, L"Option");
 
 		/* validate the payload */
+		std::wstring whoSelf = str::wd::Build(L"option [", option.name, L']');
 		if (entry.payload)
 			detail::ValidateType(option.payload.type, whoSelf);
 
@@ -177,7 +184,7 @@ namespace arger::detail {
 				detail::ValidateDefValue(option.payload.type, value, whoSelf);
 		}
 	}
-	inline void ValidateGroup(const arger::Config& config, const arger::Group& group, detail::ValidConfig& state, detail::ValidGroup* parent, detail::ValidArguments* super) {
+	inline void ValidateGroup(const arger::Config& config, const arger::Group& group, detail::ValidConfig& state, detail::ValidGroup* parent, detail::ValidArguments* super, bool menu) {
 		if (group.name.size() <= 1)
 			throw arger::ConfigException{ L"Group name must at least be two characters long." };
 		if (group.name.starts_with(L"-"))
@@ -201,27 +208,12 @@ namespace arger::detail {
 			super->abbreviations[group.abbreviation] = &entry;
 		}
 
-		/* validate the special-purpose attributes */
-		if (group.flagHelp || group.flagVersion) {
-			detail::ValidateFlags(config, group, str::wd::Build(L"Group with id [", id, L']'), !group.positionals.empty() || !group.groups.list.empty());
-			if (parent != 0)
-				throw arger::ConfigException{ L"Group with id [", id, L"] can only have a special purpose group assigned if its a root group." };
-
-			/* update the global configuration */
-			if (group.flagHelp) {
-				if (state.helpGroup != 0)
-					throw arger::ConfigException{ L"Group with id [", id, L"] cannot have be a special purpose help group as [", state.helpGroup->id, L"] already has it assigned." };
-				state.helpGroup = &entry;
-			}
-			if (group.flagVersion) {
-				if (state.versionGroup != 0)
-					throw arger::ConfigException{ L"Group with id [", id, L"] cannot have a special purpose version group as [", state.versionGroup->id, L"] already has it assigned." };
-				state.versionGroup = &entry;
-			}
-		}
+		/* check if the name or abbreviation clashes with the help/version entries */
+		if (menu)
+			detail::ValidateSpecialEntry(state, group.name, group.abbreviation, L"Group");
 
 		/* validate the arguments */
-		detail::ValidateArguments(config, group, state, entry, &entry, super);
+		detail::ValidateArguments(config, group, state, entry, &entry, super, menu);
 
 		/* check if the group-id is unique (only necessary if it does not contain sub-groups itself) */
 		if (!entry.incomplete) {
@@ -234,12 +226,12 @@ namespace arger::detail {
 
 		/* register all new options */
 		for (const auto& option : group.options)
-			detail::ValidateOption(config, option, state, &entry);
+			detail::ValidateOption(config, option, state, &entry, menu);
 
 		/* validate the help attributes */
 		detail::ValidateHelp(group, str::wd::Build(L"group [", id, L"]"));
 	}
-	inline void ValidateArguments(const arger::Config& config, const detail::Arguments& arguments, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidGroup* self, detail::ValidArguments* super) {
+	inline void ValidateArguments(const arger::Config& config, const detail::Arguments& arguments, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidGroup* self, detail::ValidArguments* super, bool menu) {
 		entry.args = &arguments;
 		entry.incomplete = !arguments.groups.list.empty();
 		entry.nestedPositionals = !arguments.positionals.empty();
@@ -258,7 +250,7 @@ namespace arger::detail {
 		}
 		if (entry.incomplete) {
 			for (const auto& sub : arguments.groups.list)
-				detail::ValidateGroup(config, sub, state, self, (self == 0 ? super : self));
+				detail::ValidateGroup(config, sub, state, self, (self == 0 ? super : self), menu);
 			for (const auto& sub : entry.sub)
 				entry.nestedPositionals = (entry.nestedPositionals || sub.second.nestedPositionals);
 			return;
@@ -285,20 +277,6 @@ namespace arger::detail {
 		}
 	}
 	inline void ValidateFinalizedGroups(detail::ValidConfig& state, const detail::ValidGroup& group) {
-		/* validate the name and abbreviation relative to help/version groups */
-		if (state.helpGroup != 0 && state.helpGroup != &group) {
-			if (state.helpGroup->group->name == group.group->name)
-				throw arger::ConfigException{ L"Group [", group.id, L"] cannot share a name with the special purpose help group." };;
-			if (state.helpGroup->group->abbreviation == group.group->abbreviation && group.group->abbreviation != 0)
-				throw arger::ConfigException{ L"Group [", group.id, L"] cannot share an abbreviation with the special purpose help group." };;
-		}
-		if (state.versionGroup != 0 && state.versionGroup != &group) {
-			if (state.versionGroup->group->name == group.group->name)
-				throw arger::ConfigException{ L"Group [", group.id, L"] cannot share a name with the special purpose version group." };;
-			if (state.versionGroup->group->abbreviation == group.group->abbreviation && group.group->abbreviation != 0)
-				throw arger::ConfigException{ L"Group [", group.id, L"] cannot share an abbreviation with the special purpose version group." };;
-		}
-
 		/* validate that used options are defined and usable */
 		for (const auto& option : group.group->use) {
 			/* check if the used option exists */
@@ -325,13 +303,31 @@ namespace arger::detail {
 			throw arger::ConfigException{ L"Configuration must have a program name." };
 		state.config = &config;
 
+		/* validate the special-purpose entries attributes */
+		if (!config.special.help.name.empty()) {
+			if (config.special.help.name.size() <= 1)
+				throw arger::ConfigException{ L"Help entry name must at least be two characters long." };
+			if (config.special.version.name == config.special.help.name)
+				throw arger::ConfigException{ L"Help entry and version entry cannot both have the name [", config.special.help.name, L"]." };
+			if (!config.special.version.name.empty()) {
+				if (config.special.help.abbreviation != 0 && config.special.help.abbreviation == config.special.version.abbreviation)
+					throw arger::ConfigException{ L"Help entry and version entry cannot both have the abbreviation [", config.special.help.abbreviation, L"]." };
+			}
+			state.help = &config.special.help;
+		}
+		if (!config.special.version.name.empty()) {
+			if (config.special.version.name.size() <= 1)
+				throw arger::ConfigException{ L"Version entry name must at least be two characters long." };
+			state.version = &config.special.version;
+		}
+
 		/* validate the help attributes */
 		detail::ValidateHelp(config, L"arguments");
 
 		/* validate the options and arguments */
 		for (const auto& option : config.options)
-			detail::ValidateOption(config, option, state, 0);
-		detail::ValidateArguments(config, config, state, state, 0, &state);
+			detail::ValidateOption(config, option, state, 0, menu);
+		detail::ValidateArguments(config, config, state, state, 0, &state, menu);
 
 		/* post-validate all groups after all groups and flags have been loaded */
 		for (const auto& [_, group] : state.sub)

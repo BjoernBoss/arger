@@ -48,6 +48,13 @@ namespace arger {
 
 		class HelpBuilder {
 		private:
+			struct NameCache {
+				const std::wstring* description = 0;
+				const detail::ValidOption* option = 0;
+				wchar_t abbreviation = 0;
+			};
+
+		private:
 			std::wstring pBuffer;
 			size_t pPosition = 0;
 			const detail::ValidGroup* pSelected = 0;
@@ -217,7 +224,7 @@ namespace arger {
 				/* iterate over the help-content and append it to the help-buffer */
 				for (size_t i = 0; i < help.help.size(); ++i) {
 					fAddNewLine(true);
-					fAddString(help.help[i].name + L" ");
+					fAddString(help.help[i].name + L": ");
 					fAddString(help.help[i].text, detail::NumCharsHelpLeft);
 				}
 			}
@@ -281,13 +288,15 @@ namespace arger {
 				/* add all required options (must all consume a payload, as flags are never required) */
 				bool hasOptionals = false;
 				for (const auto& [name, option] : pConfig.options) {
-					/* check if the entry can be skipped for this group */
-					if (!detail::CheckUsage(&option, pSelected))
-						continue;
-					if (option.minimum == 0) {
+					/* check if options exist in theory */
+					if (detail::CheckUsage(&option, pSelected) && option.minimum == 0) {
 						hasOptionals = true;
 						continue;
 					}
+
+					/* check if the entry can be skipped for this group */
+					if (!fCheckOptionPrint(&option, menu))
+						continue;
 					fAddSpacedToken(str::wd::Build(L"--", name, L"=<", option.option->payload.name, L">"));
 				}
 				if (hasOptionals)
@@ -310,10 +319,15 @@ namespace arger {
 				else if (topMost->nestedPositionals)
 					fAddSpacedToken(L"[params...]");
 			}
-			void fBuildOptionals(bool required, bool menu) {
+			void fBuildOptions(bool required, bool menu) {
 				const detail::ValidArguments* topMost = (pSelected == 0 ? static_cast<const detail::ValidArguments*>(&pConfig) : pSelected);
 
-				/* iterate over the optionals and add the corresponding type */
+				/* collect all of the names to be used */
+				std::map<std::wstring, NameCache> selected;
+				if (!menu && !required && pConfig.help != 0)
+					selected.insert({ pConfig.help->name, NameCache{ &pConfig.help->description, 0, pConfig.help->abbreviation } });
+				if (!menu && !required && pConfig.version != 0)
+					selected.insert({ pConfig.version->name, NameCache{ &pConfig.version->description, 0, pConfig.version->abbreviation } });
 				for (const auto& [name, option] : pConfig.options) {
 					if ((option.minimum > 0) != required)
 						continue;
@@ -321,47 +335,59 @@ namespace arger {
 					/* check if the option can be discarded based on the selection */
 					if (!fCheckOptionPrint(&option, menu))
 						continue;
+					selected.insert({ name, NameCache{ &option.option->description, &option, option.option->abbreviation } });
+				}
+
+				/* iterate over the optionals and print them */
+				for (const auto& [name, cache] : selected) {
 					fAddNewLine(false);
 
-					/* construct the left help string */
+					/* add the abbreviation and name */
 					std::wstring temp = L"  ";
-					if (option.option->abbreviation != 0)
-						temp.append(1, L'-').append(1, option.option->abbreviation).append(L", ");
+					if (cache.abbreviation != 0)
+						temp.append(1, L'-').append(1, cache.abbreviation).append(L", ");
 					temp.append(L"--").append(name);
-					if (option.payload)
-						temp.append(L"=<").append(option.option->payload.name).append(1, L'>').append(fTypeString(option.option->payload.type));
+					const detail::ValidOption* option = cache.option;
+
+					/* add the payload */
+					if (option != 0 && option->payload)
+						temp.append(L"=<").append(option->option->payload.name).append(1, L'>').append(fTypeString(option->option->payload.type));
 					fAddString(temp);
 
 					/* add the description text and custom usage-limits and write the result out */
-					temp = option.option->description;
-					if (option.minimum != 1 || option.maximum != 1)
-						temp.append(fLimitString(option.minimum, option.maximum > 1 ? option.maximum : 0));
+					temp = *cache.description;
+					if (option != 0 && (option->minimum != 1 || option->maximum != 1))
+						temp.append(fLimitString(option->minimum, option->maximum > 1 ? option->maximum : 0));
 					fAddString(temp, detail::NumCharsHelpLeft, 1);
 
+					/* check if this was a special entry, in which case no additional data will be added */
+					if (option == 0)
+						continue;
+
 					/* add the enum value description */
-					fEnumDescription(option.option->payload.type);
+					fEnumDescription(option->option->payload.type);
 
 					/* add the default values */
-					if (!option.option->payload.defValue.empty())
-						fDefaultDescription(&option.option->payload.defValue.front(), &option.option->payload.defValue.back() + 1);
+					if (!option->option->payload.defValue.empty())
+						fDefaultDescription(&option->option->payload.defValue.front(), &option->option->payload.defValue.back() + 1);
 
 					/* add the usages (if groups still need to be selected and not all are users) */
-					if (topMost->incomplete) {
-						size_t users = 0;
-						for (const auto& [name, group] : topMost->sub) {
-							if (detail::CheckUsage(&option, &group))
-								++users;
+					if (!topMost->incomplete)
+						continue;
+					size_t users = 0;
+					for (const auto& [name, group] : topMost->sub) {
+						if (detail::CheckUsage(option, &group))
+							++users;
+					}
+					if (users != topMost->sub.size()) {
+						fAddNewLine(false);
+						temp = L"Used for: ";
+						size_t index = 0;
+						for (const auto& group : topMost->sub) {
+							if (option->users.contains(&group.second))
+								temp.append(index++ > 0 ? L"|" : L"").append(group.first);
 						}
-						if (users != topMost->sub.size()) {
-							fAddNewLine(false);
-							temp = L"Used for: ";
-							size_t index = 0;
-							for (const auto& group : topMost->sub) {
-								if (option.users.contains(&group.second))
-									temp.append(index++ > 0 ? L"|" : L"").append(group.first);
-							}
-							fAddString(temp, detail::NumCharsHelpLeft);
-						}
+						fAddString(temp, detail::NumCharsHelpLeft);
 					}
 				}
 			}
@@ -382,15 +408,30 @@ namespace arger {
 
 				/* add the description of all sub-groups */
 				const detail::ValidArguments* topMost = (pSelected == 0 ? static_cast<const detail::ValidArguments*>(&pConfig) : pSelected);
-				if (topMost->incomplete) {
+				if (topMost->incomplete || (menu && (pConfig.help != 0 || pConfig.version != 0))) {
 					fAddNewLine(true);
-					fAddString(str::wd::Build(L"Options for [", topMost->groupName, L"]:"));
-					for (const auto& [name, group] : topMost->sub) {
+					if (topMost->incomplete)
+						fAddString(str::wd::Build(L"Options for [", topMost->groupName, L"]:"));
+					else
+						fAddString(str::wd::Build(L"Keywords:"));
+
+					/* collect the list of all names to be used */
+					std::map<std::wstring, NameCache> selected;
+					if (menu && pConfig.help != 0)
+						selected.insert({ pConfig.help->name, NameCache{ &pConfig.help->description, 0, pConfig.help->abbreviation } });
+					if (menu && pConfig.version != 0)
+						selected.insert({ pConfig.version->name, NameCache{ &pConfig.version->description, 0, pConfig.version->abbreviation } });
+					for (const auto& [name, group] : topMost->sub)
+						selected.insert({ name, NameCache{ &group.group->description, 0, group.group->abbreviation } });
+
+					/* print all of the selected entries */
+					for (const auto& [name, cache] : selected) {
 						fAddNewLine(false);
 						fAddString(str::wd::Build(L"  ", name));
-						if (group.group->abbreviation != 0)
-							fAddString(str::wd::Build(L", ", group.group->abbreviation));
-						fAddString(group.group->description, detail::NumCharsHelpLeft, 1);
+						if (cache.abbreviation != 0)
+							fAddString(str::wd::Build(L", ", cache.abbreviation));
+						if (!cache.description->empty())
+							fAddString(*cache.description, detail::NumCharsHelpLeft, 1);
 					}
 				}
 
@@ -434,14 +475,14 @@ namespace arger {
 				if (reqArgs) {
 					fAddNewLine(true);
 					fAddString(L"Required arguments:");
-					fBuildOptionals(true, menu);
+					fBuildOptions(true, menu);
 				}
 
 				/* add the optional argument descriptions (will automatically be sorted lexicographically) */
 				if (optArgs) {
 					fAddNewLine(true);
 					fAddString(L"Optional arguments:");
-					fBuildOptionals(false, menu);
+					fBuildOptions(false, menu);
 				}
 
 				/* add all of the global help descriptions and the help-content of the selected groups */

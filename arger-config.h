@@ -9,6 +9,7 @@ namespace arger {
 	struct Group;
 	struct Option;
 
+
 	namespace detail {
 		struct Config {};
 
@@ -53,10 +54,6 @@ namespace arger {
 		struct Use {
 			std::set<std::wstring> use;
 		};
-		struct SpecialPurpose {
-			bool flagHelp = false;
-			bool flagVersion = false;
-		};
 		struct Positionals {
 		public:
 			struct Entry {
@@ -77,6 +74,19 @@ namespace arger {
 				std::vector<arger::Group> list;
 				std::wstring name;
 			} groups;
+		};
+		struct SpecialEntry :
+			public detail::Description,
+			public detail::Abbreviation {
+			std::wstring name;
+			constexpr SpecialEntry() {}
+			constexpr SpecialEntry(std::wstring name) : name{ name } {}
+		};
+		struct SpecialEntries {
+			struct {
+				detail::SpecialEntry help;
+				detail::SpecialEntry version;
+			} special;
 		};
 
 		template <class Base, class Config>
@@ -109,22 +119,22 @@ namespace arger {
 		public detail::Options,
 		public detail::Arguments,
 		public detail::Version,
-		public detail::Program {
+		public detail::Program,
+		public detail::SpecialEntries {
 	public:
 		constexpr Config();
 		constexpr Config(const arger::IsConfig<arger::Config> auto&... configs);
 	};
 
 	/* general optional flag/payload
-	*	Note: if passed to a group, it is implicitly only bound to that group */
+	*	Note: if passed to a group, it is implicitly only bound to that group - but all names and abbreviations must be unique */
 	struct Option :
 		public detail::Config,
 		public detail::Description,
 		public detail::Constraint,
 		public detail::Require,
 		public detail::Abbreviation,
-		public detail::Payload,
-		public detail::SpecialPurpose {
+		public detail::Payload {
 	public:
 		std::wstring name;
 
@@ -144,7 +154,6 @@ namespace arger {
 		public detail::Help,
 		public detail::Use,
 		public detail::Arguments,
-		public detail::SpecialPurpose,
 		public detail::Abbreviation,
 		public detail::Options {
 	public:
@@ -156,6 +165,34 @@ namespace arger {
 		constexpr Group(std::wstring name, std::wstring id, const arger::IsConfig<arger::Group> auto&... configs);
 		constexpr void apply(detail::Groups& base) const {
 			base.groups.list.push_back(*this);
+		}
+	};
+
+	/* configure the key to be used as option for argument mode and any group name for menu mode, which triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
+	struct HelpEntry :
+		public detail::Config,
+		public detail::SpecialEntry {
+	public:
+		constexpr HelpEntry(std::wstring name) : SpecialEntry{ name } {}
+		constexpr HelpEntry(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs) : SpecialEntry{ name } {
+			detail::ApplyConfigs(*this, configs...);
+		}
+		constexpr void apply(detail::SpecialEntries& base) const {
+			base.special.help = *this;
+		}
+	};
+
+	/* configure the key to be used as option for argument mode and any group name for menu mode, which triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
+	struct VersionEntry :
+		public detail::Config,
+		public detail::SpecialEntry {
+	public:
+		constexpr VersionEntry(std::wstring name) : SpecialEntry{ name } {}
+		constexpr VersionEntry(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs) : SpecialEntry{ name } {
+			detail::ApplyConfigs(*this, configs...);
+		}
+		constexpr void apply(detail::SpecialEntries& base) const {
+			base.special.version = *this;
 		}
 	};
 
@@ -260,7 +297,7 @@ namespace arger {
 		}
 	};
 
-	/* add an abbreviation character for an option or group to allow it to be accessible as single letters or, for example, -x */
+	/* add an abbreviation character for an option, group, or help/version entry to allow it to be accessible as single letters or, for example, -x */
 	struct Abbreviation : public detail::Config {
 	public:
 		wchar_t chr = 0;
@@ -298,24 +335,6 @@ namespace arger {
 		Use(const auto&... options) : options{ options... } {}
 		void apply(detail::Use& base) const {
 			base.use.insert(options.begin(), options.end());
-		}
-	};
-
-	/* mark this flag/group as being the help-indicating flag, which triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
-	struct HelpFlag : detail::Config {
-	public:
-		constexpr HelpFlag() {}
-		constexpr void apply(detail::SpecialPurpose& base) const {
-			base.flagHelp = true;
-		}
-	};
-
-	/* mark this flag as being the version-indicating flag, which triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
-	struct VersionFlag : detail::Config {
-	public:
-		constexpr VersionFlag() {}
-		constexpr void apply(detail::SpecialPurpose& base) const {
-			base.flagVersion = true;
 		}
 	};
 
