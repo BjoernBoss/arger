@@ -68,8 +68,8 @@ namespace arger {
 		}
 
 	public:
-		template <arger::IsEnum Type>
-		constexpr Type asEnum() const {
+		template <arger::IsId Type = size_t>
+		constexpr Type id() const {
 			if (std::holds_alternative<arger::EnumValue>(*this))
 				return static_cast<Type>(std::get<arger::EnumValue>(*this).id);
 			throw arger::TypeException{ L"arger::Value is not an enum." };

@@ -17,36 +17,20 @@ namespace arger {
 		size_t pGroupId = 0;
 
 	public:
-		bool flag(size_t id) const {
-			return pFlags.contains(id);
-		}
-		bool flag(arger::IsEnum auto id) const {
+		bool flag(arger::IsId auto id) const {
 			return pFlags.contains(static_cast<size_t>(id));
 		}
-		constexpr size_t id() const {
-			return pGroupId;
-		}
-		template <arger::IsEnum Type>
-		constexpr Type idAsEnum() const {
+		template <arger::IsId Type = size_t>
+		constexpr Type id() const {
 			return static_cast<Type>(pGroupId);
 		}
 
 	public:
-		size_t options(size_t id) const {
-			auto it = pOptions.find(id);
-			return (it == pOptions.end() ? 0 : it->second.size());
-		}
-		size_t options(arger::IsEnum auto id) const {
+		size_t options(arger::IsId auto id) const {
 			auto it = pOptions.find(static_cast<size_t>(id));
 			return (it == pOptions.end() ? 0 : it->second.size());
 		}
-		std::optional<arger::Value> option(size_t id, size_t index = 0) const {
-			auto it = pOptions.find(id);
-			if (it == pOptions.end() || index >= it->second.size())
-				return {};
-			return it->second[index];
-		}
-		std::optional<arger::Value> option(arger::IsEnum auto id, size_t index = 0) const {
+		std::optional<arger::Value> option(arger::IsId auto id, size_t index = 0) const {
 			auto it = pOptions.find(static_cast<size_t>(id));
 			if (it == pOptions.end() || index >= it->second.size())
 				return {};

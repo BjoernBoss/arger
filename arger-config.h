@@ -52,7 +52,7 @@ namespace arger {
 			} payload;
 		};
 		struct Use {
-			std::set<std::wstring> use;
+			std::set<size_t> use;
 		};
 		struct Positionals {
 		public:
@@ -140,10 +140,8 @@ namespace arger {
 		size_t id = 0;
 
 	public:
-		Option(std::wstring name, size_t id);
-		Option(std::wstring name, arger::IsEnum auto id);
-		constexpr Option(std::wstring name, size_t id, const arger::IsConfig<arger::Option> auto&... configs);
-		constexpr Option(std::wstring name, arger::IsEnum auto id, const arger::IsConfig<arger::Option> auto&... configs);
+		Option(std::wstring name, arger::IsId auto id);
+		constexpr Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Option> auto&... configs);
 		constexpr void apply(detail::Options& base) const {
 			base.options.push_back(*this);
 		}
@@ -165,11 +163,9 @@ namespace arger {
 
 	public:
 		Group(std::wstring name);
-		Group(std::wstring name, size_t id);
-		Group(std::wstring name, arger::IsEnum auto id);
+		Group(std::wstring name, arger::IsId auto id);
 		constexpr Group(std::wstring name, const arger::IsConfig<arger::Group> auto&... configs);
-		constexpr Group(std::wstring name, size_t id, const arger::IsConfig<arger::Group> auto&... configs);
-		constexpr Group(std::wstring name, arger::IsEnum auto id, const arger::IsConfig<arger::Group> auto&... configs);
+		constexpr Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Group> auto&... configs);
 		constexpr void apply(detail::Groups& base) const {
 			base.groups.list.push_back(*this);
 		}
@@ -208,25 +204,17 @@ namespace arger {
 		detail::ApplyConfigs(*this, configs...);
 	}
 
-	inline arger::Option::Option(std::wstring name, size_t id) : name{ name }, id{ id } {}
-	inline arger::Option::Option(std::wstring name, arger::IsEnum auto id) : name{ name }, id{ static_cast<size_t>(id) } {}
-	constexpr arger::Option::Option(std::wstring name, size_t id, const arger::IsConfig<arger::Option> auto&... configs) : name{ name }, id{ id } {
-		detail::ApplyConfigs(*this, configs...);
-	}
-	constexpr arger::Option::Option(std::wstring name, arger::IsEnum auto id, const arger::IsConfig<arger::Option> auto&... configs) : name{ name }, id{ static_cast<size_t>(id) } {
+	inline arger::Option::Option(std::wstring name, arger::IsId auto id) : name{ name }, id{ static_cast<size_t>(id) } {}
+	constexpr arger::Option::Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Option> auto&... configs) : name{ name }, id{ static_cast<size_t>(id) } {
 		detail::ApplyConfigs(*this, configs...);
 	}
 
 	inline arger::Group::Group(std::wstring name) : name{ name }, id{ 0 } {}
-	inline arger::Group::Group(std::wstring name, size_t id) : name{ name }, id{ id } {}
-	inline arger::Group::Group(std::wstring name, arger::IsEnum auto id) : name{ name }, id{ static_cast<size_t>(id) } {}
+	inline arger::Group::Group(std::wstring name, arger::IsId auto id) : name{ name }, id{ static_cast<size_t>(id) } {}
 	constexpr arger::Group::Group(std::wstring name, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ 0 } {
 		detail::ApplyConfigs(*this, configs...);
 	}
-	constexpr arger::Group::Group(std::wstring name, size_t id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ id } {
-		detail::ApplyConfigs(*this, configs...);
-	}
-	constexpr arger::Group::Group(std::wstring name, arger::IsEnum auto id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ static_cast<size_t>(id) } {
+	constexpr arger::Group::Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ static_cast<size_t>(id) } {
 		detail::ApplyConfigs(*this, configs...);
 	}
 
@@ -348,10 +336,10 @@ namespace arger {
 	/* add usage-constraints to let the corresponding options only be used by groups, which add them as usage (by default every group/argument can use all options) */
 	struct Use : public detail::Config {
 	public:
-		std::set<std::wstring> options;
+		std::set<size_t> options;
 
 	public:
-		Use(const auto&... options) : options{ options... } {}
+		Use(arger::IsId auto... options) : options{ static_cast<size_t>(options)... } {}
 		void apply(detail::Use& base) const {
 			base.use.insert(options.begin(), options.end());
 		}

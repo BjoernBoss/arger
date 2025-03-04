@@ -22,13 +22,13 @@ The following configurations are defined:
 /* general arger-configuration to be parsed */
 arger::Config(const arger::IsConfig<arger::Config> auto&... configs);
 
-/* general sub-group of options for a configuration/group (id can also be set via enums)
+/* general sub-group of options for a configuration/group (id can be enum or int)
 *	 Note: Groups/Configs can can only have sub-groups or positional arguments */
-arger::Group(std::wstring name, size_t id, const arger::IsConfig<arger::Group> auto&... configs);
+arger::Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Group> auto&... configs);
 
-/* general optional flag/payload (id can also be set via enums)
+/* general optional flag/payload (id can be enum or int)
 *	Note: if passed to a group, it is implicitly only bound to that group - but all names and abbreviations must be unique */
-arger::Option(std::wstring name, size_t id, const arger::IsConfig<arger::Option> auto&... configs);
+arger::Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Option> auto&... configs);
 
 /* configure the key to be used as option for argument mode and any group name for menu mode, which triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
 arger::HelpEntry(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs);
@@ -65,7 +65,7 @@ arger::Payload(std::wstring name, arger::Type type, arger::Value defValue);
 arger::Payload(std::wstring name, arger::Type type, std::vector<arger::Value> defValue = {});
 
 /* add usage-constraints to let the corresponding options only be used by groups, which add them as usage (by default every group/argument can use all options) */
-arger::Use(const auto&... options);
+arger::Use(arger::IsId auto... options);
 
 /* mark this flag/group as being the help-indicating flag, which triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
 arger::HelpFlag();
@@ -247,14 +247,14 @@ arger::Config config{
 				return L"Argument must be less than 50";
 			return L"";
 		}},
-		arger::Use{ L"path" }
+		arger::Use{ Option::path }
 	},
 
 	arger::Group{ L"set", Group::set,
 		arger::Description{ L"Set something in the test program. But this is just a demo description" },
 		arger::Require{ 1 },
 		arger::Positional{ L"first", arger::Primitive::unum, L"First Argument" },
-		arger::Use{ L"path" }
+		arger::Use{ Option::path }
 	},
 	arger::Group{ L"read", Group::read,
 		arger::Require{ 2 },

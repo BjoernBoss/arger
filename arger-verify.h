@@ -30,6 +30,7 @@ namespace arger::detail {
 	struct ValidConfig : public detail::ValidArguments {
 		std::map<std::wstring, detail::ValidOption> options;
 		std::map<wchar_t, detail::ValidOption*> abbreviations;
+		std::map<size_t, detail::ValidOption*> optionIds;
 		const arger::Config* config = 0;
 		const detail::SpecialEntry* help = 0;
 		const detail::SpecialEntry* version = 0;
@@ -156,6 +157,11 @@ namespace arger::detail {
 			state.abbreviations[option.abbreviation] = &entry;
 		}
 
+		/* check if the id is unique */
+		if (state.optionIds.contains(option.id))
+			throw arger::ConfigException{ L"Option id [", option.id, L"] of [", option.name, L"] already exists." };
+		state.optionIds.insert({ option.id, &entry });
+
 		/* check if the name or abbreviation clashes with the help/version entries */
 		if (!menu)
 			detail::ValidateSpecialEntry(state, option.name, option.abbreviation, L"Option");
@@ -265,18 +271,17 @@ namespace arger::detail {
 	}
 	inline void ValidateFinalizedGroups(detail::ValidConfig& state, const detail::ValidGroup& group) {
 		/* validate that used options are defined and usable */
-		for (const auto& option : group.group->use) {
-			/* check if the used option exists */
-			auto it = state.options.find(option);
-			if (it == state.options.end())
+		for (size_t option : group.group->use) {
+			auto it = state.optionIds.find(option);
+			if (it == state.optionIds.end())
 				throw arger::ConfigException{ L"Group [", group.group->name, L"] uses undefined option [", option, L"]." };
 
 			/* check if the used option can be used by this group */
-			if (!detail::CheckParent(it->second.owner, &group))
-				throw arger::ConfigException{ L"Group [", group.group->name, L"] cannot use option [", option, L"] from another group." };
+			if (!detail::CheckParent(it->second->owner, &group))
+				throw arger::ConfigException{ L"Group [", group.group->name, L"] cannot use option [", it->second->option->name, L"] from another group." };
 
 			/* add itself to the users of the group */
-			it->second.users.insert(&group);
+			it->second->users.insert(&group);
 		}
 
 		/* validate all children */

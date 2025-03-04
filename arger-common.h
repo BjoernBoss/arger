@@ -12,6 +12,7 @@
 #include <optional>
 #include <set>
 #include <type_traits>
+#include <concepts>
 
 namespace arger {
 	class Parsed;
@@ -20,8 +21,11 @@ namespace arger {
 		class Parser;
 	}
 
+	/* any type statically castable to a size_t (such as integers or enums) are considered ids */
 	template <class Type>
-	concept IsEnum = std::is_enum_v<Type>;
+	concept IsId = requires(Type t) {
+		{ static_cast<size_t>(t) } -> std::same_as<size_t>;
+	};
 
 	enum class Primitive : uint8_t {
 		any,
@@ -35,7 +39,7 @@ namespace arger {
 		size_t id = 0;
 		constexpr EnumValue(std::wstring name) : name{ name } {}
 		constexpr EnumValue(std::wstring name, size_t id) : name{ name }, id{ id } {}
-		constexpr EnumValue(std::wstring name, arger::IsEnum auto val) : name{ name }, id{ static_cast<size_t>(val) } {}
+		constexpr EnumValue(std::wstring name, arger::IsId auto val) : name{ name }, id{ static_cast<size_t>(val) } {}
 	};
 	using Enum = std::map<std::wstring, arger::EnumValue>;
 	using Type = std::variant<arger::Primitive, arger::Enum>;
