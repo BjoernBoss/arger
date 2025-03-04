@@ -413,7 +413,7 @@ namespace arger {
 					if (topMost->incomplete)
 						fAddString(str::wd::Build(L"Options for [", topMost->groupName, L"]:"));
 					else
-						fAddString(str::wd::Build(L"Keywords:"));
+						fAddString(str::wd::Build(L"Optional Keywords:"));
 
 					/* collect the list of all names to be used */
 					std::map<std::wstring, NameCache> selected;
@@ -436,7 +436,7 @@ namespace arger {
 				}
 
 				/* add the positional arguments */
-				else if (!topMost->args->positionals.empty()) {
+				if (!topMost->args->positionals.empty()) {
 					fAddNewLine(true);
 					if (pSelected == 0)
 						fAddString(L"Positional Arguments:");
