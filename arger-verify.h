@@ -30,7 +30,6 @@ namespace arger::detail {
 	struct ValidConfig : public detail::ValidArguments {
 		std::map<std::wstring, detail::ValidOption> options;
 		std::map<wchar_t, detail::ValidOption*> abbreviations;
-		std::map<std::wstring, detail::ValidGroup*> groupIds;
 		const arger::Config* config = 0;
 		const detail::SpecialEntry* help = 0;
 		const detail::SpecialEntry* version = 0;
@@ -38,7 +37,6 @@ namespace arger::detail {
 	struct ValidGroup : public detail::ValidArguments {
 		const arger::Group* group = 0;
 		const detail::ValidGroup* parent = 0;
-		std::wstring_view id;
 		size_t depth = 0;
 	};
 
@@ -189,14 +187,12 @@ namespace arger::detail {
 			throw arger::ConfigException{ L"Group name must at least be two characters long." };
 		if (group.name.starts_with(L"-"))
 			throw arger::ConfigException{ L"Group name must not start with a hypen." };
-		const std::wstring& id = (group.id.empty() ? group.name : group.id);
 
 		/* validate the name's uniqueness */
 		if (super->sub.contains(group.name))
 			throw arger::ConfigException{ L"Group with name [", group.name, L"] already exists for given groups-set." };
 		detail::ValidGroup& entry = super->sub[group.name];
 		entry.group = &group;
-		entry.id = id;
 		entry.parent = parent;
 		entry.super = super;
 		entry.depth = (parent == 0 ? 0 : parent->depth + 1);
@@ -204,7 +200,7 @@ namespace arger::detail {
 		/* check if the abbreviation is unique */
 		if (group.abbreviation != 0) {
 			if (super->abbreviations.contains(group.abbreviation))
-				throw arger::ConfigException{ L"Abbreviation [", group.abbreviation, L"] for group with id [", id, L"] already exists." };
+				throw arger::ConfigException{ L"Abbreviation [", group.abbreviation, L"] for group with name [", group.name, L"] already exists." };
 			super->abbreviations[group.abbreviation] = &entry;
 		}
 
@@ -215,21 +211,12 @@ namespace arger::detail {
 		/* validate the arguments */
 		detail::ValidateArguments(config, group, state, entry, &entry, super, menu);
 
-		/* check if the group-id is unique (only necessary if it does not contain sub-groups itself) */
-		if (!entry.incomplete) {
-			if (state.groupIds.contains(id))
-				throw arger::ConfigException{ L"Group with id [", id, L"] already exists." };
-			state.groupIds[id] = &entry;
-		}
-		else
-			entry.id = {};
-
 		/* register all new options */
 		for (const auto& option : group.options)
 			detail::ValidateOption(config, option, state, &entry, menu);
 
 		/* validate the help attributes */
-		detail::ValidateHelp(group, str::wd::Build(L"group [", id, L"]"));
+		detail::ValidateHelp(group, str::wd::Build(L"group [", group.name, L"]"));
 	}
 	inline void ValidateArguments(const arger::Config& config, const detail::Arguments& arguments, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidGroup* self, detail::ValidArguments* super, bool menu) {
 		entry.args = &arguments;
@@ -246,7 +233,7 @@ namespace arger::detail {
 		if (entry.incomplete && !arguments.positionals.empty()) {
 			if (self == 0)
 				throw arger::ConfigException{ L"Arguments cannot have positional arguments and sub-groups." };
-			throw arger::ConfigException{ L"Group [", self->id, L"] cannot have positional arguments and sub-groups." };
+			throw arger::ConfigException{ L"Group [", self->group->name, L"] cannot have positional arguments and sub-groups." };
 		}
 		if (entry.incomplete) {
 			for (const auto& sub : arguments.groups.list)
@@ -267,8 +254,8 @@ namespace arger::detail {
 		for (size_t i = 0; i < arguments.positionals.size(); ++i) {
 			/* validate the name and type */
 			if (arguments.positionals[i].name.empty())
-				throw arger::ConfigException{ L"Positional argument [", i, L"] of ", (self == 0 ? L"arguments" : str::wd::Build(L"group [", self->id, L"]")), L" must not have an empty name." };
-			std::wstring whoSelf = (self == 0 ? str::wd::Build(L"arguments positional [", i, L']') : str::wd::Build(L"groups [", self->id, L"] positional [", i, L']'));
+				throw arger::ConfigException{ L"Positional argument [", i, L"] of ", (self == 0 ? L"arguments" : str::wd::Build(L"group [", self->group->name, L"]")), L" must not have an empty name." };
+			std::wstring whoSelf = (self == 0 ? str::wd::Build(L"arguments positional [", i, L']') : str::wd::Build(L"groups [", self->group->name, L"] positional [", i, L']'));
 			detail::ValidateType(arguments.positionals[i].type, whoSelf);
 
 			/* validate the default-value */
@@ -282,11 +269,11 @@ namespace arger::detail {
 			/* check if the used option exists */
 			auto it = state.options.find(option);
 			if (it == state.options.end())
-				throw arger::ConfigException{ L"Group [", group.id, L"] uses undefined option [", option, L"]." };
+				throw arger::ConfigException{ L"Group [", group.group->name, L"] uses undefined option [", option, L"]." };
 
 			/* check if the used option can be used by this group */
 			if (!detail::CheckParent(it->second.owner, &group))
-				throw arger::ConfigException{ L"Group [", group.id, L"] cannot use option [", option, L"] from another group." };
+				throw arger::ConfigException{ L"Group [", group.group->name, L"] cannot use option [", option, L"] from another group." };
 
 			/* add itself to the users of the group */
 			it->second.users.insert(&group);

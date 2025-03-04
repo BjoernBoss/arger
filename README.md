@@ -22,9 +22,9 @@ The following configurations are defined:
 /* general arger-configuration to be parsed */
 arger::Config(const arger::IsConfig<arger::Config> auto&... configs);
 
-/* general sub-group of options for a configuration/group
+/* general sub-group of options for a configuration/group (id can also be set via enums)
 *	 Note: Groups/Configs can can only have sub-groups or positional arguments */
-arger::Group(std::wstring name, std::wstring id, const arger::IsConfig<arger::Group> auto&... configs);
+arger::Group(std::wstring name, size_t id, const arger::IsConfig<arger::Group> auto&... configs);
 
 /* general optional flag/payload
 *	Note: if passed to a group, it is implicitly only bound to that group - but all names and abbreviations must be unique */
@@ -203,6 +203,7 @@ The following example configuration:
 
 ```C++
 enum class Mode : uint8_t { abc, def };
+enum class Group : uint8_t { get, set, read };
 arger::Config config{
 	arger::Program{ L"test.exe" },
 	arger::Version{ L"1.0.1" },
@@ -233,7 +234,7 @@ arger::Config config{
 		},
 		arger::Description{ L"Example of an enum" }
 	},
-	arger::Group{ L"get", L"",
+	arger::Group{ L"get", Group::get,
 		arger::Description{ L"Get something in the test program. But this is just a demo description" },
 		arger::Require{ 2, 4 },
 		arger::Positional{ L"first", arger::Primitive::unum, L"First Argument" },
@@ -247,13 +248,13 @@ arger::Config config{
 		arger::Use{ L"path" }
 	},
 
-	arger::Group{ L"set", L"",
+	arger::Group{ L"set", Group::set,
 		arger::Description{ L"Set something in the test program. But this is just a demo description" },
 		arger::Require{ 1 },
 		arger::Positional{ L"first", arger::Primitive::unum, L"First Argument" },
 		arger::Use{ L"path" }
 	},
-	arger::Group{ L"read", L"",
+	arger::Group{ L"read", Group::read,
 		arger::Require{ 2 },
 		arger::Positional{ L"argument", arger::Enum{
 			{ L"a", arger::EnumValue{ L"This is [a] description" } },

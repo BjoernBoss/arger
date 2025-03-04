@@ -158,11 +158,17 @@ namespace arger {
 		public detail::Options {
 	public:
 		std::wstring name;
-		std::wstring id;
+		size_t id = 0;
 
 	public:
-		Group(std::wstring name, std::wstring id);
-		constexpr Group(std::wstring name, std::wstring id, const arger::IsConfig<arger::Group> auto&... configs);
+		Group(std::wstring name);
+		Group(std::wstring name, size_t id);
+		template <arger::IsEnum Type>
+		Group(std::wstring name, Type id);
+		constexpr Group(std::wstring name, const arger::IsConfig<arger::Group> auto&... configs);
+		constexpr Group(std::wstring name, size_t id, const arger::IsConfig<arger::Group> auto&... configs);
+		template <arger::IsEnum Type>
+		constexpr Group(std::wstring name, Type id, const arger::IsConfig<arger::Group> auto&... configs);
 		constexpr void apply(detail::Groups& base) const {
 			base.groups.list.push_back(*this);
 		}
@@ -206,8 +212,18 @@ namespace arger {
 		detail::ApplyConfigs(*this, configs...);
 	}
 
-	inline arger::Group::Group(std::wstring name, std::wstring id) : name{ name }, id{ id } {}
-	constexpr arger::Group::Group(std::wstring name, std::wstring id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ id } {
+	inline arger::Group::Group(std::wstring name) : name{ name }, id{ 0 } {}
+	inline arger::Group::Group(std::wstring name, size_t id) : name{ name }, id{ id } {}
+	template <arger::IsEnum Type>
+	inline arger::Group::Group(std::wstring name, Type id) : name{ name }, id{ static_cast<size_t>(id) } {}
+	constexpr arger::Group::Group(std::wstring name, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ 0 } {
+		detail::ApplyConfigs(*this, configs...);
+	}
+	constexpr arger::Group::Group(std::wstring name, size_t id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ id } {
+		detail::ApplyConfigs(*this, configs...);
+	}
+	template <arger::IsEnum Type>
+	constexpr arger::Group::Group(std::wstring name, Type id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ static_cast<size_t>(id) } {
 		detail::ApplyConfigs(*this, configs...);
 	}
 

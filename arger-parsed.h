@@ -14,14 +14,18 @@ namespace arger {
 		std::set<std::wstring> pFlags;
 		std::map<std::wstring, std::vector<arger::Value>> pOptions;
 		std::vector<arger::Value> pPositional;
-		std::wstring pGroupId;
+		size_t pGroupId = 0;
 
 	public:
 		bool flag(const std::wstring& name) const {
 			return pFlags.contains(name);
 		}
-		constexpr const std::wstring& groupId() const {
+		constexpr size_t id() const {
 			return pGroupId;
+		}
+		template <arger::IsEnum Type>
+		constexpr Type idAsEnum() const {
+			return static_cast<Type>(pGroupId);
 		}
 
 	public:

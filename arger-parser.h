@@ -111,7 +111,7 @@ namespace arger {
 			}
 
 		private:
-			constexpr void fVerifyValue(const std::wstring& name, arger::Value& value, const arger::Type& type) const {
+			void fVerifyValue(const std::wstring& name, arger::Value& value, const arger::Type& type) const {
 				/* check if an enum was expected */
 				if (std::holds_alternative<arger::Enum>(type)) {
 					const arger::Enum& allowed = std::get<arger::Enum>(type);
@@ -207,8 +207,11 @@ namespace arger {
 				/* iterate over the optional arguments and verify them */
 				for (auto& [name, option] : pConfig.options) {
 					/* check if the current option can be used by the selected group or any of its ancestors */
-					if (!detail::CheckUsage(&option, pSelected) && (option.payload ? pParsed.pOptions.contains(name) : pParsed.pFlags.contains(name)))
-						throw arger::ParsingException{ L"Argument [", name, L"] not meant for ", topMost->super->groupName, L" [", pSelected->group->name, L"]." };
+					if (!detail::CheckUsage(&option, pSelected) && (option.payload ? pParsed.pOptions.contains(name) : pParsed.pFlags.contains(name))) {
+						/* selected can never be null, as null would allow any usage - but static analyzer does not know this */
+						if (pSelected != 0)
+							throw arger::ParsingException{ L"Argument [", name, L"] not meant for ", topMost->super->groupName, L" [", pSelected->group->name, L"]." };
+					}
 
 					/* check if this is a flag, in which case nothing more needs to be checked */
 					if (!option.payload)
@@ -359,7 +362,7 @@ namespace arger {
 				fVerifyOptional();
 
 				/* setup the selected group */
-				pParsed.pGroupId = (pSelected == 0 ? L"" : pSelected->id);
+				pParsed.pGroupId = (pSelected == 0 ? 0 : pSelected->group->id);
 
 				/* validate all root/selection constraints */
 				fRecCheckConstraints(topMost);
