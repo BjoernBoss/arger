@@ -25,10 +25,9 @@ namespace arger {
 		}
 		constexpr Value(double v) : Parent{ v } {}
 		constexpr Value(bool v) : Parent{ v } {}
-		constexpr Value(std::wstring&& v) : Parent{ std::move(v) } {}
-		constexpr Value(const std::wstring& v) : Parent{ v } {}
 		constexpr Value(arger::EnumValue&& v) : Parent{ std::move(v) } {}
 		constexpr Value(const arger::EnumValue& v) : Parent{ v } {}
+		constexpr Value(const str::IsStr auto& v) : Parent{ str::wd::To(v) } {}
 
 	public:
 		/* convenience */
@@ -42,7 +41,6 @@ namespace arger {
 				static_cast<Parent&>(*this) = uint64_t(v);
 		}
 		constexpr Value(unsigned long v) : Parent{ uint64_t(v) } {}
-		constexpr Value(const wchar_t* s) : Parent{ std::wstring(s) } {}
 
 	public:
 		constexpr bool isUNum() const {
@@ -104,11 +102,12 @@ namespace arger {
 				return std::get<bool>(*this);
 			throw arger::TypeException{ L"arger::Value is not a boolean." };
 		}
-		constexpr const std::wstring& str() const {
+		template <str::IsChar ChType = wchar_t>
+		constexpr std::basic_string<ChType> str() const {
 			if (std::holds_alternative<std::wstring>(*this))
-				return std::get<std::wstring>(*this);
+				return str::View{ std::get<std::wstring>(*this) }.str<ChType>();
 			if (std::holds_alternative<arger::EnumValue>(*this))
-				return std::get<arger::EnumValue>(*this).name;
+				return str::View{ std::get<arger::EnumValue>(*this).name }.str<ChType>();
 			throw arger::TypeException{ L"arger::Value is not a string." };
 		}
 	};
