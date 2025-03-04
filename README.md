@@ -90,6 +90,7 @@ This simple example shows the configuration for a simple command line mode, with
 The following example configuration:
 
 ```C++
+enum class Mode : uint8_t { abc, def };
 arger::Config config{
 	arger::Program{ L"test.exe" },
 	arger::Version{ L"1.0.1" },
@@ -116,8 +117,8 @@ arger::Config config{
 	arger::Option{ L"mode",
 		arger::Payload{ L"test-mode",
 			arger::Enum{
-				{ L"abc", L"This is the description of option abc" },
-				{ L"def", L"This is the description of option def" }
+				{ L"abc", arger::EnumValue{ L"This is the description of option abc", Mode::abc } },
+				{ L"def", arger::EnumValue{ L"This is the description of option def", Mode::def } }
 			},
 			arger::Value{ L"def" }
 		},
@@ -201,6 +202,7 @@ To setup the sub-command line mode, add all sub-commands as groups using `arger:
 The following example configuration:
 
 ```C++
+enum class Mode : uint8_t { abc, def };
 arger::Config config{
 	arger::Program{ L"test.exe" },
 	arger::Version{ L"1.0.1" },
@@ -224,8 +226,8 @@ arger::Config config{
 	arger::Option{ L"mode",
 		arger::Payload{ L"test-mode",
 			arger::Enum{
-				{ L"abc", L"This is the description of option abc" },
-				{ L"def", L"This is the description of option def" }
+				{ L"abc", arger::EnumValue{ L"This is the description of option abc", Mode::abc } },
+				{ L"def", arger::EnumValue{ L"This is the description of option def", Mode::def } }
 			},
 			arger::Value{ L"def" }
 		},
@@ -254,8 +256,8 @@ arger::Config config{
 	arger::Group{ L"read", L"",
 		arger::Require{ 2 },
 		arger::Positional{ L"argument", arger::Enum{
-			{ L"a", L"This is [a] description" },
-			{ L"b", L"This is [b] description" }
+			{ L"a", arger::EnumValue{ L"This is [a] description" } },
+			{ L"b", arger::EnumValue{ L"This is [b] description" } }
 		}, L"First Argument" },
 		arger::Help{ L"Read-Help", L"This is a help-description only shown for read." }
 	}

@@ -11,6 +11,7 @@
 #include <variant>
 #include <optional>
 #include <set>
+#include <type_traits>
 
 namespace arger {
 	class Parsed;
@@ -19,6 +20,9 @@ namespace arger {
 		class Parser;
 	}
 
+	template <class Type>
+	concept IsEnum = std::is_enum_v<Type>;
+
 	enum class Primitive : uint8_t {
 		any,
 		inum,
@@ -26,7 +30,15 @@ namespace arger {
 		real,
 		boolean
 	};
-	using Enum = std::map<std::wstring, std::wstring>;
+	struct EnumValue {
+		std::wstring name;
+		size_t id = 0;
+		constexpr EnumValue(std::wstring name) : name{ name } {}
+		constexpr EnumValue(std::wstring name, size_t id) : name{ name }, id{ id } {}
+		template <arger::IsEnum Type>
+		constexpr EnumValue(std::wstring name, Type val) : name{ name }, id{ static_cast<size_t>(val) } {}
+	};
+	using Enum = std::map<std::wstring, arger::EnumValue>;
 	using Type = std::variant<arger::Primitive, arger::Enum>;
 
 	using Checker = std::function<std::wstring(const arger::Parsed&)>;

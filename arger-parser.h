@@ -115,9 +115,11 @@ namespace arger {
 				/* check if an enum was expected */
 				if (std::holds_alternative<arger::Enum>(type)) {
 					const arger::Enum& allowed = std::get<arger::Enum>(type);
-					if (allowed.count(value.str()) != 0)
-						return;
-					throw arger::ParsingException{ L"Invalid enum for argument [", name, L"] encountered." };
+					auto it = allowed.find(value.str());
+					if (it == allowed.end())
+						throw arger::ParsingException{ L"Invalid enum for argument [", name, L"] encountered." };
+					value = arger::Value{ it->second };
+					return;
 				}
 
 				/* validate the expected type and found value */
