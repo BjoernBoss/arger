@@ -180,7 +180,7 @@ namespace arger {
 				/* add the separate keys */
 				for (const auto& val : std::get<arger::Enum>(type)) {
 					fAddNewLine(false);
-					fAddString(str::wd::Build(L"- [", val.first, L"]: ", val.second.name), detail::NumCharsHelpLeft);
+					fAddString(str::wd::Build(L"- [", val.name, L"]: ", val.description), detail::NumCharsHelpLeft);
 				}
 			}
 			void fDefaultDescription(const arger::Value* begin, const arger::Value* end) {

@@ -118,8 +118,8 @@ arger::Config config{
 	arger::Option{ L"mode", Option::mode,
 		arger::Payload{ L"test-mode",
 			arger::Enum{
-				{ L"abc", arger::EnumValue{ L"This is the description of option abc", Mode::abc } },
-				{ L"def", arger::EnumValue{ L"This is the description of option def", Mode::def } }
+				arger::EnumEntry{ L"abc", L"This is the description of option abc", Mode::abc },
+				arger::EnumEntry{ L"def", L"This is the description of option def", Mode::def }
 			},
 			arger::Value{ L"def" }
 		},
@@ -229,8 +229,8 @@ arger::Config config{
 	arger::Option{ L"mode", Option::mode,
 		arger::Payload{ L"test-mode",
 			arger::Enum{
-				{ L"abc", arger::EnumValue{ L"This is the description of option abc", Mode::abc } },
-				{ L"def", arger::EnumValue{ L"This is the description of option def", Mode::def } }
+				arger::EnumEntry{ L"abc", L"This is the description of option abc", Mode::abc },
+				arger::EnumEntry{ L"def", L"This is the description of option def", Mode::def }
 			},
 			arger::Value{ L"def" }
 		},
@@ -259,8 +259,8 @@ arger::Config config{
 	arger::Group{ L"read", Group::read,
 		arger::Require{ 2 },
 		arger::Positional{ L"argument", arger::Enum{
-			{ L"a", arger::EnumValue{ L"This is [a] description" } },
-			{ L"b", arger::EnumValue{ L"This is [b] description" } }
+			arger::EnumEntry{ L"a", L"This is [a] description", 0 },
+			arger::EnumEntry{ L"b", L"This is [b] description", 1 }
 		}, L"First Argument" },
 		arger::Help{ L"Read-Help", L"This is a help-description only shown for read." }
 	}

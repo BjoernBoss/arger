@@ -115,12 +115,18 @@ namespace arger {
 				/* check if an enum was expected */
 				if (std::holds_alternative<arger::Enum>(type)) {
 					const arger::Enum& allowed = std::get<arger::Enum>(type);
-					auto it = allowed.find(value.str());
+
+					/* resolve the id of the string */
+					auto it = std::find_if(allowed.begin(), allowed.end(), [&](const arger::EnumEntry& e) { return e.name == value.str(); });
 					if (it == allowed.end())
 						throw arger::ParsingException{ L"Invalid enum for argument [", name, L"] encountered." };
-					value = arger::Value{ it->second };
+					value = arger::Value{ detail::EnumId{ it->id } };
 					return;
 				}
+
+				/* all values, which are not strings anymore, originate from default values and have already been validated */
+				if (!value.isStr())
+					return;
 
 				/* validate the expected type and found value */
 				switch (std::get<arger::Primitive>(type)) {
@@ -168,6 +174,13 @@ namespace arger {
 				if (topMost->incomplete)
 					throw arger::ParsingException{ str::View{ topMost->groupName }.title(), L" missing." };
 
+				/* fill the positional arguments up on default values (ensures later verification/unpacking is easier) */
+				for (size_t i = pParsed.pPositional.size(); i < topMost->args->positionals.size(); ++i) {
+					if (!topMost->args->positionals[i].defValue.has_value())
+						break;
+					pParsed.pPositional.push_back(topMost->args->positionals[i].defValue.value());
+				}
+
 				/* validate the requirements for the positional arguments and parse their values */
 				for (size_t i = 0; i < pParsed.pPositional.size(); ++i) {
 					/* check if the argument is out of range */
@@ -178,18 +191,12 @@ namespace arger {
 					}
 					size_t index = std::min<size_t>(i, topMost->args->positionals.size() - 1);
 
-					/* check if the default value should be used and otherwise validate the argument (default will already be validated) */
+					/* check if the value is empty and the default value should be used */
 					if (pParsed.pPositional[i].str().empty() && topMost->args->positionals[index].defValue.has_value())
 						pParsed.pPositional[i] = topMost->args->positionals[index].defValue.value();
-					else
-						fVerifyValue(topMost->args->positionals[index].name, pParsed.pPositional[i], topMost->args->positionals[index].type);
-				}
 
-				/* fill up on default values (will already be validated) */
-				for (size_t i = pParsed.pPositional.size(); i < topMost->args->positionals.size(); ++i) {
-					if (!topMost->args->positionals[i].defValue.has_value())
-						break;
-					pParsed.pPositional.push_back(topMost->args->positionals[i].defValue.value());
+					/* validate and unpack the argument */
+					fVerifyValue(topMost->args->positionals[index].name, pParsed.pPositional[i], topMost->args->positionals[index].type);
 				}
 
 				/* check if the minimum required number of parameters has not been reached
@@ -221,21 +228,23 @@ namespace arger {
 					auto it = pParsed.pOptions.find(option.option->id);
 					size_t count = (it == pParsed.pOptions.end() ? 0 : it->second.size());
 
-					/* check if the default values should be assigned (are already validated by the verifying-step) */
+					/* check if the default values should be assigned (limits are already ensured to be valid) */
 					if (count == 0 && !option.option->payload.defValue.empty()) {
-						pParsed.pOptions.insert({ option.option->id, {} }).first->second = option.option->payload.defValue;
-						continue;
+						it = pParsed.pOptions.insert({ option.option->id, {} }).first;
+						it->second = option.option->payload.defValue;
+						count = option.option->payload.defValue.size();
+					}
+					else {
+						/* check if the optional-argument has been found */
+						if (option.minimum > count)
+							throw arger::ParsingException{ L"Argument [", name, L"] is missing." };
+
+						/* check if too many instances were found */
+						if (option.maximum > 0 && count > option.maximum)
+							throw arger::ParsingException{ L"Argument [", name, L"] can at most be specified ", option.maximum, " times." };
 					}
 
-					/* check if the optional-argument has been found */
-					if (option.minimum > count)
-						throw arger::ParsingException{ L"Argument [", name, L"] is missing." };
-
-					/* check if too many instances were found */
-					if (option.maximum > 0 && count > option.maximum)
-						throw arger::ParsingException{ L"Argument [", name, L"] can at most be specified ", option.maximum, " times." };
-
-					/* verify the values themselves */
+					/* verify and unpack the values themselves */
 					for (size_t i = 0; i < count; ++i)
 						fVerifyValue(name, it->second[i], option.option->payload.type);
 				}

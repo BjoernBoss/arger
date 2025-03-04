@@ -5,10 +5,16 @@
 #include "arger-common.h"
 
 namespace arger {
+	namespace detail {
+		struct EnumId {
+			size_t id = 0;
+		};
+	}
+
 	/* representation of a single argument value (performs primitive type-conversions when accessing values) */
-	struct Value : private std::variant<uint64_t, int64_t, double, bool, std::wstring, arger::EnumValue> {
+	struct Value : private std::variant<uint64_t, int64_t, double, bool, std::wstring, detail::EnumId> {
 	private:
-		using Parent = std::variant<uint64_t, int64_t, double, bool, std::wstring, arger::EnumValue>;
+		using Parent = std::variant<uint64_t, int64_t, double, bool, std::wstring, detail::EnumId>;
 
 	public:
 		Value() : Parent{ 0llu } {}
@@ -25,9 +31,8 @@ namespace arger {
 		}
 		constexpr Value(double v) : Parent{ v } {}
 		constexpr Value(bool v) : Parent{ v } {}
-		constexpr Value(arger::EnumValue&& v) : Parent{ std::move(v) } {}
-		constexpr Value(const arger::EnumValue& v) : Parent{ v } {}
 		constexpr Value(const str::IsStr auto& v) : Parent{ str::wd::To(v) } {}
+		constexpr Value(const detail::EnumId& v) : Parent{ v } {}
 
 	public:
 		/* convenience */
@@ -43,6 +48,9 @@ namespace arger {
 		constexpr Value(unsigned long v) : Parent{ uint64_t(v) } {}
 
 	public:
+		constexpr bool isId() const {
+			return std::holds_alternative<detail::EnumId>(*this);
+		}
 		constexpr bool isUNum() const {
 			return std::holds_alternative<uint64_t>(*this);
 		}
@@ -68,15 +76,13 @@ namespace arger {
 	public:
 		template <arger::IsId Type = size_t>
 		constexpr Type id() const {
-			if (std::holds_alternative<arger::EnumValue>(*this))
-				return static_cast<Type>(std::get<arger::EnumValue>(*this).id);
+			if (std::holds_alternative<detail::EnumId>(*this))
+				return static_cast<Type>(std::get<detail::EnumId>(*this).id);
 			throw arger::TypeException{ L"arger::Value is not an enum." };
 		}
 		constexpr uint64_t unum() const {
 			if (std::holds_alternative<uint64_t>(*this))
 				return std::get<uint64_t>(*this);
-			if (std::holds_alternative<arger::EnumValue>(*this))
-				return std::get<arger::EnumValue>(*this).id;
 			throw arger::TypeException{ L"arger::Value is not an unsigned-number." };
 		}
 		constexpr int64_t inum() const {
@@ -84,8 +90,6 @@ namespace arger {
 				return int64_t(std::get<uint64_t>(*this));
 			if (std::holds_alternative<int64_t>(*this))
 				return std::get<int64_t>(*this);
-			if (std::holds_alternative<arger::EnumValue>(*this))
-				return std::get<arger::EnumValue>(*this).id;
 			throw arger::TypeException{ L"arger::Value is not a signed-number." };
 		}
 		constexpr double real() const {
@@ -106,8 +110,6 @@ namespace arger {
 		constexpr std::basic_string<ChType> str() const {
 			if (std::holds_alternative<std::wstring>(*this))
 				return str::View{ std::get<std::wstring>(*this) }.str<ChType>();
-			if (std::holds_alternative<arger::EnumValue>(*this))
-				return str::View{ std::get<arger::EnumValue>(*this).name }.str<ChType>();
 			throw arger::TypeException{ L"arger::Value is not a string." };
 		}
 	};

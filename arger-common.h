@@ -34,14 +34,13 @@ namespace arger {
 		real,
 		boolean
 	};
-	struct EnumValue {
+	struct EnumEntry {
 		std::wstring name;
+		std::wstring description;
 		size_t id = 0;
-		constexpr EnumValue(std::wstring name) : name{ name } {}
-		constexpr EnumValue(std::wstring name, size_t id) : name{ name }, id{ id } {}
-		constexpr EnumValue(std::wstring name, arger::IsId auto val) : name{ name }, id{ static_cast<size_t>(val) } {}
+		constexpr EnumEntry(std::wstring name, std::wstring description, arger::IsId auto id) : name{ name }, description{ description }, id{ static_cast<size_t>(id) } {}
 	};
-	using Enum = std::map<std::wstring, arger::EnumValue>;
+	using Enum = std::vector<arger::EnumEntry>;
 	using Type = std::variant<arger::Primitive, arger::Enum>;
 
 	using Checker = std::function<std::wstring(const arger::Parsed&)>;

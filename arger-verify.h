@@ -4,6 +4,7 @@
 
 #include "arger-common.h"
 #include "arger-config.h"
+#include "arger-value.h"
 
 namespace arger::detail {
 	struct ValidGroup;
@@ -91,9 +92,9 @@ namespace arger::detail {
 		/* check if the value must be an enum */
 		if (std::holds_alternative<arger::Enum>(type)) {
 			const arger::Enum& allowed = std::get<arger::Enum>(type);
-			if (value.isStr() && allowed.count(value.str()) != 0)
+			if (value.isStr() && std::find_if(allowed.begin(), allowed.end(), [&](const arger::EnumEntry& e) { return e.name == value.str(); }) != allowed.end())
 				return;
-			throw arger::ConfigException{ L"Default value of ", who, L" must be a valid enum for the given type." };
+			throw arger::ConfigException{ L"Default value of ", who, L" must be a valid enum-string for the given type." };
 		}
 
 		/* validate the expected default type (value automatically performs conversion) */
