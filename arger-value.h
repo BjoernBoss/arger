@@ -41,11 +41,6 @@ namespace arger {
 				static_cast<Parent&>(*this) = uint64_t(v);
 		}
 		constexpr Value(unsigned int v) : Parent{ uint64_t(v) } {}
-		constexpr Value(long v) : Parent{ int64_t(v) } {
-			if (v >= 0)
-				static_cast<Parent&>(*this) = uint64_t(v);
-		}
-		constexpr Value(unsigned long v) : Parent{ uint64_t(v) } {}
 
 	public:
 		constexpr bool isId() const {
