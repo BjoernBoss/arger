@@ -137,10 +137,13 @@ namespace arger {
 		public detail::Payload {
 	public:
 		std::wstring name;
+		size_t id = 0;
 
 	public:
-		Option(std::wstring name);
-		constexpr Option(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs);
+		Option(std::wstring name, size_t id);
+		Option(std::wstring name, arger::IsEnum auto id);
+		constexpr Option(std::wstring name, size_t id, const arger::IsConfig<arger::Option> auto&... configs);
+		constexpr Option(std::wstring name, arger::IsEnum auto id, const arger::IsConfig<arger::Option> auto&... configs);
 		constexpr void apply(detail::Options& base) const {
 			base.options.push_back(*this);
 		}
@@ -163,12 +166,10 @@ namespace arger {
 	public:
 		Group(std::wstring name);
 		Group(std::wstring name, size_t id);
-		template <arger::IsEnum Type>
-		Group(std::wstring name, Type id);
+		Group(std::wstring name, arger::IsEnum auto id);
 		constexpr Group(std::wstring name, const arger::IsConfig<arger::Group> auto&... configs);
 		constexpr Group(std::wstring name, size_t id, const arger::IsConfig<arger::Group> auto&... configs);
-		template <arger::IsEnum Type>
-		constexpr Group(std::wstring name, Type id, const arger::IsConfig<arger::Group> auto&... configs);
+		constexpr Group(std::wstring name, arger::IsEnum auto id, const arger::IsConfig<arger::Group> auto&... configs);
 		constexpr void apply(detail::Groups& base) const {
 			base.groups.list.push_back(*this);
 		}
@@ -207,23 +208,25 @@ namespace arger {
 		detail::ApplyConfigs(*this, configs...);
 	}
 
-	inline arger::Option::Option(std::wstring name) : name{ name } {}
-	constexpr arger::Option::Option(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs) : name{ name } {
+	inline arger::Option::Option(std::wstring name, size_t id) : name{ name }, id{ id } {}
+	inline arger::Option::Option(std::wstring name, arger::IsEnum auto id) : name{ name }, id{ static_cast<size_t>(id) } {}
+	constexpr arger::Option::Option(std::wstring name, size_t id, const arger::IsConfig<arger::Option> auto&... configs) : name{ name }, id{ id } {
+		detail::ApplyConfigs(*this, configs...);
+	}
+	constexpr arger::Option::Option(std::wstring name, arger::IsEnum auto id, const arger::IsConfig<arger::Option> auto&... configs) : name{ name }, id{ static_cast<size_t>(id) } {
 		detail::ApplyConfigs(*this, configs...);
 	}
 
 	inline arger::Group::Group(std::wstring name) : name{ name }, id{ 0 } {}
 	inline arger::Group::Group(std::wstring name, size_t id) : name{ name }, id{ id } {}
-	template <arger::IsEnum Type>
-	inline arger::Group::Group(std::wstring name, Type id) : name{ name }, id{ static_cast<size_t>(id) } {}
+	inline arger::Group::Group(std::wstring name, arger::IsEnum auto id) : name{ name }, id{ static_cast<size_t>(id) } {}
 	constexpr arger::Group::Group(std::wstring name, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ 0 } {
 		detail::ApplyConfigs(*this, configs...);
 	}
 	constexpr arger::Group::Group(std::wstring name, size_t id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ id } {
 		detail::ApplyConfigs(*this, configs...);
 	}
-	template <arger::IsEnum Type>
-	constexpr arger::Group::Group(std::wstring name, Type id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ static_cast<size_t>(id) } {
+	constexpr arger::Group::Group(std::wstring name, arger::IsEnum auto id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ static_cast<size_t>(id) } {
 		detail::ApplyConfigs(*this, configs...);
 	}
 

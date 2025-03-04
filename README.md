@@ -26,9 +26,9 @@ arger::Config(const arger::IsConfig<arger::Config> auto&... configs);
 *	 Note: Groups/Configs can can only have sub-groups or positional arguments */
 arger::Group(std::wstring name, size_t id, const arger::IsConfig<arger::Group> auto&... configs);
 
-/* general optional flag/payload
+/* general optional flag/payload (id can also be set via enums)
 *	Note: if passed to a group, it is implicitly only bound to that group - but all names and abbreviations must be unique */
-arger::Option(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs);
+arger::Option(std::wstring name, size_t id, const arger::IsConfig<arger::Option> auto&... configs);
 
 /* configure the key to be used as option for argument mode and any group name for menu mode, which triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
 arger::HelpEntry(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs);
@@ -91,12 +91,13 @@ The following example configuration:
 
 ```C++
 enum class Mode : uint8_t { abc, def };
+enum class Option : uint8_t { test, path, mode };
 arger::Config config{
 	arger::Program{ L"test.exe" },
 	arger::Version{ L"1.0.1" },
 	arger::Help{ L"Some Description", L"This is the indepth description." },
 	arger::Description{ L"Some test program" },
-	arger::Option{ L"test",
+	arger::Option{ L"test", Option::test,
 		arger::Abbreviation{ L't' },
 		arger::Description{ L"This is the description of the test flag." }
 	},
@@ -108,13 +109,13 @@ arger::Config config{
 		arger::Abbreviation{ L'v' },
 		arger::Description{ L"Print the program version." }
 	},
-	arger::Option{ L"path",
+	arger::Option{ L"path", Option::path,
 		arger::Abbreviation{ L'p' },
 		arger::Payload{ L"file-path", arger::Primitive::any },
 		arger::Description{ L"This is some path option" },
 		arger::Require{ 1, 0 }
 	},
-	arger::Option{ L"mode",
+	arger::Option{ L"mode", Option::mode,
 		arger::Payload{ L"test-mode",
 			arger::Enum{
 				{ L"abc", arger::EnumValue{ L"This is the description of option abc", Mode::abc } },
@@ -204,13 +205,14 @@ The following example configuration:
 ```C++
 enum class Mode : uint8_t { abc, def };
 enum class Group : uint8_t { get, set, read };
+enum class Option : uint8_t { test, path, mode };
 arger::Config config{
 	arger::Program{ L"test.exe" },
 	arger::Version{ L"1.0.1" },
 	arger::Help{ L"Some Description", L"This is the indepth description." },
 	arger::GroupName{ L"test-setting" },
 	arger::Description{ L"Some test program" },
-	arger::Option{ L"test",
+	arger::Option{ L"test", Option::test,
 		arger::Abbreviation{ L't' },
 		arger::Description{ L"This is the description of the test flag." }
 	},
@@ -218,13 +220,13 @@ arger::Config config{
 		arger::Abbreviation{ L'h' },
 		arger::Description{ L"Print this help menu." }
 	},
-	arger::Option{ L"path",
+	arger::Option{ L"path", Option::path,
 		arger::Abbreviation{ L'p' },
 		arger::Payload{ L"file-path", arger::Primitive::any },
 		arger::Description{ L"This is some path option" },
 		arger::Require{ 1 }
 	},
-	arger::Option{ L"mode",
+	arger::Option{ L"mode", Option::mode,
 		arger::Payload{ L"test-mode",
 			arger::Enum{
 				{ L"abc", arger::EnumValue{ L"This is the description of option abc", Mode::abc } },

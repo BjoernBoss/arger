@@ -35,8 +35,7 @@ namespace arger {
 		size_t id = 0;
 		constexpr EnumValue(std::wstring name) : name{ name } {}
 		constexpr EnumValue(std::wstring name, size_t id) : name{ name }, id{ id } {}
-		template <arger::IsEnum Type>
-		constexpr EnumValue(std::wstring name, Type val) : name{ name }, id{ static_cast<size_t>(val) } {}
+		constexpr EnumValue(std::wstring name, arger::IsEnum auto val) : name{ name }, id{ static_cast<size_t>(val) } {}
 	};
 	using Enum = std::map<std::wstring, arger::EnumValue>;
 	using Type = std::variant<arger::Primitive, arger::Enum>;

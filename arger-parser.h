@@ -84,7 +84,7 @@ namespace arger {
 
 					/* check if this is a flag and mark it as seen */
 					if (!entry->payload) {
-						pParsed.pFlags.insert(entry->option->name);
+						pParsed.pFlags.insert(entry->option->id);
 						continue;
 					}
 
@@ -99,9 +99,9 @@ namespace arger {
 					payloadUsed = true;
 
 					/* write the value as raw string into the buffer (dont perform any validations or limit checks for now) */
-					auto it = pParsed.pOptions.find(entry->option->name);
+					auto it = pParsed.pOptions.find(entry->option->id);
 					if (it == pParsed.pOptions.end())
-						it = pParsed.pOptions.insert({ entry->option->name, {} }).first;
+						it = pParsed.pOptions.insert({ entry->option->id, {} }).first;
 					it->second.emplace_back(arger::Value{ hasPayload ? payload : pArgs[pIndex++] });
 				}
 
@@ -207,7 +207,7 @@ namespace arger {
 				/* iterate over the optional arguments and verify them */
 				for (auto& [name, option] : pConfig.options) {
 					/* check if the current option can be used by the selected group or any of its ancestors */
-					if (!detail::CheckUsage(&option, pSelected) && (option.payload ? pParsed.pOptions.contains(name) : pParsed.pFlags.contains(name))) {
+					if (!detail::CheckUsage(&option, pSelected) && (option.payload ? pParsed.pOptions.contains(option.option->id) : pParsed.pFlags.contains(option.option->id))) {
 						/* selected can never be null, as null would allow any usage - but static analyzer does not know this */
 						if (pSelected != 0)
 							throw arger::ParsingException{ L"Argument [", name, L"] not meant for ", topMost->super->groupName, L" [", pSelected->group->name, L"]." };
@@ -218,12 +218,12 @@ namespace arger {
 						continue;
 
 					/* lookup the option */
-					auto it = pParsed.pOptions.find(name);
+					auto it = pParsed.pOptions.find(option.option->id);
 					size_t count = (it == pParsed.pOptions.end() ? 0 : it->second.size());
 
 					/* check if the default values should be assigned (are already validated by the verifying-step) */
 					if (count == 0 && !option.option->payload.defValue.empty()) {
-						pParsed.pOptions.insert({ name, {} }).first->second = option.option->payload.defValue;
+						pParsed.pOptions.insert({ option.option->id, {} }).first->second = option.option->payload.defValue;
 						continue;
 					}
 
@@ -368,8 +368,8 @@ namespace arger {
 				fRecCheckConstraints(topMost);
 
 				/* validate all optional constraints */
-				for (const auto& [name, option] : pConfig.options) {
-					if (!pParsed.pOptions.contains(name))
+				for (const auto& [_, option] : pConfig.options) {
+					if (!(option.payload ? pParsed.pOptions.contains(option.option->id) : pParsed.pFlags.contains(option.option->id)))
 						continue;
 					for (const auto& fn : option.option->constraints) {
 						std::wstring err = fn(pParsed);

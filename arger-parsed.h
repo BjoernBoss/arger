@@ -11,14 +11,17 @@ namespace arger {
 		friend class arger::Arguments;
 		friend class detail::Parser;
 	private:
-		std::set<std::wstring> pFlags;
-		std::map<std::wstring, std::vector<arger::Value>> pOptions;
+		std::set<size_t> pFlags;
+		std::map<size_t, std::vector<arger::Value>> pOptions;
 		std::vector<arger::Value> pPositional;
 		size_t pGroupId = 0;
 
 	public:
-		bool flag(const std::wstring& name) const {
-			return pFlags.contains(name);
+		bool flag(size_t id) const {
+			return pFlags.contains(id);
+		}
+		bool flag(arger::IsEnum auto id) const {
+			return pFlags.contains(static_cast<size_t>(id));
 		}
 		constexpr size_t id() const {
 			return pGroupId;
@@ -29,12 +32,22 @@ namespace arger {
 		}
 
 	public:
-		size_t options(const std::wstring& name) const {
-			auto it = pOptions.find(name);
+		size_t options(size_t id) const {
+			auto it = pOptions.find(id);
 			return (it == pOptions.end() ? 0 : it->second.size());
 		}
-		std::optional<arger::Value> option(const std::wstring& name, size_t index = 0) const {
-			auto it = pOptions.find(name);
+		size_t options(arger::IsEnum auto id) const {
+			auto it = pOptions.find(static_cast<size_t>(id));
+			return (it == pOptions.end() ? 0 : it->second.size());
+		}
+		std::optional<arger::Value> option(size_t id, size_t index = 0) const {
+			auto it = pOptions.find(id);
+			if (it == pOptions.end() || index >= it->second.size())
+				return {};
+			return it->second[index];
+		}
+		std::optional<arger::Value> option(arger::IsEnum auto id, size_t index = 0) const {
+			auto it = pOptions.find(static_cast<size_t>(id));
 			if (it == pOptions.end() || index >= it->second.size())
 				return {};
 			return it->second[index];
