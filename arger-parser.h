@@ -272,7 +272,6 @@ namespace arger {
 				detail::BaseBuilder base{ pArgs.empty() || menu ? L"" : pArgs[pIndex++], config, menu };
 
 				/* iterate over the arguments and parse them based on the definitions */
-				size_t dirtyGroup = pArgs.size();
 				bool canHaveSpecialEntries = true;
 				while (pIndex < pArgs.size()) {
 					const std::wstring& next = pArgs[pIndex++];
@@ -320,27 +319,26 @@ namespace arger {
 					}
 
 					/* check if this is a group-selector */
-					if (topMost->incomplete && dirtyGroup == pArgs.size()) {
+					if (topMost->incomplete) {
 						/* find the group with the matching argument-name */
-						auto it = topMost->sub.find(next);
+						const detail::ValidGroup* _next = 0;
+						if (auto it = topMost->sub.find(next); it != topMost->sub.end())
+							_next = &it->second;
+						else if (auto it = topMost->abbreviations.find(next.size() == 1 ? next[0] : L'\0'); it != topMost->abbreviations.end())
+							_next = it->second;
 
-						/* check if a group has been found */
-						if (it != topMost->sub.end()) {
-							topMost = (pSelected = &it->second);
+						/* check if a matching group has been found */
+						if (_next != 0) {
+							topMost = (pSelected = _next);
+							pParsed.pGroupIds.push_back(pSelected->group->id);
 							canHaveSpecialEntries = true;
 							continue;
 						}
 
-						/* check if an abbreviation matches */
-						if (next.size() == 1) {
-							auto at = topMost->abbreviations.find(next[0]);
-							if (at != topMost->abbreviations.end()) {
-								topMost = (pSelected = at->second);
-								canHaveSpecialEntries = true;
-								continue;
-							}
-						}
-						dirtyGroup = pIndex - 1;
+						/* setup the failed match */
+						if (pDeferred.empty())
+							str::BuildTo(pDeferred, L"Unknown ", topMost->groupName, L" [", next, L"] encountered.");
+						continue;
 					}
 
 					/* add the argument to the list of positional arguments (dont perform any validations or
@@ -356,10 +354,6 @@ namespace arger {
 				if (!print.empty())
 					throw arger::PrintMessage{ print };
 
-				/* verify the group selection */
-				if (dirtyGroup < pArgs.size())
-					throw arger::ParsingException{ L"Unknown ", topMost->groupName, L" [", pArgs[dirtyGroup], L"] encountered." };
-
 				/* check if a deferred error can be thrown */
 				if (!pDeferred.empty())
 					throw arger::ParsingException{ pDeferred };
@@ -369,9 +363,6 @@ namespace arger {
 
 				/* verify the optional arguments */
 				fVerifyOptional();
-
-				/* setup the selected group */
-				pParsed.pGroupId = (pSelected == 0 ? 0 : pSelected->group->id);
 
 				/* validate all root/selection constraints */
 				fRecCheckConstraints(topMost);

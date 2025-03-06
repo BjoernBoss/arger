@@ -13,6 +13,7 @@
 #include <set>
 #include <type_traits>
 #include <concepts>
+#include <cinttypes>
 
 namespace arger {
 	class Parsed;
