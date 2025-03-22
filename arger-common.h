@@ -17,7 +17,6 @@
 
 namespace arger {
 	class Parsed;
-	class Arguments;
 	namespace detail {
 		class Parser;
 	}

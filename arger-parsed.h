@@ -8,7 +8,6 @@
 namespace arger {
 	/* represents the parsed results of the arguments */
 	class Parsed {
-		friend class arger::Arguments;
 		friend class detail::Parser;
 	private:
 		std::set<size_t> pFlags;
