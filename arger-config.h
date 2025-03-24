@@ -155,6 +155,27 @@ namespace arger {
 		}
 	};
 
+	/* endpoint for positional arguments for a configuration/group (to enable a group to have multiple variations of positional counts)
+	*	 Note: If Groups/Configs define positional arguments directly, an implicit endpoint is defined and no further endpoints can be added */
+	struct Endpoint :
+		public detail::Config,
+		public detail::Require,
+		public detail::Positionals,
+		public detail::Constraint,
+		public detail::Description {
+	public:
+		size_t id = 0;
+
+	public:
+		Endpoint();
+		Endpoint(arger::IsId auto id);
+		constexpr Endpoint(const arger::IsConfig<arger::Endpoint> auto&... configs);
+		constexpr Endpoint(arger::IsId auto id, const arger::IsConfig<arger::Endpoint> auto&... configs);
+		constexpr void apply(detail::Endpoints& base) const {
+			base.endpoints.push_back(*this);
+		}
+	};
+
 	/* general sub-group of options for a configuration/group
 	*	 Note: Groups/Configs can can only have sub-groups or positional arguments */
 	struct Group :
@@ -176,27 +197,6 @@ namespace arger {
 		constexpr Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Group> auto&... configs);
 		constexpr void apply(detail::Groups& base) const {
 			base.groups.list.push_back(*this);
-		}
-	};
-
-	/* endpoint for positional arguments for a configuration/group (to enable a group to have multiple variations of positional counts)
-	*	 Note: If Groups/Configs define positional arguments directly, an implicit endpoint is defined and no further endpoints can be added */
-	struct Endpoint :
-		public detail::Config,
-		public detail::Require,
-		public detail::Positionals,
-		public detail::Constraint,
-		public detail::Description {
-	public:
-		size_t id = 0;
-
-	public:
-		Endpoint();
-		Endpoint(arger::IsId auto id);
-		constexpr Endpoint(const arger::IsConfig<arger::Endpoint> auto&... configs);
-		constexpr Endpoint(arger::IsId auto id, const arger::IsConfig<arger::Endpoint> auto&... configs);
-		constexpr void apply(detail::Endpoints& base) const {
-			base.endpoints.push_back(*this);
 		}
 	};
 
@@ -238,21 +238,21 @@ namespace arger {
 		detail::ApplyConfigs(*this, configs...);
 	}
 
-	inline arger::Group::Group(std::wstring name) : name{ name }, id{ 0 } {}
-	inline arger::Group::Group(std::wstring name, arger::IsId auto id) : name{ name }, id{ static_cast<size_t>(id) } {}
-	constexpr arger::Group::Group(std::wstring name, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ 0 } {
-		detail::ApplyConfigs(*this, configs...);
-	}
-	constexpr arger::Group::Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ static_cast<size_t>(id) } {
-		detail::ApplyConfigs(*this, configs...);
-	}
-
 	inline arger::Endpoint::Endpoint() : id{ 0 } {}
 	inline arger::Endpoint::Endpoint(arger::IsId auto id) : id{ static_cast<size_t>(id) } {}
 	constexpr arger::Endpoint::Endpoint(const arger::IsConfig<arger::Endpoint> auto&... configs) : id{ 0 } {
 		detail::ApplyConfigs(*this, configs...);
 	}
 	constexpr arger::Endpoint::Endpoint(arger::IsId auto id, const arger::IsConfig<arger::Endpoint> auto&... configs) : id{ static_cast<size_t>(id) } {
+		detail::ApplyConfigs(*this, configs...);
+	}
+
+	inline arger::Group::Group(std::wstring name) : name{ name }, id{ 0 } {}
+	inline arger::Group::Group(std::wstring name, arger::IsId auto id) : name{ name }, id{ static_cast<size_t>(id) } {}
+	constexpr arger::Group::Group(std::wstring name, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ 0 } {
+		detail::ApplyConfigs(*this, configs...);
+	}
+	constexpr arger::Group::Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ static_cast<size_t>(id) } {
 		detail::ApplyConfigs(*this, configs...);
 	}
 
