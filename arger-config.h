@@ -8,7 +8,7 @@
 namespace arger {
 	struct Group;
 	struct Option;
-
+	struct Endpoint;
 
 	namespace detail {
 		struct Config {};
@@ -88,6 +88,12 @@ namespace arger {
 				detail::SpecialEntry version;
 			} special;
 		};
+		struct Endpoints {
+			std::vector<arger::Endpoint> endpoints;
+		};
+		struct EndpointId {
+			size_t endpointId = 0;
+		};
 
 		template <class Base, class Config>
 		constexpr void ApplyConfigs(Base& base, const Config& config) {
@@ -103,7 +109,9 @@ namespace arger {
 			public detail::Require,
 			public detail::Positionals,
 			public detail::Constraint,
-			public detail::Groups {
+			public detail::Groups,
+			public detail::Endpoints,
+			public detail::EndpointId {
 		};
 	}
 
@@ -171,6 +179,27 @@ namespace arger {
 		}
 	};
 
+	/* endpoint for positional arguments for a configuration/group (to enable a group to have multiple variations of positional counts)
+	*	 Note: If Groups/Configs define positional arguments directly, an implicit endpoint is defined and no further endpoints can be added */
+	struct Endpoint :
+		public detail::Config,
+		public detail::Require,
+		public detail::Positionals,
+		public detail::Constraint,
+		public detail::Description {
+	public:
+		size_t id = 0;
+
+	public:
+		Endpoint();
+		Endpoint(arger::IsId auto id);
+		constexpr Endpoint(const arger::IsConfig<arger::Endpoint> auto&... configs);
+		constexpr Endpoint(arger::IsId auto id, const arger::IsConfig<arger::Endpoint> auto&... configs);
+		constexpr void apply(detail::Endpoints& base) const {
+			base.endpoints.push_back(*this);
+		}
+	};
+
 	/* configure the key to be used as option for argument mode and any group name for menu mode, which triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
 	struct HelpEntry :
 		public detail::Config,
@@ -215,6 +244,15 @@ namespace arger {
 		detail::ApplyConfigs(*this, configs...);
 	}
 	constexpr arger::Group::Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ static_cast<size_t>(id) } {
+		detail::ApplyConfigs(*this, configs...);
+	}
+
+	inline arger::Endpoint::Endpoint() : id{ 0 } {}
+	inline arger::Endpoint::Endpoint(arger::IsId auto id) : id{ static_cast<size_t>(id) } {}
+	constexpr arger::Endpoint::Endpoint(const arger::IsConfig<arger::Endpoint> auto&... configs) : id{ 0 } {
+		detail::ApplyConfigs(*this, configs...);
+	}
+	constexpr arger::Endpoint::Endpoint(arger::IsId auto id, const arger::IsConfig<arger::Endpoint> auto&... configs) : id{ static_cast<size_t>(id) } {
 		detail::ApplyConfigs(*this, configs...);
 	}
 
@@ -313,6 +351,19 @@ namespace arger {
 		constexpr Abbreviation(wchar_t c) : chr{ c } {}
 		constexpr void apply(detail::Abbreviation& base) const {
 			base.abbreviation = chr;
+		}
+	};
+
+	/* set the endpoint id of the implicitly defined endpoint
+	*	Note: cannot be used in conjunction with explicitly defined endpoints */
+	struct EndpointId : public detail::Config {
+	public:
+		size_t id = 0;
+
+	public:
+		constexpr EndpointId(arger::IsId auto id) : id{ static_cast<size_t>(id) } {}
+		constexpr void apply(detail::EndpointId& base) const {
+			base.endpointId = id;
 		}
 	};
 

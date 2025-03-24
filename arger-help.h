@@ -255,6 +255,18 @@ namespace arger {
 				fRecHelpStrings(selected->parent);
 				fHelpContent(*selected->group);
 			}
+			void fAddEndpointDescription(const detail::ValidEndpoint& endpoint) {
+				/* add the positional parameter for the topmost argument-object */
+				for (size_t i = 0; i < endpoint.positionals->size(); ++i) {
+					std::wstring token = (*endpoint.positionals)[i].name;
+
+					if (i + 1 >= endpoint.positionals->size() && (endpoint.maximum == 0 || i + 1 < endpoint.maximum))
+						token += L"...";
+					if (i >= endpoint.minimum)
+						token = L"[" + token + L']';
+					fAddSpacedToken(token);
+				}
+			}
 
 		private:
 			bool fCheckOptionPrint(const detail::ValidOption* option, bool menu) const {
@@ -282,7 +294,7 @@ namespace arger {
 
 				/* add the already selected groups and potentially upcoming group-name */
 				fRecGroupUsage(pSelected, topMost);
-				if (topMost->incomplete)
+				if (topMost->endpoints.empty())
 					fAddSpacedToken(str::wd::Build(L'[', topMost->groupName, L']'));
 
 				/* add all required options (must all consume a payload, as flags are never required) */
@@ -302,22 +314,18 @@ namespace arger {
 				if (hasOptionals)
 					fAddSpacedToken(L"[options...]");
 
-				/* add the positional parameter for the topmost argument-object */
-				if (!topMost->incomplete) {
-					for (size_t i = 0; i < topMost->args->positionals.size(); ++i) {
-						std::wstring token = topMost->args->positionals[i].name;
-
-						if (i + 1 >= topMost->args->positionals.size() && (topMost->maximum == 0 || i + 1 < topMost->maximum))
-							token += L"...";
-						if (i >= topMost->minimum)
-							token = L"[" + token + L']';
-						fAddSpacedToken(token);
-					}
-				}
-
 				/* add the hint to the arguments after the final group has been selected */
-				else if (topMost->nestedPositionals)
+				if (topMost->endpoints.empty() && topMost->nestedPositionals)
 					fAddSpacedToken(L"[params...]");
+
+				/* add all of the separate endpoints */
+				for (size_t i = 0; i < topMost->endpoints.size(); ++i) {
+					if (topMost->endpoints.size() > 1) {
+						fAddNewLine(false);
+						fAddString(str::wd::Build(L"  [Variation ", i + 1, L"]:"));
+					}
+					fAddEndpointDescription(topMost->endpoints[i]);
+				}
 			}
 			void fBuildOptions(bool required, bool menu) {
 				const detail::ValidArguments* topMost = (pSelected == 0 ? static_cast<const detail::ValidArguments*>(&pConfig) : pSelected);
@@ -372,7 +380,7 @@ namespace arger {
 						fDefaultDescription(&option->option->payload.defValue.front(), &option->option->payload.defValue.back() + 1);
 
 					/* add the usages (if groups still need to be selected and not all are users) */
-					if (!topMost->incomplete)
+					if (!topMost->endpoints.empty())
 						continue;
 					size_t users = 0;
 					for (const auto& [name, group] : topMost->sub) {
@@ -408,9 +416,9 @@ namespace arger {
 
 				/* add the description of all sub-groups */
 				const detail::ValidArguments* topMost = (pSelected == 0 ? static_cast<const detail::ValidArguments*>(&pConfig) : pSelected);
-				if (topMost->incomplete || (menu && (pConfig.help != 0 || pConfig.version != 0))) {
+				if (topMost->endpoints.empty() || (menu && (pConfig.help != 0 || pConfig.version != 0))) {
 					fAddNewLine(true);
-					if (topMost->incomplete)
+					if (topMost->endpoints.empty())
 						fAddString(str::wd::Build(L"Options for [", topMost->groupName, L"]:"));
 					else
 						fAddString(str::wd::Build(L"Optional Keywords:"));
@@ -435,32 +443,44 @@ namespace arger {
 					}
 				}
 
-				/* add the positional arguments */
-				if (!topMost->args->positionals.empty()) {
-					fAddNewLine(true);
-					if (pSelected == 0)
-						fAddString(L"Positional Arguments:");
-					else
-						fAddString(str::wd::Build(L"Positional Arguments for ", topMost->super->groupName, " [", pSelected->group->name, "]: "));
+				/* add the endpoints */
+				if (!topMost->endpoints.empty()) {
+					/* add the separate endpoints */
+					for (size_t i = 0; i < topMost->endpoints.size(); ++i) {
+						fAddNewLine(true);
+						if (topMost->endpoints.size() == 1)
+							fAddString(L"Positional Arguments:");
+						else {
+							fAddString(str::wd::Build(L"Positional Arguments [Variation ", i + 1, L"]:"));
+							fAddEndpointDescription(topMost->endpoints[i]);
+						}
+						const detail::ValidEndpoint& endpoint = topMost->endpoints[i];
 
-					/* add the positional arguments descriptions (will automatically be sorted by position) */
-					for (size_t i = 0; i < topMost->args->positionals.size(); ++i) {
-						const detail::Positionals::Entry& positional = topMost->args->positionals[i];
-						fAddNewLine(false);
+						/* add the positional arguments descriptions (will automatically be sorted by position) */
+						for (size_t j = 0; j < endpoint.positionals->size(); ++j) {
+							const detail::Positionals::Entry& positional = (*endpoint.positionals)[j];
+							fAddNewLine(false);
 
-						/* add the name and corresponding type and description */
-						fAddString(str::wd::Build("  ", positional.name, fTypeString(positional.type), L" "));
-						std::wstring temp = positional.description;
-						if (i + 1 >= topMost->args->positionals.size() && i + 1 < topMost->maximum)
-							temp.append(fLimitString(std::max<intptr_t>(topMost->minimum - intptr_t(i), 0), topMost->maximum - i));
-						fAddString(temp, detail::NumCharsHelpLeft, 1);
+							/* add the name and corresponding type and description */
+							fAddString(str::wd::Build("  ", positional.name, fTypeString(positional.type), L" "));
+							std::wstring temp = positional.description;
+							if (j + 1 >= endpoint.positionals->size() && j + 1 < endpoint.maximum)
+								temp.append(fLimitString(std::max<intptr_t>(endpoint.minimum - intptr_t(j), 0), endpoint.maximum - j));
+							fAddString(temp, detail::NumCharsHelpLeft, 1);
 
-						/* add the enum value description */
-						fEnumDescription(positional.type);
+							/* add the enum value description */
+							fEnumDescription(positional.type);
 
-						/* add the default values */
-						if (positional.defValue.has_value())
-							fDefaultDescription(&positional.defValue.value(), &positional.defValue.value() + 1);
+							/* add the default values */
+							if (positional.defValue.has_value())
+								fDefaultDescription(&positional.defValue.value(), &positional.defValue.value() + 1);
+						}
+
+						/* add the description of the endpoint */
+						if (endpoint.description != 0) {
+							fAddNewLine(true);
+							fAddString(*endpoint.description, 4);
+						}
 					}
 				}
 

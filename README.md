@@ -26,6 +26,10 @@ arger::Config(const arger::IsConfig<arger::Config> auto&... configs);
 *	 Note: Groups/Configs can can only have sub-groups or positional arguments */
 arger::Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Group> auto&... configs);
 
+/* endpoint for positional arguments for a configuration/group (to enable a group to have multiple variations of positional counts)
+*	 Note: If Groups/Configs define positional arguments directly, an implicit endpoint is defined and no further endpoints can be added */
+arger::Endpoint(arger::IsId auto id, const arger::IsConfig<arger::Endpoint> auto&... configs);
+
 /* general optional flag/payload (id can be enum or int)
 *	Note: if passed to a group, it is implicitly only bound to that group - but all names and abbreviations must be unique */
 arger::Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Option> auto&... configs);
@@ -59,6 +63,10 @@ arger::Require(size_t min, size_t max);
 
 /* add an abbreviation character for an option, group, or help/version entry to allow it to be accessible as single letters or, for example, -x */
 arger::Abbreviation(wchar_t c);
+
+/* set the endpoint id of the implicitly defined endpoint
+*	Note: cannot be used in conjunction with explicitly defined endpoints */
+arger::EndpointId(arger::IsId auto id);
 
 /* add a payload to an option with a given name and of a given type, and optional default values (must meet the requirement-counts) */
 arger::Payload(std::wstring name, arger::Type type, arger::Value defValue);

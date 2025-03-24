@@ -167,46 +167,60 @@ namespace arger {
 					break;
 				}
 			}
-			constexpr void fVerifyPositional() {
+			constexpr const detail::ValidEndpoint* fVerifyPositional() {
 				const detail::ValidArguments* topMost = (pSelected == 0 ? static_cast<const detail::ValidArguments*>(&pConfig) : pSelected);
 
 				/* check if the topmost object is still incomplete */
-				if (topMost->incomplete)
+				if (topMost->endpoints.empty())
 					throw arger::ParsingException{ str::View{ topMost->groupName }.title(), L" missing." };
 
-				/* fill the positional arguments up on default values (ensures later verification/unpacking is easier) */
-				for (size_t i = pParsed.pPositional.size(); i < topMost->args->positionals.size(); ++i) {
-					if (!topMost->args->positionals[i].defValue.has_value())
+				/* select the endpoint to be used (this ensures that for too few arguments, the first one is picked, too many
+				*	arguments, the last one is picked, and for in-between, the one next in line is picked) */
+				const detail::ValidEndpoint* endpoint = &topMost->endpoints[0];
+				for (size_t i = 1; i < topMost->endpoints.size(); ++i) {
+					if (topMost->endpoints[i].minimum <= pParsed.pPositional.size()) {
+						endpoint = &topMost->endpoints[i];
+						continue;
+					}
+					if (endpoint->maximum < pParsed.pPositional.size())
+						endpoint = &topMost->endpoints[i];
+					break;
+				}
+
+				/* fill the positional arguments up on default values (ensures later verification and makes unpacking easier) */
+				for (size_t i = pParsed.pPositional.size(); i < endpoint->positionals->size(); ++i) {
+					if (!(*endpoint->positionals)[i].defValue.has_value())
 						break;
-					pParsed.pPositional.push_back(topMost->args->positionals[i].defValue.value());
+					pParsed.pPositional.push_back((*endpoint->positionals)[i].defValue.value());
 				}
 
 				/* validate the requirements for the positional arguments and parse their values */
 				for (size_t i = 0; i < pParsed.pPositional.size(); ++i) {
 					/* check if the argument is out of range */
-					if (topMost->args->positionals.empty() || (topMost->maximum > 0 && i >= topMost->maximum)) {
+					if (endpoint->positionals->empty() || (endpoint->maximum > 0 && i >= endpoint->maximum)) {
 						if (pSelected == 0)
 							throw arger::ParsingException{ L"Unrecognized argument [", pParsed.pPositional[i].str(), L"] encountered." };
 						throw arger::ParsingException{ L"Unrecognized argument [", pParsed.pPositional[i].str(), L"] encountered for ", topMost->super->groupName, L" [", pSelected->group->name, L"]." };
 					}
-					size_t index = std::min<size_t>(i, topMost->args->positionals.size() - 1);
+					size_t index = std::min<size_t>(i, endpoint->positionals->size() - 1);
 
 					/* check if the value is empty and the default value should be used */
-					if (pParsed.pPositional[i].str().empty() && topMost->args->positionals[index].defValue.has_value())
-						pParsed.pPositional[i] = topMost->args->positionals[index].defValue.value();
+					if (pParsed.pPositional[i].str().empty() && (*endpoint->positionals)[index].defValue.has_value())
+						pParsed.pPositional[i] = (*endpoint->positionals)[index].defValue.value();
 
 					/* validate and unpack the argument */
-					fVerifyValue(topMost->args->positionals[index].name, pParsed.pPositional[i], topMost->args->positionals[index].type);
+					fVerifyValue((*endpoint->positionals)[index].name, pParsed.pPositional[i], (*endpoint->positionals)[index].type);
 				}
 
 				/* check if the minimum required number of parameters has not been reached
 				*	(maximum not necessary to be checked, as it will be checked implicitly by the verification-loop) */
-				if (pParsed.pPositional.size() < topMost->minimum) {
-					size_t index = std::min<size_t>(topMost->args->positionals.size() - 1, pParsed.pPositional.size());
+				if (pParsed.pPositional.size() < endpoint->minimum) {
+					size_t index = std::min<size_t>(endpoint->positionals->size() - 1, pParsed.pPositional.size());
 					if (pSelected == 0)
-						throw arger::ParsingException{ L"Argument [", topMost->args->positionals[index].name, L"] is missing." };
-					throw arger::ParsingException{ L"Argument [", topMost->args->positionals[index].name, L"] is missing for ", topMost->super->groupName, L" [", pSelected->group->name, L"]." };
+						throw arger::ParsingException{ L"Argument [", (*endpoint->positionals)[index].name, L"] is missing." };
+					throw arger::ParsingException{ L"Argument [", (*endpoint->positionals)[index].name, L"] is missing for ", topMost->super->groupName, L" [", pSelected->group->name, L"]." };
 				}
+				return endpoint;
 			}
 			void fVerifyOptional() {
 				const detail::ValidArguments* topMost = (pSelected == 0 ? static_cast<const detail::ValidArguments*>(&pConfig) : pSelected);
@@ -249,16 +263,17 @@ namespace arger {
 						fVerifyValue(name, it->second[i], option.option->payload.type);
 				}
 			}
+			void fCheckConstraints(const std::vector<arger::Checker>& constraints) {
+				for (const auto& fn : constraints) {
+					if (std::wstring err = fn(pParsed); !err.empty())
+						throw arger::ParsingException{ err };
+				}
+			}
 			void fRecCheckConstraints(const detail::ValidArguments* args) {
 				if (args == 0)
 					return;
 				fRecCheckConstraints(args->super);
-
-				for (const auto& fn : args->args->constraints) {
-					std::wstring err = fn(pParsed);
-					if (!err.empty())
-						throw arger::ParsingException{ err };
-				}
+				fCheckConstraints(*args->constraints);
 			}
 
 		public:
@@ -272,13 +287,11 @@ namespace arger {
 				detail::BaseBuilder base{ pArgs.empty() || menu ? L"" : pArgs[pIndex++], config, menu };
 
 				/* iterate over the arguments and parse them based on the definitions */
-				bool canHaveSpecialEntries = true;
 				while (pIndex < pArgs.size()) {
 					const std::wstring& next = pArgs[pIndex++];
 
-					/* check if its the version or help group (only if the last entry was
-					*	part of a group-selection or the top-most group is still incomplete) */
-					if (menu && (canHaveSpecialEntries || topMost->incomplete)) {
+					/* check if its the version or help group (only if no positional arguments have yet been pushed) */
+					if (menu && pParsed.pPositional.empty()) {
 						if (pConfig.help != 0 && (next.size() != 1 ? (next == pConfig.help->name) : (pConfig.help->abbreviation == next[0] && next[0] != 0))) {
 							pPrintHelp = true;
 							continue;
@@ -288,7 +301,6 @@ namespace arger {
 							continue;
 						}
 					}
-					canHaveSpecialEntries = false;
 
 					/* check if its an optional argument or positional-lock */
 					if (!pPositionalLocked && !next.empty() && next[0] == L'-') {
@@ -319,7 +331,7 @@ namespace arger {
 					}
 
 					/* check if this is a group-selector */
-					if (topMost->incomplete) {
+					if (topMost->endpoints.empty()) {
 						/* find the group with the matching argument-name */
 						const detail::ValidGroup* _next = 0;
 						if (auto it = topMost->sub.find(next); it != topMost->sub.end())
@@ -331,7 +343,6 @@ namespace arger {
 						if (_next != 0) {
 							topMost = (pSelected = _next);
 							pParsed.pGroupIds.push_back(pSelected->group->id);
-							canHaveSpecialEntries = true;
 							continue;
 						}
 
@@ -359,7 +370,8 @@ namespace arger {
 					throw arger::ParsingException{ pDeferred };
 
 				/* verify the positional arguments */
-				fVerifyPositional();
+				const detail::ValidEndpoint* endpoint = fVerifyPositional();
+				pParsed.pEndpoint = endpoint->id;
 
 				/* verify the optional arguments */
 				fVerifyOptional();
@@ -367,15 +379,14 @@ namespace arger {
 				/* validate all root/selection constraints */
 				fRecCheckConstraints(topMost);
 
+				/* validate the endpoint constraints */
+				if (endpoint != 0 && endpoint->constraints != 0)
+					fCheckConstraints(*endpoint->constraints);
+
 				/* validate all optional constraints */
 				for (const auto& [_, option] : pConfig.options) {
-					if (!(option.payload ? pParsed.pOptions.contains(option.option->id) : pParsed.pFlags.contains(option.option->id)))
-						continue;
-					for (const auto& fn : option.option->constraints) {
-						std::wstring err = fn(pParsed);
-						if (!err.empty())
-							throw arger::ParsingException{ err };
-					}
+					if ((option.payload ? pParsed.pOptions.contains(option.option->id) : pParsed.pFlags.contains(option.option->id)))
+						fCheckConstraints(option.option->constraints);
 				}
 
 				/* return the parsed structure */

@@ -14,6 +14,7 @@
 #include <type_traits>
 #include <concepts>
 #include <cinttypes>
+#include <algorithm>
 
 namespace arger {
 	class Parsed;

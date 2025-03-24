@@ -14,15 +14,20 @@ namespace arger {
 		std::map<size_t, std::vector<arger::Value>> pOptions;
 		std::vector<arger::Value> pPositional;
 		std::vector<size_t> pGroupIds;
+		size_t pEndpoint;
 
 	public:
 		bool flag(arger::IsId auto id) const {
 			return pFlags.contains(static_cast<size_t>(id));
 		}
 		template <arger::IsId Type = size_t>
-		constexpr Type id(intmax_t index = -1) const {
+		constexpr Type group(intmax_t index = -1) const {
 			intmax_t _index = (index < 0 ? intmax_t(pGroupIds.size()) + index : index);
 			return static_cast<Type>(pGroupIds[size_t(_index)]);
+		}
+		template <arger::IsId Type = size_t>
+		constexpr Type endpoint() const {
+			return static_cast<Type>(pEndpoint);
 		}
 
 	public:
