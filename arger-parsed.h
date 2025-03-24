@@ -14,7 +14,7 @@ namespace arger {
 		std::map<size_t, std::vector<arger::Value>> pOptions;
 		std::vector<arger::Value> pPositional;
 		std::vector<size_t> pGroupIds;
-		size_t pEndpoint;
+		size_t pEndpoint = 0;
 
 	public:
 		bool flag(arger::IsId auto id) const {
