@@ -7,8 +7,6 @@
 #include "arger-value.h"
 
 namespace arger::detail {
-	struct ValidGroup;
-
 	struct ValidEndpoint {
 		const std::vector<detail::Positionals::Entry>* positionals = 0;
 		const std::vector<arger::Checker>* constraints = 0;
@@ -20,16 +18,18 @@ namespace arger::detail {
 	struct ValidArguments {
 		const std::vector<arger::Checker>* constraints = 0;
 		const detail::ValidArguments* super = 0;
-		std::map<std::wstring, detail::ValidGroup> sub;
-		std::map<wchar_t, detail::ValidGroup*> abbreviations;
+		std::map<std::wstring, detail::ValidArguments> sub;
+		std::map<wchar_t, detail::ValidArguments*> abbreviations;
 		std::vector<detail::ValidEndpoint> endpoints;
+		const arger::Group* group = 0;
 		std::wstring groupName;
+		size_t depth = 0;
 		bool nestedPositionals = false;
 	};
 	struct ValidOption {
 		const arger::Option* option = 0;
-		std::set<const detail::ValidGroup*> users;
-		const detail::ValidGroup* owner = 0;
+		std::set<const detail::ValidArguments*> users;
+		const detail::ValidArguments* owner = 0;
 		size_t minimum = 0;
 		size_t maximum = 0;
 		bool payload = false;
@@ -42,18 +42,8 @@ namespace arger::detail {
 		const detail::SpecialEntry* help = 0;
 		const detail::SpecialEntry* version = 0;
 	};
-	struct ValidGroup : public detail::ValidArguments {
-		const arger::Group* group = 0;
-		const detail::ValidGroup* parent = 0;
-		size_t depth = 0;
-	};
 
-	inline bool CheckParent(const detail::ValidGroup* parent, const detail::ValidGroup* child) {
-		if (parent == 0)
-			return true;
-		if (child == 0)
-			return false;
-
+	inline bool CheckParent(const detail::ValidArguments* parent, const detail::ValidArguments* child) {
 		/* check if the child can be above the parent */
 		if (child->depth < parent->depth)
 			return false;
@@ -62,20 +52,17 @@ namespace arger::detail {
 		while (child != 0) {
 			if (child == parent)
 				return true;
-			child = child->parent;
+			child = child->super;
 		}
 		return false;
 	}
-	inline bool CheckAncestors(const detail::ValidGroup* a, const detail::ValidGroup* b) {
-		if (a == 0 || b == 0)
-			return true;
-
+	inline bool CheckAncestors(const detail::ValidArguments* a, const detail::ValidArguments* b) {
 		/* find the other group in the younger of the two groups */
 		if (a->depth < b->depth)
 			return detail::CheckParent(a, b);
 		return detail::CheckParent(b, a);
 	}
-	inline bool CheckUsage(const detail::ValidOption* option, const detail::ValidGroup* group) {
+	inline bool CheckUsage(const detail::ValidOption* option, const detail::ValidArguments* group) {
 		for (const auto& user : option->users) {
 			if (detail::CheckAncestors(user, group))
 				return true;
@@ -174,8 +161,7 @@ namespace arger::detail {
 				detail::ValidateDefValue(positionals[i].type, positionals[i].defValue.value());
 		}
 	}
-	inline void ValidateArguments(const arger::Config& config, const detail::Arguments& arguments, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidGroup* self, detail::ValidArguments* super, bool menu);
-	inline void ValidateOption(const arger::Config& config, const arger::Option& option, detail::ValidConfig& state, const detail::ValidGroup* owner, bool menu) {
+	inline void ValidateOption(const arger::Config& config, const arger::Option& option, detail::ValidConfig& state, const detail::ValidArguments* owner, bool menu) {
 		if (option.name.size() <= 1)
 			throw arger::ConfigException{ L"Option name must at least be two characters long." };
 		if (option.name.starts_with(L"-"))
@@ -230,45 +216,13 @@ namespace arger::detail {
 				detail::ValidateDefValue(option.payload.type, value);
 		}
 	}
-	inline void ValidateGroup(const arger::Config& config, const arger::Group& group, detail::ValidConfig& state, detail::ValidGroup* parent, detail::ValidArguments* super, bool menu) {
-		if (group.name.size() <= 1)
-			throw arger::ConfigException{ L"Group name must at least be two characters long." };
-		if (group.name.starts_with(L"-"))
-			throw arger::ConfigException{ L"Group name must not start with a hypen." };
-
-		/* validate the name's uniqueness */
-		if (super->sub.contains(group.name))
-			throw arger::ConfigException{ L"Group names within a sub-group must be unique." };
-		detail::ValidGroup& entry = super->sub[group.name];
-		entry.group = &group;
-		entry.parent = parent;
-		entry.super = super;
-		entry.depth = (parent == 0 ? 0 : parent->depth + 1);
-
-		/* check if the abbreviation is unique */
-		if (group.abbreviation != 0) {
-			if (super->abbreviations.contains(group.abbreviation))
-				throw arger::ConfigException{ L"Group abbreviations within a sub-group must be unique." };
-			super->abbreviations[group.abbreviation] = &entry;
-		}
-
-		/* check if the name or abbreviation clashes with the help/version entries */
-		if (menu)
-			detail::ValidateSpecialEntry(state, group.name, group.abbreviation);
-
-		/* validate the arguments */
-		detail::ValidateArguments(config, group, state, entry, &entry, super, menu);
-
-		/* register all new options */
-		for (const auto& option : group.options)
-			detail::ValidateOption(config, option, state, &entry, menu);
-
-		/* validate the help attributes */
-		detail::ValidateHelp(group);
-	}
-	inline void ValidateArguments(const arger::Config& config, const detail::Arguments& arguments, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidGroup* self, detail::ValidArguments* super, bool menu) {
+	inline void ValidateArguments(const arger::Config& config, const detail::Arguments& arguments, const arger::Group* group, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidArguments* super, bool menu) {
+		/* populate the entry */
 		entry.constraints = &arguments.constraints;
 		entry.nestedPositionals = !arguments.positionals.empty();
+		entry.super = super;
+		entry.depth = (super == 0 ? 0 : super->depth + 1);
+		entry.group = group;
 
 		/* validate and configure the group name */
 		if (arguments.groups.name.empty())
@@ -277,16 +231,44 @@ namespace arger::detail {
 			entry.groupName = str::View{ arguments.groups.name }.lower();
 
 		/* validate the groups */
-		if (!arguments.groups.list.empty() && (!arguments.positionals.empty() || !arguments.endpoints.empty())) {
-			if (self == 0)
-				throw arger::ConfigException{ L"Arguments cannot have positional arguments and sub-groups." };
-			throw arger::ConfigException{ L"Group cannot have positional arguments and sub-groups." };
-		}
 		if (!arguments.groups.list.empty()) {
-			for (const auto& sub : arguments.groups.list)
-				detail::ValidateGroup(config, sub, state, self, (self == 0 ? super : self), menu);
-			for (const auto& sub : entry.sub)
-				entry.nestedPositionals = (entry.nestedPositionals || sub.second.nestedPositionals);
+			if (!arguments.positionals.empty() || !arguments.endpoints.empty())
+				throw arger::ConfigException{ L"Groups and positional arguments cannot be used in conjunction." };
+
+			/* register all groups */
+			for (const auto& sub : arguments.groups.list) {
+				if (sub.name.size() <= 1)
+					throw arger::ConfigException{ L"Group name must at least be two characters long." };
+				if (sub.name.starts_with(L"-"))
+					throw arger::ConfigException{ L"Group name must not start with a hypen." };
+
+				/* validate the name's uniqueness */
+				if (entry.sub.contains(sub.name))
+					throw arger::ConfigException{ L"Group names within a sub-group must be unique." };
+				detail::ValidArguments& next = entry.sub[sub.name];
+
+				/* check if the abbreviation is unique */
+				if (sub.abbreviation != 0) {
+					if (entry.abbreviations.contains(sub.abbreviation))
+						throw arger::ConfigException{ L"Group abbreviations within a sub-group must be unique." };
+					entry.abbreviations[sub.abbreviation] = &next;
+				}
+
+				/* check if the name or abbreviation clashes with the help/version entries */
+				if (menu)
+					detail::ValidateSpecialEntry(state, sub.name, sub.abbreviation);
+
+				/* validate the arguments */
+				detail::ValidateArguments(config, sub, &sub, state, next, &entry, menu);
+				entry.nestedPositionals = (entry.nestedPositionals || next.nestedPositionals);
+
+				/* register all new options */
+				for (const auto& option : sub.options)
+					detail::ValidateOption(config, option, state, &next, menu);
+
+				/* validate the help attributes */
+				detail::ValidateHelp(sub);
+			}
 			return;
 		}
 
@@ -311,7 +293,7 @@ namespace arger::detail {
 				throw arger::ConfigException{ L"Endpoint positional requirement counts must not overlap in order to ensure each endpoint can be matched uniquely." };
 		}
 	}
-	inline void ValidateFinalizedGroups(detail::ValidConfig& state, const detail::ValidGroup& group) {
+	inline void ValidateFinalizeArguments(detail::ValidConfig& state, const detail::ValidArguments& group) {
 		/* validate that used options are defined and usable */
 		for (size_t option : group.group->use) {
 			auto it = state.optionIds.find(option);
@@ -328,7 +310,7 @@ namespace arger::detail {
 
 		/* validate all children */
 		for (const auto& [_, child] : group.sub)
-			detail::ValidateFinalizedGroups(state, child);
+			detail::ValidateFinalizeArguments(state, child);
 	}
 	inline void ValidateConfig(const arger::Config& config, detail::ValidConfig& state, bool menu) {
 		if (menu && !config.program.empty())
@@ -360,12 +342,12 @@ namespace arger::detail {
 
 		/* validate the options and arguments */
 		for (const auto& option : config.options)
-			detail::ValidateOption(config, option, state, 0, menu);
-		detail::ValidateArguments(config, config, state, state, 0, &state, menu);
+			detail::ValidateOption(config, option, state, &state, menu);
+		detail::ValidateArguments(config, config, 0, state, state, 0, menu);
 
 		/* post-validate all groups after all groups and flags have been loaded */
 		for (const auto& [_, group] : state.sub)
-			detail::ValidateFinalizedGroups(state, group);
+			detail::ValidateFinalizeArguments(state, group);
 
 		/* finalize all options by adding the root-group to all non-restricted options */
 		for (auto& [name, option] : state.options) {

@@ -57,13 +57,13 @@ namespace arger {
 		private:
 			std::wstring pBuffer;
 			size_t pPosition = 0;
-			const detail::ValidGroup* pSelected = 0;
+			const detail::ValidArguments* pTopMost = 0;
 			const detail::ValidConfig& pConfig;
 			const detail::BaseBuilder& pBase;
 			size_t pNumChars = 0;
 
 		public:
-			constexpr HelpBuilder(const detail::BaseBuilder& base, const detail::ValidConfig& config, const detail::ValidGroup* selected, size_t numChars) : pBase{ base }, pConfig{ config }, pSelected{ selected } {
+			constexpr HelpBuilder(const detail::BaseBuilder& base, const detail::ValidConfig& config, const detail::ValidArguments* topMost, size_t numChars) : pBase{ base }, pConfig{ config }, pTopMost{ topMost } {
 				pNumChars = std::max(detail::NumCharsHelpLeft + 8, numChars);
 			}
 
@@ -230,30 +230,30 @@ namespace arger {
 			}
 
 		private:
-			constexpr void fRecGroupUsage(const detail::ValidGroup* selected, const detail::ValidArguments* self) {
-				if (selected == 0)
+			constexpr void fRecGroupUsage(const detail::ValidArguments* topMost) {
+				if (topMost == 0 || topMost->super == 0)
 					return;
-				fRecGroupUsage(selected->parent, selected->super);
-				fAddSpacedToken(selected->group->name);
+				fRecGroupUsage(topMost->super);
+				fAddSpacedToken(topMost->group->name);
 			}
-			constexpr void fRecGroupDescription(const detail::ValidGroup* selected) {
+			constexpr void fRecGroupDescription(const detail::ValidArguments* topMost) {
 				/* add the description of all parents */
-				if (selected == 0)
+				if (topMost == 0 || topMost->super == 0)
 					return;
-				fRecGroupDescription(selected->parent);
-				if (selected->group->description.empty())
+				fRecGroupDescription(topMost->super);
+				if (topMost->group->description.empty())
 					return;
 
 				/* add the newline, description header and description itself */
 				fAddNewLine(true);
-				fAddString(str::wd::Build(str::View{ selected->super->groupName }.title(), L": ", selected->group->name));
-				fAddString(selected->group->description, 4);
+				fAddString(str::wd::Build(str::View{ topMost->super->groupName }.title(), L": ", topMost->group->name));
+				fAddString(topMost->group->description, 4);
 			}
-			constexpr void fRecHelpStrings(const detail::ValidGroup* selected) {
-				if (selected == 0)
+			constexpr void fRecHelpStrings(const detail::ValidArguments* topMost) {
+				if (topMost == 0 || topMost->super == 0)
 					return;
-				fRecHelpStrings(selected->parent);
-				fHelpContent(*selected->group);
+				fRecHelpStrings(topMost->super);
+				fHelpContent(*topMost->group);
 			}
 			void fAddEndpointDescription(const detail::ValidEndpoint& endpoint) {
 				/* add the positional parameter for the topmost argument-object */
@@ -272,36 +272,34 @@ namespace arger {
 			bool fCheckOptionPrint(const detail::ValidOption* option, bool menu) const {
 				/* in normal mode, check if the argument is excluded by the current selected group, based on the usage-requirements */
 				if (!menu)
-					return detail::CheckUsage(option, pSelected);
+					return detail::CheckUsage(option, pTopMost);
 
 				/* in menu-mode, print only flags, which are only available because a parent uses it,
 				*	and for the special case of the root, only print it if no other groups exist */
-				if (pSelected == 0)
+				if (pTopMost->super == 0)
 					return pConfig.sub.empty();
 				for (const auto& user : option->users) {
-					if (detail::CheckParent(user, pSelected))
+					if (detail::CheckParent(user, pTopMost))
 						return true;
 				}
 				return false;
 			}
 			void fBuildUsage(bool menu) {
-				const detail::ValidArguments* topMost = (pSelected == 0 ? static_cast<const detail::ValidArguments*>(&pConfig) : pSelected);
-
 				/* add the example-usage descriptive line */
 				fAddToken(menu ? L"Input>" : L"Usage: ");
 				if (!menu)
 					fAddToken(pBase.program());
 
 				/* add the already selected groups and potentially upcoming group-name */
-				fRecGroupUsage(pSelected, topMost);
-				if (topMost->endpoints.empty())
-					fAddSpacedToken(str::wd::Build(L'[', topMost->groupName, L']'));
+				fRecGroupUsage(pTopMost);
+				if (pTopMost->endpoints.empty())
+					fAddSpacedToken(str::wd::Build(L'[', pTopMost->groupName, L']'));
 
 				/* add all required options (must all consume a payload, as flags are never required) */
 				bool hasOptionals = false;
 				for (const auto& [name, option] : pConfig.options) {
 					/* check if options exist in theory */
-					if (detail::CheckUsage(&option, pSelected) && option.minimum == 0) {
+					if (detail::CheckUsage(&option, pTopMost) && option.minimum == 0) {
 						hasOptionals = true;
 						continue;
 					}
@@ -315,21 +313,19 @@ namespace arger {
 					fAddSpacedToken(L"[options...]");
 
 				/* add the hint to the arguments after the final group has been selected */
-				if (topMost->endpoints.empty() && topMost->nestedPositionals)
+				if (pTopMost->endpoints.empty() && pTopMost->nestedPositionals)
 					fAddSpacedToken(L"[params...]");
 
 				/* add all of the separate endpoints */
-				for (size_t i = 0; i < topMost->endpoints.size(); ++i) {
-					if (topMost->endpoints.size() > 1) {
+				for (size_t i = 0; i < pTopMost->endpoints.size(); ++i) {
+					if (pTopMost->endpoints.size() > 1) {
 						fAddNewLine(false);
 						fAddString(str::wd::Build(L"  [Variation ", i + 1, L"]:"));
 					}
-					fAddEndpointDescription(topMost->endpoints[i]);
+					fAddEndpointDescription(pTopMost->endpoints[i]);
 				}
 			}
 			void fBuildOptions(bool required, bool menu) {
-				const detail::ValidArguments* topMost = (pSelected == 0 ? static_cast<const detail::ValidArguments*>(&pConfig) : pSelected);
-
 				/* collect all of the names to be used */
 				std::map<std::wstring, NameCache> selected;
 				if (!menu && !required && pConfig.help != 0)
@@ -380,18 +376,18 @@ namespace arger {
 						fDefaultDescription(&option->option->payload.defValue.front(), &option->option->payload.defValue.back() + 1);
 
 					/* add the usages (if groups still need to be selected and not all are users) */
-					if (!topMost->endpoints.empty())
+					if (!pTopMost->endpoints.empty())
 						continue;
 					size_t users = 0;
-					for (const auto& [name, group] : topMost->sub) {
+					for (const auto& [name, group] : pTopMost->sub) {
 						if (detail::CheckUsage(option, &group))
 							++users;
 					}
-					if (users != topMost->sub.size()) {
+					if (users != pTopMost->sub.size()) {
 						fAddNewLine(false);
 						temp = L"Used for: ";
 						size_t index = 0;
-						for (const auto& group : topMost->sub) {
+						for (const auto& group : pTopMost->sub) {
 							if (option->users.contains(&group.second))
 								temp.append(index++ > 0 ? L"|" : L"").append(group.first);
 						}
@@ -412,14 +408,13 @@ namespace arger {
 				}
 
 				/* add the group description */
-				fRecGroupDescription(pSelected);
+				fRecGroupDescription(pTopMost);
 
 				/* add the description of all sub-groups */
-				const detail::ValidArguments* topMost = (pSelected == 0 ? static_cast<const detail::ValidArguments*>(&pConfig) : pSelected);
-				if (topMost->endpoints.empty() || (menu && (pConfig.help != 0 || pConfig.version != 0))) {
+				if (pTopMost->endpoints.empty() || (menu && (pConfig.help != 0 || pConfig.version != 0))) {
 					fAddNewLine(true);
-					if (topMost->endpoints.empty())
-						fAddString(str::wd::Build(L"Options for [", topMost->groupName, L"]:"));
+					if (pTopMost->endpoints.empty())
+						fAddString(str::wd::Build(L"Options for [", pTopMost->groupName, L"]:"));
 					else
 						fAddString(str::wd::Build(L"Optional Keywords:"));
 
@@ -429,7 +424,7 @@ namespace arger {
 						selected.insert({ pConfig.help->name, NameCache{ &pConfig.help->description, 0, pConfig.help->abbreviation } });
 					if (menu && pConfig.version != 0)
 						selected.insert({ pConfig.version->name, NameCache{ &pConfig.version->description, 0, pConfig.version->abbreviation } });
-					for (const auto& [name, group] : topMost->sub)
+					for (const auto& [name, group] : pTopMost->sub)
 						selected.insert({ name, NameCache{ &group.group->description, 0, group.group->abbreviation } });
 
 					/* print all of the selected entries */
@@ -444,17 +439,17 @@ namespace arger {
 				}
 
 				/* add the endpoints */
-				if (!topMost->endpoints.empty()) {
+				if (!pTopMost->endpoints.empty()) {
 					/* add the separate endpoints */
-					for (size_t i = 0; i < topMost->endpoints.size(); ++i) {
+					for (size_t i = 0; i < pTopMost->endpoints.size(); ++i) {
 						fAddNewLine(true);
-						if (topMost->endpoints.size() == 1)
+						if (pTopMost->endpoints.size() == 1)
 							fAddString(L"Positional Arguments:");
 						else {
 							fAddString(str::wd::Build(L"Positional Arguments [Variation ", i + 1, L"]:"));
-							fAddEndpointDescription(topMost->endpoints[i]);
+							fAddEndpointDescription(pTopMost->endpoints[i]);
 						}
-						const detail::ValidEndpoint& endpoint = topMost->endpoints[i];
+						const detail::ValidEndpoint& endpoint = pTopMost->endpoints[i];
 
 						/* add the positional arguments descriptions (will automatically be sorted by position) */
 						for (size_t j = 0; j < endpoint.positionals->size(); ++j) {
@@ -507,7 +502,7 @@ namespace arger {
 
 				/* add all of the global help descriptions and the help-content of the selected groups */
 				fHelpContent(*pConfig.config);
-				fRecHelpStrings(pSelected);
+				fRecHelpStrings(pTopMost);
 
 				/* return the constructed help-string */
 				std::wstring out;
