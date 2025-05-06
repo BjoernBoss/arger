@@ -175,10 +175,6 @@ namespace arger::detail {
 		entry.payload = !option.payload.name.empty();
 		entry.owner = owner;
 
-		/* add the owner as first user of the group */
-		if (owner != 0)
-			entry.users.insert(owner);
-
 		/* check if the abbreviation is unique */
 		if (option.abbreviation != 0) {
 			if (state.abbreviations.contains(option.abbreviation))
@@ -349,10 +345,10 @@ namespace arger::detail {
 		for (const auto& [_, group] : state.sub)
 			detail::ValidateFinalizeArguments(state, group);
 
-		/* finalize all options by adding the root-group to all non-restricted options */
+		/* finalize all options by adding the owner to all non-restricted options */
 		for (auto& [name, option] : state.options) {
 			if (option.users.empty())
-				option.users.insert(0);
+				option.users.insert(option.owner);
 		}
 	}
 }
