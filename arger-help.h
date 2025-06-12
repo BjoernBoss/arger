@@ -220,14 +220,6 @@ namespace arger {
 					return L" [real]";
 				return L"";
 			}
-			constexpr void fHelpContent(const detail::Help& help) {
-				/* iterate over the help-content and append it to the help-buffer */
-				for (size_t i = 0; i < help.help.size(); ++i) {
-					fAddNewLine(true);
-					fAddString(help.help[i].name + L": ");
-					fAddString(help.help[i].text, detail::NumCharsHelpLeft);
-				}
-			}
 
 		private:
 			constexpr void fRecGroupUsage(const detail::ValidArguments* topMost) {
@@ -236,24 +228,35 @@ namespace arger {
 				fRecGroupUsage(topMost->super);
 				fAddSpacedToken(topMost->group->name);
 			}
-			constexpr void fRecGroupDescription(const detail::ValidArguments* topMost) {
+			constexpr void fRecGroupDescription(const detail::ValidArguments* topMost, bool top) {
 				/* add the description of all parents */
 				if (topMost == 0 || topMost->super == 0)
 					return;
-				fRecGroupDescription(topMost->super);
-				if (topMost->group->description.empty())
+				fRecGroupDescription(topMost->super, false);
+				if (topMost->group->description.text.empty())
+					return;
+				if (!topMost->group->description.allChildren && !top)
 					return;
 
 				/* add the newline, description header and description itself */
 				fAddNewLine(true);
 				fAddString(str::wd::Build(str::View{ topMost->super->groupName }.title(), L": ", topMost->group->name));
-				fAddString(topMost->group->description, 4);
+				fAddString(topMost->group->description.text, 4);
 			}
-			constexpr void fRecHelpStrings(const detail::ValidArguments* topMost) {
-				if (topMost == 0 || topMost->super == 0)
+			constexpr void fRecHelpStrings(const detail::ValidArguments* topMost, bool top) {
+				if (topMost == 0)
 					return;
-				fRecHelpStrings(topMost->super);
-				fHelpContent(*topMost->group);
+				fRecHelpStrings(topMost->super, false);
+
+				/* iterate over the help-content and append it to the help-buffer */
+				const detail::Help* help = (topMost->group == 0 ? (detail::Help*)pConfig.config : (detail::Help*)topMost->group);
+				for (size_t i = 0; i < help->help.size(); ++i) {
+					if (!help->help[i].allChildren && !top)
+						continue;
+					fAddNewLine(true);
+					fAddString(help->help[i].name + L": ");
+					fAddString(help->help[i].text, detail::NumCharsHelpLeft);
+				}
 			}
 			void fAddEndpointDescription(const detail::ValidEndpoint& endpoint) {
 				/* add the positional parameter for the topmost argument-object */
@@ -326,12 +329,13 @@ namespace arger {
 				}
 			}
 			void fBuildOptions(bool required, bool menu) {
-				/* collect all of the names to be used */
+				/* collect all of the names to be used (ignore all-children
+				*	for descriptions as they are shown on the right side) */
 				std::map<std::wstring, NameCache> selected;
 				if (!menu && !required && pConfig.help != 0)
-					selected.insert({ pConfig.help->name, NameCache{ &pConfig.help->description, 0, pConfig.help->abbreviation } });
+					selected.insert({ pConfig.help->name, NameCache{ &pConfig.help->description.text, 0, pConfig.help->abbreviation } });
 				if (!menu && !required && pConfig.version != 0)
-					selected.insert({ pConfig.version->name, NameCache{ &pConfig.version->description, 0, pConfig.version->abbreviation } });
+					selected.insert({ pConfig.version->name, NameCache{ &pConfig.version->description.text, 0, pConfig.version->abbreviation } });
 				for (const auto& [name, option] : pConfig.options) {
 					if ((option.minimum > 0) != required)
 						continue;
@@ -339,7 +343,7 @@ namespace arger {
 					/* check if the option can be discarded based on the selection */
 					if (!fCheckOptionPrint(&option, menu))
 						continue;
-					selected.insert({ name, NameCache{ &option.option->description, &option, option.option->abbreviation } });
+					selected.insert({ name, NameCache{ &option.option->description.text, &option, option.option->abbreviation } });
 				}
 
 				/* iterate over the optionals and print them */
@@ -402,13 +406,13 @@ namespace arger {
 				fBuildUsage(menu);
 
 				/* add the program description */
-				if (!pConfig.config->description.empty()) {
+				if (!pConfig.config->description.text.empty() && (pConfig.config->description.allChildren || pTopMost == &pConfig)) {
 					fAddNewLine(true);
-					fAddString(pConfig.config->description, 4);
+					fAddString(pConfig.config->description.text, 4);
 				}
 
 				/* add the group description */
-				fRecGroupDescription(pTopMost);
+				fRecGroupDescription(pTopMost, true);
 
 				/* add the description of all sub-groups */
 				if (pTopMost->endpoints.empty() || (menu && (pConfig.help != 0 || pConfig.version != 0))) {
@@ -418,14 +422,15 @@ namespace arger {
 					else
 						fAddString(str::wd::Build(L"Optional Keywords:"));
 
-					/* collect the list of all names to be used */
+					/* collect the list of all names to be used (ignore all-children
+					*	for descriptions as they are shown on the right side) */
 					std::map<std::wstring, NameCache> selected;
 					if (menu && pConfig.help != 0)
-						selected.insert({ pConfig.help->name, NameCache{ &pConfig.help->description, 0, pConfig.help->abbreviation } });
+						selected.insert({ pConfig.help->name, NameCache{ &pConfig.help->description.text, 0, pConfig.help->abbreviation } });
 					if (menu && pConfig.version != 0)
-						selected.insert({ pConfig.version->name, NameCache{ &pConfig.version->description, 0, pConfig.version->abbreviation } });
+						selected.insert({ pConfig.version->name, NameCache{ &pConfig.version->description.text, 0, pConfig.version->abbreviation } });
 					for (const auto& [name, group] : pTopMost->sub)
-						selected.insert({ name, NameCache{ &group.group->description, 0, group.group->abbreviation } });
+						selected.insert({ name, NameCache{ &group.group->description.text, 0, group.group->abbreviation } });
 
 					/* print all of the selected entries */
 					for (const auto& [name, cache] : selected) {
@@ -500,9 +505,8 @@ namespace arger {
 					fBuildOptions(false, menu);
 				}
 
-				/* add all of the global help descriptions and the help-content of the selected groups */
-				fHelpContent(*pConfig.config);
-				fRecHelpStrings(pTopMost);
+				/* add all of the help descriptions for the selected group */
+				fRecHelpStrings(pTopMost, true);
 
 				/* return the constructed help-string */
 				std::wstring out;

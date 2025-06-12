@@ -46,11 +46,11 @@ arger::Version(std::wstring version);
 /* default alternative program name for the configuration */
 arger::Program(std::wstring program);
 
-/* description to the corresponding object */
-arger::Description(std::wstring desc);
+/* description to the corresponding object (all children only applies to optional descriptions; configures if the text should be printed for all subsequent children as well) */
+arger::Description(std::wstring desc, bool allChildren = true);
 
-/* add help-string to the corresponding object */
-arger::Help(std::wstring name, std::wstring text);
+/* add help-string to the corresponding object (all children configures if the text should be printed for all subsequent children as well) */
+arger::Help(std::wstring name, std::wstring text, bool allChildren = true);
 
 /* add a constraint to be executed if the corresponding object is selected via the arguments */
 arger::Constraint(arger::Checker constraint);

@@ -20,13 +20,17 @@ namespace arger {
 			std::wstring program;
 		};
 		struct Description {
-			std::wstring description;
+			struct {
+				std::wstring text;
+				bool allChildren = false;
+			} description;
 		};
 		struct Help {
 		public:
 			struct Entry {
 				std::wstring name;
 				std::wstring text;
+				bool allChildren = false;
 			};
 
 		public:
@@ -280,25 +284,27 @@ namespace arger {
 		}
 	};
 
-	/* description to the corresponding object */
+	/* description to the corresponding object (all children only applies to optional descriptions) */
 	struct Description : public detail::Config {
 	public:
 		std::wstring desc;
+		bool allChildren = false;
 
 	public:
-		constexpr Description(std::wstring desc) : desc{ desc } {}
+		constexpr Description(std::wstring desc, bool allChildren = true) : desc{ desc }, allChildren{ allChildren } {}
 		constexpr void apply(detail::Description& base) const {
-			base.description = desc;
+			base.description.text = desc;
+			base.description.allChildren = allChildren;
 		}
 	};
 
-	/* add help-string to the corresponding object */
+	/* add help-string to the corresponding object (all children configures if the text should be printed for all subsequent children as well) */
 	struct Help : public detail::Config {
 	public:
 		detail::Help::Entry entry;
 
 	public:
-		constexpr Help(std::wstring name, std::wstring text) : entry{ name, text } {}
+		constexpr Help(std::wstring name, std::wstring text, bool allChildren = true) : entry{ name, text, allChildren } {}
 		constexpr void apply(detail::Help& base) const {
 			base.help.push_back(entry);
 		}

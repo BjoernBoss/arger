@@ -131,11 +131,11 @@ namespace arger::detail {
 		std::optional<size_t> minimum = (args == 0 ? endpoint->require : args->require).minimum;
 		std::optional<size_t> maximum = (args == 0 ? endpoint->require : args->require).maximum;
 
-		/* setup the new endpoint */
+		/* setup the new endpoint (all-children is ignored for end-points as they do not have children) */
 		detail::ValidEndpoint& next = entry.endpoints.emplace_back();
 		next.positionals = &positionals;
 		next.constraints = (args == 0 ? &endpoint->constraints : 0);
-		next.description = (args == 0 ? &endpoint->description : 0);
+		next.description = (args == 0 ? &endpoint->description.text : 0);
 		next.id = (args == 0 ? endpoint->id : args->endpointId);
 
 		/* configure the limits */
