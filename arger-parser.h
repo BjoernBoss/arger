@@ -237,9 +237,8 @@ namespace arger {
 
 					/* check if the default values should be assigned (limits are already ensured to be valid) */
 					if (count == 0 && !option.option->payload.defValue.empty()) {
-						it = pParsed.pOptions.insert({ option.option->id, {} }).first;
-						it->second = option.option->payload.defValue;
-						count = option.option->payload.defValue.size();
+						it = pParsed.pOptions.insert({ option.option->id, option.option->payload.defValue }).first;
+						count = it->second.size();
 					}
 					else {
 						/* check if the optional-argument has been found */
