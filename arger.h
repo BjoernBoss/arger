@@ -14,7 +14,7 @@ namespace arger {
 	inline std::vector<std::wstring> Prepare(int argc, const str::IsChar auto* const* argv) {
 		std::vector<std::wstring> args;
 		for (size_t i = 0; i < argc; ++i)
-			args.push_back(str::wd::Make(argv[i]));
+			args.push_back(str::wd::Safe(argv[i]));
 		return args;
 	}
 
@@ -72,7 +72,7 @@ namespace arger {
 
 	/* convenience functions for help-hints with default argument pattern from split arguments */
 	inline constexpr std::wstring HelpHint(int argc, const str::IsChar auto* const* argv, const arger::Config& config) {
-		return arger::HelpHint({ str::wd::Make(argc == 0 ? "" : argv[0]) }, config);
+		return arger::HelpHint({ str::wd::Safe(argc == 0 ? "" : argv[0]) }, config);
 	}
 
 	/* convenience functions for standard program arguments parsing from a single command-line */
