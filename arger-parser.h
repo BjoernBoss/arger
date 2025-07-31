@@ -131,21 +131,21 @@ namespace arger {
 				/* validate the expected type and found value */
 				switch (std::get<arger::Primitive>(type)) {
 				case arger::Primitive::inum: {
-					auto [num, len, res] = str::ParseNum<int64_t>(value.str(), 10, str::PrefixMode::overwrite);
+					auto [num, len, res] = str::SiParseNum<int64_t>(value.str(), { .prefix = str::PrefixMode::overwrite, .scale = str::SiScaleMode::detect });
 					if (res != str::NumResult::valid || len != value.str().size())
 						throw arger::ParsingException{ L"Invalid signed integer for argument [", name, L"] encountered." };
 					value = arger::Value{ num };
 					break;
 				}
 				case arger::Primitive::unum: {
-					auto [num, len, res] = str::ParseNum<uint64_t>(value.str(), 10, str::PrefixMode::overwrite);
+					auto [num, len, res] = str::SiParseNum<uint64_t>(value.str(), { .prefix = str::PrefixMode::overwrite, .scale = str::SiScaleMode::detect });
 					if (res != str::NumResult::valid || len != value.str().size())
 						throw arger::ParsingException{ L"Invalid unsigned integer for argument [", name, L"] encountered." };
 					value = arger::Value{ num };
 					break;
 				}
 				case arger::Primitive::real: {
-					auto [num, len, res] = str::ParseNum<double>(value.str(), 10, str::PrefixMode::overwrite);
+					auto [num, len, res] = str::SiParseNum<double>(value.str(), { .prefix = str::PrefixMode::overwrite, .scale = str::SiScaleMode::detect });
 					if (res != str::NumResult::valid || len != value.str().size())
 						throw arger::ParsingException{ L"Invalid real for argument [", name, L"] encountered." };
 					value = arger::Value{ num };

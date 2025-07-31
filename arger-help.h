@@ -213,11 +213,11 @@ namespace arger {
 				if (actual == arger::Primitive::boolean)
 					return L" [bool]";
 				if (actual == arger::Primitive::unum)
-					return L" [uint]";
+					return L" [uint; si]";
 				if (actual == arger::Primitive::inum)
-					return L" [int]";
+					return L" [int; si]";
 				if (actual == arger::Primitive::real)
-					return L" [real]";
+					return L" [real; si]";
 				return L"";
 			}
 
