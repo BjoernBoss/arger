@@ -13,6 +13,8 @@ This library is a header only library. Simply clone the repository, ensure that 
 
 	$ git clone https://github.com/BjoernBoss/arger.git --recursive
 
+Note: for convenience, all numerical argument types, can be given using any `radix` (provided the corresponding prefix is used), and can be extended using `Si` prefix scalings. I.e. `0x50G` is valid, and will result in `80 * 10^9`. This also includes binary `Si` types, such as `ki` and `Mi` as `2^10` and `2^20` respectively. I.e. `0b10000000000mi` will be equal to `1.0`.
+
 ## Configuration Options
 
 There exist a set of configuration options, which can either be applied to optional arguments (`arger::Option`), to groups (`arger::Group`) or the general configuration (`arger::Config`).
