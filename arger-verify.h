@@ -161,7 +161,7 @@ namespace arger::detail {
 				detail::ValidateDefValue(positionals[i].type, positionals[i].defValue.value());
 		}
 	}
-	inline void ValidateOption(const arger::Config& config, const arger::Option& option, detail::ValidConfig& state, const detail::ValidArguments* owner, bool menu) {
+	inline void ValidateOption(const arger::Config& config, const arger::Option& option, detail::ValidConfig& state, const detail::ValidArguments* owner) {
 		if (option.name.size() <= 1)
 			throw arger::ConfigException{ L"Option name must at least be two characters long." };
 		if (option.name.starts_with(L"-"))
@@ -187,8 +187,8 @@ namespace arger::detail {
 			throw arger::ConfigException{ L"Option ids must be unique." };
 		state.optionIds.insert({ option.id, &entry });
 
-		/* check if the name or abbreviation clashes with the help/version entries */
-		if (!menu)
+		/* check if the name or abbreviation clashes with the help/version entries (for options only necessary for programs) */
+		if (!config.program.empty())
 			detail::ValidateSpecialEntry(state, option.name, option.abbreviation);
 
 		/* validate the payload */
@@ -212,7 +212,7 @@ namespace arger::detail {
 				detail::ValidateDefValue(option.payload.type, value);
 		}
 	}
-	inline void ValidateArguments(const arger::Config& config, const detail::Arguments& arguments, const arger::Group* group, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidArguments* super, bool menu) {
+	inline void ValidateArguments(const arger::Config& config, const detail::Arguments& arguments, const arger::Group* group, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidArguments* super) {
 		/* populate the entry */
 		entry.constraints = &arguments.constraints;
 		entry.nestedPositionals = !arguments.positionals.empty();
@@ -250,17 +250,17 @@ namespace arger::detail {
 					entry.abbreviations[sub.abbreviation] = &next;
 				}
 
-				/* check if the name or abbreviation clashes with the help/version entries */
-				if (menu)
+				/* check if the name or abbreviation clashes with the help/version entries (for groups only necessary for menus) */
+				if (config.program.empty())
 					detail::ValidateSpecialEntry(state, sub.name, sub.abbreviation);
 
 				/* validate the arguments */
-				detail::ValidateArguments(config, sub, &sub, state, next, &entry, menu);
+				detail::ValidateArguments(config, sub, &sub, state, next, &entry);
 				entry.nestedPositionals = (entry.nestedPositionals || next.nestedPositionals);
 
 				/* register all new options */
 				for (const auto& option : sub.options)
-					detail::ValidateOption(config, option, state, &next, menu);
+					detail::ValidateOption(config, option, state, &next);
 
 				/* validate the information attributes */
 				detail::ValidateInformation(sub);
@@ -308,11 +308,7 @@ namespace arger::detail {
 		for (const auto& [_, child] : group.sub)
 			detail::ValidateFinalizeArguments(state, child);
 	}
-	inline void ValidateConfig(const arger::Config& config, detail::ValidConfig& state, bool menu) {
-		if (menu && !config.program.empty())
-			throw arger::ConfigException{ L"Menu cannot have a program name." };
-		if (!menu && config.program.empty())
-			throw arger::ConfigException{ L"Configuration must have a program name." };
+	inline void ValidateConfig(const arger::Config& config, detail::ValidConfig& state) {
 		state.config = &config;
 
 		/* validate the special-purpose entries attributes */
@@ -340,8 +336,8 @@ namespace arger::detail {
 
 		/* validate the options and arguments */
 		for (const auto& option : config.options)
-			detail::ValidateOption(config, option, state, &state, menu);
-		detail::ValidateArguments(config, config, 0, state, state, 0, menu);
+			detail::ValidateOption(config, option, state, &state);
+		detail::ValidateArguments(config, config, 0, state, state, 0);
 
 		/* post-validate all groups after all groups and flags have been loaded */
 		for (const auto& [_, group] : state.sub)

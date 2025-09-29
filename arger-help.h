@@ -16,10 +16,9 @@ namespace arger {
 		private:
 			const arger::Config& pConfig;
 			std::wstring pProgram;
-			bool pMenu = false;
 
 		public:
-			constexpr BaseBuilder(const std::wstring& firstArg, const arger::Config& config, bool menu) : pConfig{ config }, pMenu{ menu } {
+			constexpr BaseBuilder(const std::wstring& firstArg, const arger::Config& config) : pConfig{ config } {
 				/* check if the first argument contains a valid program-name */
 				std::wstring_view view{ firstArg };
 				size_t begin = view.size();
@@ -33,7 +32,7 @@ namespace arger {
 		public:
 			constexpr std::wstring buildVersionString() const {
 				/* version string is guaranteed to never be empty if it can be requested to be built */
-				if (pMenu)
+				if (pConfig.program.empty())
 					return pConfig.version;
 				if (pProgram.empty())
 					throw arger::ConfigException{ L"Configuration must have a program name." };
@@ -42,8 +41,8 @@ namespace arger {
 			constexpr std::wstring buildHelpHintString() const {
 				if (pConfig.special.help.name.empty())
 					throw arger::ConfigException{ L"Help entry name must not be empty for help-hint string." };
-				if (pMenu)
-					return str::wd::Build(L"Try '", pConfig.special.help.name, L"' for more information.");
+				if (pConfig.program.empty())
+					return str::wd::Build(L"Use '", pConfig.special.help.name, L"' for more information.");
 				if (pProgram.empty())
 					throw arger::ConfigException{ L"Configuration must have a program name." };
 				return str::wd::Build(L"Try '", pProgram, L" --", pConfig.special.help.name, L"' for more information.");
@@ -284,9 +283,9 @@ namespace arger {
 			}
 
 		private:
-			bool fCheckOptionPrint(const detail::ValidOption* option, bool menu) const {
-				/* in normal mode, check if the argument is excluded by the current selected group, based on the usage-requirements */
-				if (!menu)
+			bool fCheckOptionPrint(const detail::ValidOption* option) const {
+				/* in program mode, check if the argument is excluded by the current selected group, based on the usage-requirements */
+				if (!pConfig.config->program.empty())
 					return detail::CheckUsage(option, pTopMost);
 
 				/* in menu-mode, print only flags, which are only available because a parent uses it,
@@ -299,10 +298,10 @@ namespace arger {
 				}
 				return false;
 			}
-			void fBuildUsage(bool menu) {
+			void fBuildUsage() {
 				/* add the example-usage descriptive line */
-				fAddToken(menu ? L"Input>" : L"Usage: ");
-				if (!menu)
+				fAddToken(pConfig.config->program.empty() ? L"Input>" : L"Usage: ");
+				if (!pConfig.config->program.empty())
 					fAddToken(pBase.program());
 
 				/* add the already selected groups and potentially upcoming group-name */
@@ -320,7 +319,7 @@ namespace arger {
 					}
 
 					/* check if the entry can be skipped for this group */
-					if (!fCheckOptionPrint(&option, menu))
+					if (!fCheckOptionPrint(&option))
 						continue;
 					fAddSpacedToken(str::wd::Build(L"--", name, L"=<", option.option->payload.name, L">"));
 				}
@@ -340,20 +339,22 @@ namespace arger {
 					fAddEndpointDescription(pTopMost->endpoints[i]);
 				}
 			}
-			void fBuildOptions(bool required, bool menu) {
-				/* collect all of the names to be used (ignore all-children
-				*	for descriptions as they are shown on the right side) */
+			void fBuildOptions(bool required) {
+				/* collect all of the names to be used (ignore all-children for descriptions as they
+				*	are shown on the right side, also add the help/version options for programs) */
 				std::map<std::wstring, NameCache> selected;
-				if (!menu && !required && pConfig.help != 0)
-					selected.insert({ pConfig.help->name, NameCache{ &pConfig.help->description.text, 0, pConfig.help->abbreviation } });
-				if (!menu && !required && pConfig.version != 0)
-					selected.insert({ pConfig.version->name, NameCache{ &pConfig.version->description.text, 0, pConfig.version->abbreviation } });
+				if (!pConfig.config->program.empty() && !required) {
+					if (pConfig.help != 0)
+						selected.insert({ pConfig.help->name, NameCache{ &pConfig.help->description.text, 0, pConfig.help->abbreviation } });
+					if (pConfig.version != 0)
+						selected.insert({ pConfig.version->name, NameCache{ &pConfig.version->description.text, 0, pConfig.version->abbreviation } });
+				}
 				for (const auto& [name, option] : pConfig.options) {
 					if ((option.minimum > 0) != required)
 						continue;
 
 					/* check if the option can be discarded based on the selection */
-					if (!fCheckOptionPrint(&option, menu))
+					if (!fCheckOptionPrint(&option))
 						continue;
 					selected.insert({ name, NameCache{ &option.option->description.text, &option, option.option->abbreviation } });
 				}
@@ -413,9 +414,9 @@ namespace arger {
 			}
 
 		public:
-			std::wstring buildHelpString(bool menu) {
+			std::wstring buildHelpString() {
 				/* add the example-usage descriptive line */
-				fBuildUsage(menu);
+				fBuildUsage();
 
 				/* add the program description */
 				if (!pConfig.config->description.text.empty() && (pConfig.config->description.allChildren || pTopMost == &pConfig)) {
@@ -426,21 +427,23 @@ namespace arger {
 				/* add the group description */
 				fRecGroupDescription(pTopMost, true);
 
-				/* add the description of all sub-groups */
-				if (pTopMost->endpoints.empty() || (menu && (pConfig.help != 0 || pConfig.version != 0))) {
+				/* add the description of all sub-groups (for menus, help/version are considered groups as well) */
+				if (pTopMost->endpoints.empty() || (pConfig.config->program.empty() && (pConfig.help != 0 || pConfig.version != 0))) {
 					fAddNewLine(true);
 					if (pTopMost->endpoints.empty())
 						fAddString(str::wd::Build(L"Options for [", pTopMost->groupName, L"]:"));
 					else
 						fAddString(str::wd::Build(L"Optional Keywords:"));
 
-					/* collect the list of all names to be used (ignore all-children
-					*	for descriptions as they are shown on the right side) */
+					/* collect the list of all names to be used (ignore all-children for descriptions as
+					*	they are shown on the right side, add the help and version entries for menus) */
 					std::map<std::wstring, NameCache> selected;
-					if (menu && pConfig.help != 0)
-						selected.insert({ pConfig.help->name, NameCache{ &pConfig.help->description.text, 0, pConfig.help->abbreviation } });
-					if (menu && pConfig.version != 0)
-						selected.insert({ pConfig.version->name, NameCache{ &pConfig.version->description.text, 0, pConfig.version->abbreviation } });
+					if (pConfig.config->program.empty()) {
+						if (pConfig.help != 0)
+							selected.insert({ pConfig.help->name, NameCache{ &pConfig.help->description.text, 0, pConfig.help->abbreviation } });
+						if (pConfig.version != 0)
+							selected.insert({ pConfig.version->name, NameCache{ &pConfig.version->description.text, 0, pConfig.version->abbreviation } });
+					}
 					for (const auto& [name, group] : pTopMost->sub)
 						selected.insert({ name, NameCache{ &group.group->description.text, 0, group.group->abbreviation } });
 
@@ -499,7 +502,7 @@ namespace arger {
 				/* check if there are optional/required arguments */
 				bool optArgs = false, reqArgs = false;
 				for (const auto& entry : pConfig.options) {
-					if (fCheckOptionPrint(&entry.second, menu))
+					if (fCheckOptionPrint(&entry.second))
 						(entry.second.minimum > 0 ? reqArgs : optArgs) = true;
 				}
 
@@ -507,14 +510,14 @@ namespace arger {
 				if (reqArgs) {
 					fAddNewLine(true);
 					fAddString(L"Required arguments:");
-					fBuildOptions(true, menu);
+					fBuildOptions(true);
 				}
 
 				/* add the optional argument descriptions (will automatically be sorted lexicographically) */
 				if (optArgs) {
 					fAddNewLine(true);
 					fAddString(L"Optional arguments:");
-					fBuildOptions(false, menu);
+					fBuildOptions(false);
 				}
 
 				/* add all of the information descriptions for the selected group */
@@ -528,8 +531,8 @@ namespace arger {
 		};
 	}
 
-	/* construct help-hint suggesting to use the help entry (for example '--help') */
+	/* construct help-hint suggesting to use the help entry (for example 'try --help', or 'use help') */
 	inline constexpr std::wstring HelpHint(const std::vector<std::wstring>& args, const arger::Config& config) {
-		return detail::BaseBuilder{ (args.empty() ? L"" : args[0]), config, false }.buildHelpHintString();
+		return detail::BaseBuilder{ (args.empty() ? L"" : args[0]), config }.buildHelpHintString();
 	}
 }

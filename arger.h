@@ -70,28 +70,18 @@ namespace arger {
 		return arger::HelpHint(arger::Prepare(line), config);
 	}
 
-	/* convenience functions for help-hints with default argument pattern from split arguments */
+	/* convenience functions for help-hints with default argument pattern from separated arguments */
 	inline constexpr std::wstring HelpHint(int argc, const str::IsChar auto* const* argv, const arger::Config& config) {
 		return arger::HelpHint({ str::wd::Safe(argc == 0 ? "" : argv[0]) }, config);
 	}
 
-	/* convenience functions for standard program arguments parsing from a single command-line */
+	/* convenience functions for standard program or menu-input arguments parsing from a single command-line */
 	inline arger::Parsed Parse(const str::IsStr auto& line, const arger::Config& config, size_t lineLength = arger::NumCharsHelp) {
 		return arger::Parse(arger::Prepare(line), config, lineLength);
 	}
 
-	/* convenience functions for standard program arguments parsing from split arguments */
+	/* convenience functions for standard program or menu-input arguments parsing from separated arguments */
 	inline arger::Parsed Parse(int argc, const str::IsChar auto* const* argv, const arger::Config& config, size_t lineLength = arger::NumCharsHelp) {
 		return arger::Parse(arger::Prepare(argc, argv), config, lineLength);
-	}
-
-	/* convenience functions for menu-input arguments parsing from a single command-line */
-	inline arger::Parsed Menu(const str::IsStr auto& line, const arger::Config& config, size_t lineLength = arger::NumCharsHelp) {
-		return arger::Menu(arger::Prepare(line), config, lineLength);
-	}
-
-	/* convenience functions for menu-input arguments parsing from split arguments */
-	inline arger::Parsed Menu(int argc, const str::IsChar auto* const* argv, const arger::Config& config, size_t lineLength = arger::NumCharsHelp) {
-		return arger::Menu(arger::Prepare(argc, argv), config, lineLength);
 	}
 }

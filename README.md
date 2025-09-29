@@ -6,7 +6,7 @@ Small header-only library written in `C++20` to add simple argument parsing to C
 
 The simple idea is to define the argument-layout using `arger::Config`. The `arger::Parse(int argc, const argv, const arger::Config& config)` method will then produce a `arger::Parsed` structure, which contains the final results.
 
-For convenience, there also exists `arger::Menu(int argc, const argv, const arger::Config& config)`, which is designed to be used in command-line style menus. It will therefore not require, nor print any program information and redesign the help menu to fit a command-line style menu. It will also turn the help and version entries from options to group keys, which can be used at any time.
+A configuration can be used for program arguments or as command-line style menus. This will not require, nor print any program information and redesign the help menu to fit a command-line style menu. It will also turn the help and version entries from options to group keys, which can be used at any time. Menu mode or normal program mode is decided based on the existance of a pre-defined program name.
 
 ## Using the library
 This library is a header only library. Simply clone the repository, ensure that `./repos` is on the path (or at least that `<ustring/ustring.h>` can be resolved), and include `<arger/arger.h>`.
@@ -45,7 +45,7 @@ arger::VersionEntry(std::wstring name, const arger::IsConfig<arger::Option> auto
 /* version text for the current configuration (preceeded by program name, if not in menu-mode) */
 arger::VersionText(std::wstring text);
 
-/* default alternative program name for the configuration */
+/* default alternative program name for the configuration (no program implies menu mode) */
 arger::Program(std::wstring program);
 
 /* description to the corresponding object (all children only applies to optional descriptions; configures if the text should be printed for all subsequent children as well) */

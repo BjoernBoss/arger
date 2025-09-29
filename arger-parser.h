@@ -25,12 +25,12 @@ namespace arger {
 			Parser(const std::vector<std::wstring>& args) : pArgs{ args } {}
 
 		private:
-			void fParseOptional(const std::wstring& arg, const std::wstring& payload, bool fullName, bool hasPayload, bool menu) {
+			void fParseOptional(const std::wstring& arg, const std::wstring& payload, bool fullName, bool hasPayload) {
 				bool payloadUsed = false;
 
-				/* check if it could be the help menu */
+				/* check if it could be the help or version entry (only relevant for programs) */
 				size_t i = 0;
-				if (fullName && !menu) {
+				if (fullName && !pConfig.config->program.empty()) {
 					if (pConfig.help != 0 && pConfig.help->name == arg) {
 						pPrintHelp = true;
 						i = arg.size();
@@ -59,12 +59,12 @@ namespace arger {
 						i = arg.size();
 					}
 
-					/* check if its one of the special entries */
-					else if (!menu && pConfig.help != 0 && pConfig.help->abbreviation == arg[i]) {
+					/* check if its one of the special entries (only relevant for programs) */
+					else if (!pConfig.config->program.empty() && pConfig.help != 0 && pConfig.help->abbreviation == arg[i]) {
 						pPrintHelp = true;
 						continue;
 					}
-					else if (!menu && pConfig.version != 0 && pConfig.version->abbreviation == arg[i]) {
+					else if (!pConfig.config->program.empty() && pConfig.version != 0 && pConfig.version->abbreviation == arg[i]) {
 						pPrintVersion = true;
 						continue;
 					}
@@ -124,10 +124,6 @@ namespace arger {
 					return;
 				}
 
-				/* all values, which are not strings anymore, originate from default values and have already been validated */
-				if (!value.isStr())
-					return;
-
 				/* validate the expected type and found value */
 				switch (std::get<arger::Primitive>(type)) {
 				case arger::Primitive::inum: {
@@ -185,13 +181,6 @@ namespace arger {
 					break;
 				}
 
-				/* fill the positional arguments up on default values (ensures later verification and makes unpacking easier) */
-				for (size_t i = pParsed.pPositional.size(); i < endpoint->positionals->size(); ++i) {
-					if (!(*endpoint->positionals)[i].defValue.has_value())
-						break;
-					pParsed.pPositional.push_back((*endpoint->positionals)[i].defValue.value());
-				}
-
 				/* validate the requirements for the positional arguments and parse their values */
 				for (size_t i = 0; i < pParsed.pPositional.size(); ++i) {
 					/* check if the argument is out of range */
@@ -202,12 +191,19 @@ namespace arger {
 					}
 					size_t index = std::min<size_t>(i, endpoint->positionals->size() - 1);
 
-					/* check if the value is empty and the default value should be used */
+					/* check if the value is empty and the default value should be used and otherwise unpack the value */
 					if (pParsed.pPositional[i].str().empty() && (*endpoint->positionals)[index].defValue.has_value())
 						pParsed.pPositional[i] = (*endpoint->positionals)[index].defValue.value();
+					else
+						fVerifyValue((*endpoint->positionals)[index].name, pParsed.pPositional[i], (*endpoint->positionals)[index].type);
+				}
 
-					/* validate and unpack the argument */
-					fVerifyValue((*endpoint->positionals)[index].name, pParsed.pPositional[i], (*endpoint->positionals)[index].type);
+				/* fill the positional arguments up on default values (ensures later verification and makes unpacking
+				*	easier - cannot violate maximum, as maximum will always at least fit the number of defined positionals) */
+				for (size_t i = pParsed.pPositional.size(); i < endpoint->positionals->size(); ++i) {
+					if (!(*endpoint->positionals)[i].defValue.has_value())
+						break;
+					pParsed.pPositional.push_back((*endpoint->positionals)[i].defValue.value());
 				}
 
 				/* check if the minimum required number of parameters has not been reached
@@ -237,18 +233,17 @@ namespace arger {
 
 					/* check if the default values should be assigned (limits are already ensured to be valid) */
 					if (count == 0 && !option.option->payload.defValue.empty()) {
-						it = pParsed.pOptions.insert({ option.option->id, option.option->payload.defValue }).first;
-						count = it->second.size();
+						pParsed.pOptions.insert({ option.option->id, option.option->payload.defValue });
+						continue;
 					}
-					else {
-						/* check if the optional-argument has been found */
-						if (option.minimum > count)
-							throw arger::ParsingException{ L"Argument [", name, L"] is missing." };
 
-						/* check if too many instances were found */
-						if (option.maximum > 0 && count > option.maximum)
-							throw arger::ParsingException{ L"Argument [", name, L"] can at most be specified ", option.maximum, " times." };
-					}
+					/* check if the optional-argument has been found */
+					if (option.minimum > count)
+						throw arger::ParsingException{ L"Argument [", name, L"] is missing." };
+
+					/* check if too many instances were found */
+					if (option.maximum > 0 && count > option.maximum)
+						throw arger::ParsingException{ L"Argument [", name, L"] can at most be specified ", option.maximum, " times." };
 
 					/* verify and unpack the values themselves */
 					for (size_t i = 0; i < count; ++i)
@@ -269,21 +264,21 @@ namespace arger {
 			}
 
 		public:
-			arger::Parsed parse(const arger::Config& config, size_t lineLength, bool menu) {
+			arger::Parsed parse(const arger::Config& config, size_t lineLength) {
 				pTopMost = static_cast<const detail::ValidArguments*>(&pConfig);
 
 				/* validate and pre-process the configuration */
-				detail::ValidateConfig(config, pConfig, menu);
+				detail::ValidateConfig(config, pConfig);
 
-				/* extract the program name */
-				detail::BaseBuilder base{ ((pArgs.empty() || menu) ? L"" : pArgs[pIndex++]), config, menu };
+				/* extract the program name (no argument needed for menus) */
+				detail::BaseBuilder base{ ((pArgs.empty() || pConfig.config->program.empty()) ? L"" : pArgs[pIndex++]), config };
 
 				/* iterate over the arguments and parse them based on the definitions */
 				while (pIndex < pArgs.size()) {
 					const std::wstring& next = pArgs[pIndex++];
 
-					/* check if its the version or help group (only if no positional arguments have yet been pushed) */
-					if (menu && pParsed.pPositional.empty()) {
+					/* check if its the version or help group (only relevant for menus and only if no positional arguments have yet been pushed) */
+					if (pConfig.config->program.empty() && pParsed.pPositional.empty()) {
 						if (pConfig.help != 0 && (next.size() != 1 ? (next == pConfig.help->name) : (pConfig.help->abbreviation == next[0] && next[0] != 0))) {
 							pPrintHelp = true;
 							continue;
@@ -318,7 +313,7 @@ namespace arger {
 
 						/* parse the single long or multiple short arguments */
 						size_t hypenCount = (next.size() > 2 && next[1] == L'-' ? 2 : 1);
-						fParseOptional(next.substr(hypenCount, end - hypenCount), payload, (hypenCount == 2), hasPayload, menu);
+						fParseOptional(next.substr(hypenCount, end - hypenCount), payload, (hypenCount == 2), hasPayload);
 						continue;
 					}
 
@@ -353,7 +348,7 @@ namespace arger {
 				/* check if the help or version should be printed */
 				std::wstring print = (pPrintVersion ? base.buildVersionString() : L"");
 				if (pPrintHelp)
-					print.append(print.empty() ? L"" : L"\n\n").append(detail::HelpBuilder{ base, pConfig, pTopMost, lineLength }.buildHelpString(menu));
+					print.append(print.empty() ? L"" : L"\n\n").append(detail::HelpBuilder{ base, pConfig, pTopMost, lineLength }.buildHelpString());
 				if (!print.empty())
 					throw arger::PrintMessage{ print };
 
@@ -389,13 +384,8 @@ namespace arger {
 		};
 	}
 
-	/* parse the arguments as standard program arguments */
+	/* parse the arguments as standard program or menu-input arguments */
 	inline arger::Parsed Parse(const std::vector<std::wstring>& args, const arger::Config& config, size_t lineLength = arger::NumCharsHelp) {
-		return detail::Parser{ args }.parse(config, lineLength, false);
-	}
-
-	/* parse the arguments as menu-input arguments */
-	inline arger::Parsed Menu(const std::vector<std::wstring>& args, const arger::Config& config, size_t lineLength = arger::NumCharsHelp) {
-		return detail::Parser{ args }.parse(config, lineLength, true);
+		return detail::Parser{ args }.parse(config, lineLength);
 	}
 }

@@ -272,7 +272,7 @@ namespace arger {
 		}
 	};
 
-	/* default alternative program name for the configuration */
+	/* default alternative program name for the configuration (no program implies menu mode) */
 	struct Program : public detail::Config {
 	public:
 		std::wstring program;
