@@ -276,7 +276,7 @@ namespace arger {
 				detail::ValidateConfig(config, pConfig, menu);
 
 				/* extract the program name */
-				detail::BaseBuilder base{ pArgs.empty() || menu ? L"" : pArgs[pIndex++], config, menu };
+				detail::BaseBuilder base{ ((pArgs.empty() || menu) ? L"" : pArgs[pIndex++]), config, menu };
 
 				/* iterate over the arguments and parse them based on the definitions */
 				while (pIndex < pArgs.size()) {

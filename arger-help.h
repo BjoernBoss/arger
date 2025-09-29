@@ -16,33 +16,37 @@ namespace arger {
 		private:
 			const arger::Config& pConfig;
 			std::wstring pProgram;
+			bool pMenu = false;
 
 		public:
-			constexpr BaseBuilder(const std::wstring& firstArg, const arger::Config& config, bool menu) : pConfig{ config } {
-				if (menu)
-					return;
-				if (config.program.empty())
-					throw arger::ConfigException{ L"Program must not be empty." };
-
+			constexpr BaseBuilder(const std::wstring& firstArg, const arger::Config& config, bool menu) : pConfig{ config }, pMenu{ menu } {
 				/* check if the first argument contains a valid program-name */
 				std::wstring_view view{ firstArg };
 				size_t begin = view.size();
 				while (begin > 0 && view[begin - 1] != L'/' && view[begin - 1] != L'\\')
 					--begin;
 
-				/* setup the final program name */
+				/* setup the final program name (if the first argument is an empty string, the configured program name will be used) */
 				pProgram = (begin == view.size() ? config.program : std::wstring{ view.substr(begin) });
 			}
 
 		public:
 			constexpr std::wstring buildVersionString() const {
 				/* version string is guaranteed to never be empty if it can be requested to be built */
-				if (pProgram.empty())
+				if (pMenu)
 					return pConfig.version;
+				if (pProgram.empty())
+					throw arger::ConfigException{ L"Configuration must have a program name." };
 				return str::wd::Build(pProgram, L' ', pConfig.version);
 			}
 			constexpr std::wstring buildHelpHintString() const {
-				return str::wd::Build(L"Try '", pProgram, L" --help' for more information.");
+				if (pConfig.special.help.name.empty())
+					throw arger::ConfigException{ L"Help entry name must not be empty for help-hint string." };
+				if (pMenu)
+					return str::wd::Build(L"Try '", pConfig.special.help.name, L"' for more information.");
+				if (pProgram.empty())
+					throw arger::ConfigException{ L"Configuration must have a program name." };
+				return str::wd::Build(L"Try '", pProgram, L" --", pConfig.special.help.name, L"' for more information.");
 			}
 			constexpr const std::wstring& program() const {
 				return pProgram;
@@ -519,7 +523,7 @@ namespace arger {
 		};
 	}
 
-	/* construct help-hint suggesting to use '--help' */
+	/* construct help-hint suggesting to use the help entry (for example '--help') */
 	inline constexpr std::wstring HelpHint(const std::vector<std::wstring>& args, const arger::Config& config) {
 		return detail::BaseBuilder{ (args.empty() ? L"" : args[0]), config, false }.buildHelpHintString();
 	}
