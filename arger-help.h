@@ -8,9 +8,9 @@
 
 namespace arger {
 	static constexpr size_t NumCharsHelp = 100;
+	static constexpr size_t NumCharsHelpLeft = 32;
 
 	namespace detail {
-		static constexpr size_t NumCharsHelpLeft = 32;
 
 		class BaseBuilder {
 		private:
@@ -71,7 +71,7 @@ namespace arger {
 
 		public:
 			constexpr HelpBuilder(const detail::BaseBuilder& base, const detail::ValidConfig& config, const detail::ValidArguments* topMost, size_t numChars) : pBase{ base }, pConfig{ config }, pTopMost{ topMost } {
-				pNumChars = std::max(detail::NumCharsHelpLeft + 8, numChars);
+				pNumChars = std::max(arger::NumCharsHelpLeft + 8, numChars);
 			}
 
 		private:
@@ -184,10 +184,15 @@ namespace arger {
 				if (!std::holds_alternative<arger::Enum>(type))
 					return;
 
+				/* count the key-length */
+				size_t length = 0;
+				for (const auto& val : std::get<arger::Enum>(type))
+					length = std::max<size_t>(length, val.name.size());
+
 				/* add the separate keys */
 				for (const auto& val : std::get<arger::Enum>(type)) {
 					fAddNewLine(false);
-					fAddString(str::wd::Build(L"- [", val.name, L"]: ", val.description), detail::NumCharsHelpLeft);
+					fAddString(str::wd::Format(L"- [{:<{}}]: {}", val.name, length, val.description), arger::NumCharsHelpLeft, 1);
 				}
 			}
 			void fDefaultDescription(const arger::Value* begin, const arger::Value* end) {
@@ -211,7 +216,7 @@ namespace arger {
 
 				/* write the line out */
 				fAddNewLine(false);
-				fAddString(temp, detail::NumCharsHelpLeft);
+				fAddString(temp, arger::NumCharsHelpLeft);
 			}
 			constexpr const wchar_t* fTypeString(const arger::Type& type) {
 				if (std::holds_alternative<arger::Enum>(type))
@@ -220,11 +225,11 @@ namespace arger {
 				if (actual == arger::Primitive::boolean)
 					return L" [bool]";
 				if (actual == arger::Primitive::unum)
-					return L" [uint; si]";
+					return L" [uint]";
 				if (actual == arger::Primitive::inum)
-					return L" [int; si]";
+					return L" [int]";
 				if (actual == arger::Primitive::real)
-					return L" [real; si]";
+					return L" [real]";
 				return L"";
 			}
 
@@ -262,7 +267,7 @@ namespace arger {
 						continue;
 					fAddNewLine(true);
 					fAddString(information->information[i].name + L": ");
-					fAddString(information->information[i].text, detail::NumCharsHelpLeft);
+					fAddString(information->information[i].text, arger::NumCharsHelpLeft);
 				}
 			}
 			void fAddEndpointDescription(const detail::ValidEndpoint& endpoint) {
@@ -366,14 +371,14 @@ namespace arger {
 
 					/* add the payload */
 					if (option != 0 && option->payload)
-						temp.append(L"=<").append(option->option->payload.name).append(1, L'>').append(fTypeString(option->option->payload.type));
+						temp.append(L"=<").append(option->option->payload.name).append(fTypeString(option->option->payload.type)).append(1, L'>');
 					fAddString(temp);
 
 					/* add the description text and custom usage-limits and write the result out */
 					temp = *cache.description;
 					if (option != 0 && (option->minimum != 1 || option->maximum != 1))
 						temp.append(fLimitString(option->minimum, option->maximum > 1 ? option->maximum : 0));
-					fAddString(temp, detail::NumCharsHelpLeft, 1);
+					fAddString(temp, arger::NumCharsHelpLeft, 1);
 
 					/* check if this was a special entry, in which case no additional data will be added */
 					if (option == 0)
@@ -402,7 +407,7 @@ namespace arger {
 							if (option->users.contains(&group.second))
 								temp.append(index++ > 0 ? L"|" : L"").append(group.first);
 						}
-						fAddString(temp, detail::NumCharsHelpLeft);
+						fAddString(temp, arger::NumCharsHelpLeft);
 					}
 				}
 			}
@@ -446,7 +451,7 @@ namespace arger {
 						if (cache.abbreviation != 0)
 							fAddString(str::wd::Build(L", ", cache.abbreviation));
 						if (!cache.description->empty())
-							fAddString(*cache.description, detail::NumCharsHelpLeft, 1);
+							fAddString(*cache.description, arger::NumCharsHelpLeft, 1);
 					}
 				}
 
@@ -473,7 +478,7 @@ namespace arger {
 							std::wstring temp = positional.description;
 							if (j + 1 >= endpoint.positionals->size() && j + 1 < endpoint.maximum)
 								temp.append(fLimitString(std::max<intptr_t>(endpoint.minimum - intptr_t(j), 0), endpoint.maximum - j));
-							fAddString(temp, detail::NumCharsHelpLeft, 1);
+							fAddString(temp, arger::NumCharsHelpLeft, 1);
 
 							/* add the enum value description */
 							fEnumDescription(positional.type);
