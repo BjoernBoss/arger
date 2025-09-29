@@ -42,8 +42,8 @@ arger::HelpEntry(std::wstring name, const arger::IsConfig<arger::Option> auto&..
 /* configure the key to be used as option for argument mode and any group name for menu mode, which triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
 arger::VersionEntry(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs);
 
-/* version for the current configuration */
-arger::Version(std::wstring version);
+/* version text for the current configuration (preceeded by program name, if not in menu-mode) */
+arger::VersionText(std::wstring text);
 
 /* default alternative program name for the configuration */
 arger::Program(std::wstring program);
@@ -51,8 +51,8 @@ arger::Program(std::wstring program);
 /* description to the corresponding object (all children only applies to optional descriptions; configures if the text should be printed for all subsequent children as well) */
 arger::Description(std::wstring desc, bool allChildren = true);
 
-/* add help-string to the corresponding object (all children configures if the text should be printed for all subsequent children as well) */
-arger::Help(std::wstring name, std::wstring text, bool allChildren = true);
+/* add information-string to the corresponding object (all children configures if the text should be printed for all subsequent children as well) */
+arger::Information(std::wstring name, std::wstring text, bool allChildren = true);
 
 /* add a constraint to be executed if the corresponding object is selected via the arguments */
 arger::Constraint(arger::Checker constraint);
@@ -104,8 +104,8 @@ enum class Mode : uint8_t { abc, def };
 enum class Option : uint8_t { test, path, mode };
 arger::Config config{
 	arger::Program{ L"test.exe" },
-	arger::Version{ L"1.0.1" },
-	arger::Help{ L"Some Description", L"This is the indepth description." },
+	arger::VersionText{ L"[1.0.1]" },
+	arger::Information{ L"Some Description", L"This is the indepth description." },
 	arger::Description{ L"Some test program" },
 	arger::Option{ L"test", Option::test,
 		arger::Abbreviation{ L't' },
@@ -218,8 +218,8 @@ enum class Group : uint8_t { get, set, read };
 enum class Option : uint8_t { test, path, mode };
 arger::Config config{
 	arger::Program{ L"test.exe" },
-	arger::Version{ L"1.0.1" },
-	arger::Help{ L"Some Description", L"This is the indepth description." },
+	arger::Version{ L"[1.0.1]" },
+	arger::Information{ L"Some Description", L"This is the indepth description." },
 	arger::GroupName{ L"test-setting" },
 	arger::Description{ L"Some test program" },
 	arger::Option{ L"test", Option::test,
@@ -272,7 +272,7 @@ arger::Config config{
 			arger::EnumEntry{ L"a", L"This is [a] description", 0 },
 			arger::EnumEntry{ L"b", L"This is [b] description", 1 }
 		}, L"First Argument" },
-		arger::Help{ L"Read-Help", L"This is a help-description only shown for read." }
+		arger::Information{ L"Read-Help", L"This is a help-description only shown for read." }
 	}
 };
 

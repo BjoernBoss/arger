@@ -70,10 +70,10 @@ namespace arger::detail {
 		return false;
 	}
 
-	inline constexpr void ValidateHelp(const detail::Help& help) {
-		for (size_t i = 0; i < help.help.size(); ++i) {
-			if (help.help[i].name.empty() || help.help[i].text.empty())
-				throw arger::ConfigException{ L"Help name and help description must not be empty." };
+	inline constexpr void ValidateInformation(const detail::Information& information) {
+		for (size_t i = 0; i < information.information.size(); ++i) {
+			if (information.information[i].name.empty() || information.information[i].text.empty())
+				throw arger::ConfigException{ L"Information name and description must not be empty." };
 		}
 	}
 	inline constexpr void ValidateType(const arger::Type& type) {
@@ -262,8 +262,8 @@ namespace arger::detail {
 				for (const auto& option : sub.options)
 					detail::ValidateOption(config, option, state, &next, menu);
 
-				/* validate the help attributes */
-				detail::ValidateHelp(sub);
+				/* validate the information attributes */
+				detail::ValidateInformation(sub);
 			}
 			return;
 		}
@@ -330,11 +330,13 @@ namespace arger::detail {
 		if (!config.special.version.name.empty()) {
 			if (config.special.version.name.size() <= 1)
 				throw arger::ConfigException{ L"Version entry name must at least be two characters long." };
+			if (config.version.empty())
+				throw arger::ConfigException{ L"Version string must be set when using a version entry." };
 			state.version = &config.special.version;
 		}
 
-		/* validate the help attributes */
-		detail::ValidateHelp(config);
+		/* validate the information attributes */
+		detail::ValidateInformation(config);
 
 		/* validate the options and arguments */
 		for (const auto& option : config.options)

@@ -36,7 +36,10 @@ namespace arger {
 
 		public:
 			constexpr std::wstring buildVersionString() const {
-				return str::wd::Build(pProgram, L" Version [", pConfig.version, L']');
+				/* version string is guaranteed to never be empty if it can be requested to be built */
+				if (pProgram.empty())
+					return pConfig.version;
+				return str::wd::Build(pProgram, L' ', pConfig.version);
 			}
 			constexpr std::wstring buildHelpHintString() const {
 				return str::wd::Build(L"Try '", pProgram, L" --help' for more information.");
@@ -243,19 +246,19 @@ namespace arger {
 				fAddString(str::wd::Build(str::View{ topMost->super->groupName }.title(), L": ", topMost->group->name));
 				fAddString(topMost->group->description.text, 4);
 			}
-			constexpr void fRecHelpStrings(const detail::ValidArguments* topMost, bool top) {
+			constexpr void fRecInformationStrings(const detail::ValidArguments* topMost, bool top) {
 				if (topMost == 0)
 					return;
-				fRecHelpStrings(topMost->super, false);
+				fRecInformationStrings(topMost->super, false);
 
-				/* iterate over the help-content and append it to the help-buffer */
-				const detail::Help* help = (topMost->group == 0 ? (detail::Help*)pConfig.config : (detail::Help*)topMost->group);
-				for (size_t i = 0; i < help->help.size(); ++i) {
-					if (!help->help[i].allChildren && !top)
+				/* iterate over the information-content and append it to the information-buffer */
+				const detail::Information* information = (topMost->group == 0 ? (detail::Information*)pConfig.config : (detail::Information*)topMost->group);
+				for (size_t i = 0; i < information->information.size(); ++i) {
+					if (!information->information[i].allChildren && !top)
 						continue;
 					fAddNewLine(true);
-					fAddString(help->help[i].name + L": ");
-					fAddString(help->help[i].text, detail::NumCharsHelpLeft);
+					fAddString(information->information[i].name + L": ");
+					fAddString(information->information[i].text, detail::NumCharsHelpLeft);
 				}
 			}
 			void fAddEndpointDescription(const detail::ValidEndpoint& endpoint) {
@@ -505,8 +508,8 @@ namespace arger {
 					fBuildOptions(false, menu);
 				}
 
-				/* add all of the help descriptions for the selected group */
-				fRecHelpStrings(pTopMost, true);
+				/* add all of the information descriptions for the selected group */
+				fRecInformationStrings(pTopMost, true);
 
 				/* return the constructed help-string */
 				std::wstring out;

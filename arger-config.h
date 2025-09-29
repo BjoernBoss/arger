@@ -13,7 +13,7 @@ namespace arger {
 	namespace detail {
 		struct Config {};
 
-		struct Version {
+		struct VersionText {
 			std::wstring version;
 		};
 		struct Program {
@@ -25,7 +25,7 @@ namespace arger {
 				bool allChildren = false;
 			} description;
 		};
-		struct Help {
+		struct Information {
 		public:
 			struct Entry {
 				std::wstring name;
@@ -34,7 +34,7 @@ namespace arger {
 			};
 
 		public:
-			std::vector<Entry> help;
+			std::vector<Entry> information;
 		};
 		struct Constraint {
 			std::vector<arger::Checker> constraints;
@@ -127,10 +127,10 @@ namespace arger {
 	/* general arger-configuration to be parsed */
 	struct Config :
 		public detail::Description,
-		public detail::Help,
+		public detail::Information,
 		public detail::Options,
 		public detail::Arguments,
-		public detail::Version,
+		public detail::VersionText,
 		public detail::Program,
 		public detail::SpecialEntries {
 	public:
@@ -185,7 +185,7 @@ namespace arger {
 	struct Group :
 		public detail::Config,
 		public detail::Description,
-		public detail::Help,
+		public detail::Information,
 		public detail::Use,
 		public detail::Arguments,
 		public detail::Abbreviation,
@@ -260,15 +260,15 @@ namespace arger {
 		detail::ApplyConfigs(*this, configs...);
 	}
 
-	/* version for the current configuration */
-	struct Version : public detail::Config {
+	/* version text for the current configuration (preceeded by program name, if not in menu-mode) */
+	struct VersionText : public detail::Config {
 	public:
-		std::wstring version;
+		std::wstring text;
 
 	public:
-		constexpr Version(std::wstring version) : version{ version } {}
-		constexpr void apply(detail::Version& base) const {
-			base.version = version;
+		constexpr VersionText(std::wstring text) : text{ text } {}
+		constexpr void apply(detail::VersionText& base) const {
+			base.version = text;
 		}
 	};
 
@@ -298,15 +298,15 @@ namespace arger {
 		}
 	};
 
-	/* add help-string to the corresponding object (all children configures if the text should be printed for all subsequent children as well) */
-	struct Help : public detail::Config {
+	/* add information-string to the corresponding object (all children configures if the text should be printed for all subsequent children as well) */
+	struct Information : public detail::Config {
 	public:
-		detail::Help::Entry entry;
+		detail::Information::Entry entry;
 
 	public:
-		constexpr Help(std::wstring name, std::wstring text, bool allChildren = true) : entry{ name, text, allChildren } {}
-		constexpr void apply(detail::Help& base) const {
-			base.help.push_back(entry);
+		constexpr Information(std::wstring name, std::wstring text, bool allChildren = true) : entry{ name, text, allChildren } {}
+		constexpr void apply(detail::Information& base) const {
+			base.information.push_back(entry);
 		}
 	};
 
