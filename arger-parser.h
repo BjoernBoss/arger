@@ -111,16 +111,25 @@ namespace arger {
 			}
 
 		private:
+			void fResolveEnum(const std::wstring& name, arger::Value& value, const arger::Enum& allowed) const {
+				/* resolve the id of the string */
+				auto it = std::find_if(allowed.begin(), allowed.end(), [&](const arger::EnumEntry& e) { return e.name == value.str(); });
+				if (it == allowed.end())
+					throw arger::ParsingException{ L"Invalid enum for argument [", name, L"] encountered." };
+
+				/* assign the new enum-id */
+				value = arger::Value{ detail::EnumId{ it->id } };
+			}
+			void fUnpackDefValue(arger::Value& value, const arger::Type& type) const {
+				/* check if the type is an enum, in which case the type needs to be unpacked (as default enums are stored as
+				*	strings, for printing; cannot fail, as default values have already been verified to be part of the type) */
+				if (std::holds_alternative<arger::Enum>(type))
+					fResolveEnum(L"", value, std::get<arger::Enum>(type));
+			}
 			void fVerifyValue(const std::wstring& name, arger::Value& value, const arger::Type& type) const {
 				/* check if an enum was expected */
 				if (std::holds_alternative<arger::Enum>(type)) {
-					const arger::Enum& allowed = std::get<arger::Enum>(type);
-
-					/* resolve the id of the string */
-					auto it = std::find_if(allowed.begin(), allowed.end(), [&](const arger::EnumEntry& e) { return e.name == value.str(); });
-					if (it == allowed.end())
-						throw arger::ParsingException{ L"Invalid enum for argument [", name, L"] encountered." };
-					value = arger::Value{ detail::EnumId{ it->id } };
+					fResolveEnum(name, value, std::get<arger::Enum>(type));
 					return;
 				}
 
@@ -192,8 +201,10 @@ namespace arger {
 					size_t index = std::min<size_t>(i, endpoint->positionals->size() - 1);
 
 					/* check if the value is empty and the default value should be used and otherwise unpack the value */
-					if (pParsed.pPositional[i].str().empty() && (*endpoint->positionals)[index].defValue.has_value())
+					if (pParsed.pPositional[i].str().empty() && (*endpoint->positionals)[index].defValue.has_value()) {
 						pParsed.pPositional[i] = (*endpoint->positionals)[index].defValue.value();
+						fUnpackDefValue(pParsed.pPositional[i], (*endpoint->positionals)[index].type);
+					}
 					else
 						fVerifyValue((*endpoint->positionals)[index].name, pParsed.pPositional[i], (*endpoint->positionals)[index].type);
 				}
@@ -204,6 +215,7 @@ namespace arger {
 					if (!(*endpoint->positionals)[i].defValue.has_value())
 						break;
 					pParsed.pPositional.push_back((*endpoint->positionals)[i].defValue.value());
+					fUnpackDefValue(pParsed.pPositional.back(), (*endpoint->positionals)[i].type);
 				}
 
 				/* check if the minimum required number of parameters has not been reached
@@ -233,7 +245,9 @@ namespace arger {
 
 					/* check if the default values should be assigned (limits are already ensured to be valid) */
 					if (count == 0 && !option.option->payload.defValue.empty()) {
-						pParsed.pOptions.insert({ option.option->id, option.option->payload.defValue });
+						it = pParsed.pOptions.insert({ option.option->id, option.option->payload.defValue }).first;
+						for (size_t i = 0; i < it->second.size(); ++i)
+							fUnpackDefValue(it->second[i], option.option->payload.type);
 						continue;
 					}
 
