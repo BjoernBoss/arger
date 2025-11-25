@@ -21,13 +21,13 @@ namespace arger::detail {
 		std::map<std::wstring, detail::ValidArguments> sub;
 		std::map<wchar_t, detail::ValidArguments*> abbreviations;
 		std::vector<detail::ValidEndpoint> endpoints;
-		const arger::Group* group = 0;
+		const detail::Group* group = 0;
 		std::wstring groupName;
 		size_t depth = 0;
 		bool nestedPositionals = false;
 	};
 	struct ValidOption {
-		const arger::Option* option = 0;
+		const detail::Option* option = 0;
 		std::set<const detail::ValidArguments*> users;
 		const detail::ValidArguments* owner = 0;
 		size_t minimum = 0;
@@ -126,7 +126,7 @@ namespace arger::detail {
 		}
 	}
 
-	inline void ValidateEndpoint(detail::ValidArguments& entry, const detail::Arguments* args, const arger::Endpoint* endpoint) {
+	inline void ValidateEndpoint(detail::ValidArguments& entry, const detail::Arguments* args, const detail::Endpoint* endpoint) {
 		const std::vector<detail::Positionals::Entry>& positionals = (args == 0 ? endpoint->positionals : args->positionals);
 		std::optional<size_t> minimum = (args == 0 ? endpoint->require : args->require).minimum;
 		std::optional<size_t> maximum = (args == 0 ? endpoint->require : args->require).maximum;
@@ -161,7 +161,7 @@ namespace arger::detail {
 				detail::ValidateDefValue(positionals[i].type, positionals[i].defValue.value());
 		}
 	}
-	inline void ValidateOption(const arger::Config& config, const arger::Option& option, detail::ValidConfig& state, const detail::ValidArguments* owner) {
+	inline void ValidateOption(const arger::Config& config, const detail::Option& option, detail::ValidConfig& state, const detail::ValidArguments* owner) {
 		if (option.name.size() <= 1)
 			throw arger::ConfigException{ L"Option name must at least be two characters long." };
 		if (option.name.starts_with(L"-"))
@@ -212,7 +212,7 @@ namespace arger::detail {
 				detail::ValidateDefValue(option.payload.type, value);
 		}
 	}
-	inline void ValidateArguments(const arger::Config& config, const detail::Arguments& arguments, const arger::Group* group, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidArguments* super) {
+	inline void ValidateArguments(const arger::Config& config, const detail::Arguments& arguments, const detail::Group* group, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidArguments* super) {
 		/* populate the entry */
 		entry.constraints = &arguments.constraints;
 		entry.nestedPositionals = !arguments.positionals.empty();
