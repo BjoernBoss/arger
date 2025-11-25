@@ -22,27 +22,27 @@ The following configurations are defined:
 
 ```C++
 /* general arger-configuration to be parsed */
-arger::Config(const arger::IsConfig<arger::Config> auto&... configs);
+arger::Config(const arger::IsConfig<detail::Config> auto&... configs);
 
 /* general sub-group of options for a configuration/group (id can be enum or int)
 *	 Note: Groups/Configs can can only have sub-groups or positional arguments */
-arger::Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Group> auto&... configs);
+arger::Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<detail::Group> auto&... configs);
 
 /* endpoint for positional arguments for a configuration/group (to enable a group to have multiple variations of positional counts)
 *	 Note: If Groups/Configs define positional arguments directly, an implicit endpoint is defined and no further endpoints can be added */
-arger::Endpoint(arger::IsId auto id, const arger::IsConfig<arger::Endpoint> auto&... configs);
+arger::Endpoint(arger::IsId auto id, const arger::IsConfig<detail::Endpoint> auto&... configs);
 
 /* general optional flag/payload (id can be enum or int)
 *	Note: if passed to a group, it is implicitly only bound to that group - but all names and abbreviations must be unique */
-arger::Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Option> auto&... configs);
+arger::Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<detail::Option> auto&... configs);
 
 /* configure the key to be used as option for argument mode and any group name for menu mode, which
 *	triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
-arger::HelpEntry(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs);
+arger::HelpEntry(std::wstring name, const arger::IsConfig<detail::Option> auto&... configs);
 
 /* configure the key to be used as option for argument mode and any group name for menu mode, which
 *	triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
-arger::VersionEntry(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs);
+arger::VersionEntry(std::wstring name, const arger::IsConfig<detail::Option> auto&... configs);
 
 /* version text for the current configuration (preceeded by program name, if not in menu-mode) */
 arger::VersionText(std::wstring text);
@@ -54,7 +54,8 @@ arger::Program(std::wstring program);
 *	as well; only applies to optional descriptions, such as group descriptions of parents or the config description) */
 arger::Description(std::wstring desc, bool allChildren = true);
 
-/* add information-string to the corresponding object (all children configures if the text should be printed for all subsequent children as well) */
+/* add information-string to the corresponding object (all children configures
+*	if the text should be printed for all subsequent children as well) */
 arger::Information(std::wstring name, std::wstring text, bool allChildren = true);
 
 /* add a constraint to be executed if the corresponding object is selected via the arguments */

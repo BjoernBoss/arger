@@ -6,6 +6,8 @@
 #include "arger-value.h"
 
 namespace arger {
+	struct Config;
+
 	namespace detail {
 		struct Configurator {};
 
@@ -138,6 +140,16 @@ namespace arger {
 			Group(std::wstring name, size_t id) : name{ name }, id{ id } {}
 		};
 
+		struct Config :
+			public detail::Description,
+			public detail::Information,
+			public detail::Options,
+			public detail::Arguments,
+			public detail::VersionText,
+			public detail::Program,
+			public detail::SpecialEntries {
+		};
+
 		struct ConfigBurner {
 			template <class Base>
 			static constexpr void Apply(Base& base) {}
@@ -151,6 +163,8 @@ namespace arger {
 			static decltype(std::declval<Config>().burnConfig(std::declval<Base&>()), std::true_type{}) CanBurn(int) { return {}; }
 			template <class, class>
 			static std::false_type CanBurn(...) { return {}; }
+
+			static const detail::Config& GetBurned(const arger::Config& config);
 		};
 	}
 
@@ -158,17 +172,14 @@ namespace arger {
 	concept IsConfig = std::is_base_of_v<detail::Configurator, Type>&& decltype(detail::ConfigBurner::CanBurn<Base, Type>(0))::value;
 
 	/* general arger-configuration to be parsed */
-	struct Config :
-		public detail::Description,
-		public detail::Information,
-		public detail::Options,
-		public detail::Arguments,
-		public detail::VersionText,
-		public detail::Program,
-		public detail::SpecialEntries {
+	struct Config {
+		friend struct detail::ConfigBurner;
+	private:
+		detail::Config pConfig;
+
 	public:
-		constexpr Config(const arger::IsConfig<arger::Config> auto&... configs);
-		constexpr arger::Config& add(const arger::IsConfig<arger::Config> auto&... configs);
+		constexpr Config(const arger::IsConfig<detail::Config> auto&... configs);
+		constexpr arger::Config& add(const arger::IsConfig<detail::Config> auto&... configs);
 	};
 
 	/* general optional flag/payload
@@ -316,7 +327,8 @@ namespace arger {
 		}
 	};
 
-	/* add information-string to the corresponding object (all children configures if the text should be printed for all subsequent children as well) */
+	/* add information-string to the corresponding object (all children configures
+	*	if the text should be printed for all subsequent children as well) */
 	struct Information : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
@@ -475,11 +487,15 @@ namespace arger {
 		}
 	};
 
-	constexpr arger::Config::Config(const arger::IsConfig<arger::Config> auto&... configs) {
-		detail::ConfigBurner::Apply(*this, configs...);
+	inline const detail::Config& detail::ConfigBurner::GetBurned(const arger::Config& config) {
+		return config.pConfig;
 	}
-	constexpr arger::Config& arger::Config::add(const arger::IsConfig<arger::Config> auto&... configs) {
-		detail::ConfigBurner::Apply(*this, configs...);
+
+	constexpr arger::Config::Config(const arger::IsConfig<detail::Config> auto&... configs) {
+		detail::ConfigBurner::Apply(pConfig, configs...);
+	}
+	constexpr arger::Config& arger::Config::add(const arger::IsConfig<detail::Config> auto&... configs) {
+		detail::ConfigBurner::Apply(pConfig, configs...);
 		return *this;
 	}
 

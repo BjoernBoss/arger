@@ -30,7 +30,7 @@ namespace arger {
 
 				/* check if it could be the help or version entry (only relevant for programs) */
 				size_t i = 0;
-				if (fullName && !pConfig.config->program.empty()) {
+				if (fullName && !pConfig.burned->program.empty()) {
 					if (pConfig.help != 0 && pConfig.help->name == arg) {
 						pPrintHelp = true;
 						i = arg.size();
@@ -60,11 +60,11 @@ namespace arger {
 					}
 
 					/* check if its one of the special entries (only relevant for programs) */
-					else if (!pConfig.config->program.empty() && pConfig.help != 0 && pConfig.help->abbreviation == arg[i]) {
+					else if (!pConfig.burned->program.empty() && pConfig.help != 0 && pConfig.help->abbreviation == arg[i]) {
 						pPrintHelp = true;
 						continue;
 					}
-					else if (!pConfig.config->program.empty() && pConfig.version != 0 && pConfig.version->abbreviation == arg[i]) {
+					else if (!pConfig.burned->program.empty() && pConfig.version != 0 && pConfig.version->abbreviation == arg[i]) {
 						pPrintVersion = true;
 						continue;
 					}
@@ -278,18 +278,18 @@ namespace arger {
 			arger::Parsed parse(const arger::Config& config, size_t lineLength) {
 				pTopMost = static_cast<const detail::ValidArguments*>(&pConfig);
 
-				/* validate and pre-process the configuration */
+				/* validate and pre-process the configuration (valid-config must not outlive the config) */
 				detail::ValidateConfig(config, pConfig);
 
 				/* extract the program name (no argument needed for menus) */
-				detail::BaseBuilder base{ ((pArgs.empty() || pConfig.config->program.empty()) ? L"" : pArgs[pIndex++]), config };
+				detail::BaseBuilder base{ ((pArgs.empty() || pConfig.burned->program.empty()) ? L"" : pArgs[pIndex++]), config };
 
 				/* iterate over the arguments and parse them based on the definitions */
 				while (pIndex < pArgs.size()) {
 					const std::wstring& next = pArgs[pIndex++];
 
 					/* check if its the version or help group (only relevant for menus and only if no positional arguments have yet been pushed) */
-					if (pConfig.config->program.empty() && pParsed.pPositional.empty()) {
+					if (pConfig.burned->program.empty() && pParsed.pPositional.empty()) {
 						if (pConfig.help != 0 && (next.size() != 1 ? (next == pConfig.help->name) : (pConfig.help->abbreviation == next[0] && next[0] != 0))) {
 							pPrintHelp = true;
 							continue;

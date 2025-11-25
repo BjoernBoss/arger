@@ -11,14 +11,13 @@ namespace arger {
 	static constexpr size_t NumCharsHelpLeft = 32;
 
 	namespace detail {
-
 		class BaseBuilder {
 		private:
-			const arger::Config& pConfig;
+			const detail::Config& pConfig;
 			std::wstring pProgram;
 
 		public:
-			constexpr BaseBuilder(const std::wstring& firstArg, const arger::Config& config) : pConfig{ config } {
+			BaseBuilder(const std::wstring& firstArg, const arger::Config& config) : pConfig{ detail::ConfigBurner::GetBurned(config) } {
 				/* check if the first argument contains a valid program-name */
 				std::wstring_view view{ firstArg };
 				size_t begin = view.size();
@@ -26,7 +25,7 @@ namespace arger {
 					--begin;
 
 				/* setup the final program name (if the first argument is an empty string, the configured program name will be used) */
-				pProgram = (begin == view.size() ? config.program : std::wstring{ view.substr(begin) });
+				pProgram = (begin == view.size() ? pConfig.program : std::wstring{ view.substr(begin) });
 			}
 
 		public:
@@ -260,7 +259,7 @@ namespace arger {
 				fRecInformationStrings(topMost->super, false);
 
 				/* iterate over the information-content and append it to the information-buffer */
-				const detail::Information* information = (topMost->group == 0 ? (detail::Information*)pConfig.config : (detail::Information*)topMost->group);
+				const detail::Information* information = (topMost->group == 0 ? (detail::Information*)pConfig.burned : (detail::Information*)topMost->group);
 				for (size_t i = 0; i < information->information.size(); ++i) {
 					if (!information->information[i].allChildren && !top)
 						continue;
@@ -285,7 +284,7 @@ namespace arger {
 		private:
 			bool fCheckOptionPrint(const detail::ValidOption* option) const {
 				/* in program mode, check if the argument is excluded by the current selected group, based on the usage-requirements */
-				if (!pConfig.config->program.empty())
+				if (!pConfig.burned->program.empty())
 					return detail::CheckUsage(option, pTopMost);
 
 				/* in menu-mode, print only flags, which are only available because a parent uses it,
@@ -300,8 +299,8 @@ namespace arger {
 			}
 			void fBuildUsage() {
 				/* add the example-usage descriptive line */
-				fAddToken(pConfig.config->program.empty() ? L"Input>" : L"Usage: ");
-				if (!pConfig.config->program.empty())
+				fAddToken(pConfig.burned->program.empty() ? L"Input>" : L"Usage: ");
+				if (!pConfig.burned->program.empty())
 					fAddToken(pBase.program());
 
 				/* add the already selected groups and potentially upcoming group-name */
@@ -343,7 +342,7 @@ namespace arger {
 				/* collect all of the names to be used (ignore all-children for descriptions as they
 				*	are shown on the right side, also add the help/version options for programs) */
 				std::map<std::wstring, NameCache> selected;
-				if (!pConfig.config->program.empty() && !required) {
+				if (!pConfig.burned->program.empty() && !required) {
 					if (pConfig.help != 0)
 						selected.insert({ pConfig.help->name, NameCache{ &pConfig.help->description.text, 0, pConfig.help->abbreviation } });
 					if (pConfig.version != 0)
@@ -419,16 +418,16 @@ namespace arger {
 				fBuildUsage();
 
 				/* add the program description */
-				if (!pConfig.config->description.text.empty() && (pConfig.config->description.allChildren || pTopMost == &pConfig)) {
+				if (!pConfig.burned->description.text.empty() && (pConfig.burned->description.allChildren || pTopMost == &pConfig)) {
 					fAddNewLine(true);
-					fAddString(pConfig.config->description.text, 4);
+					fAddString(pConfig.burned->description.text, 4);
 				}
 
 				/* add the group description */
 				fRecGroupDescription(pTopMost, true);
 
 				/* add the description of all sub-groups (for menus, help/version are considered groups as well) */
-				if (pTopMost->endpoints.empty() || (pConfig.config->program.empty() && (pConfig.help != 0 || pConfig.version != 0))) {
+				if (pTopMost->endpoints.empty() || (pConfig.burned->program.empty() && (pConfig.help != 0 || pConfig.version != 0))) {
 					fAddNewLine(true);
 					if (pTopMost->endpoints.empty())
 						fAddString(str::wd::Build(L"Options for [", pTopMost->groupName, L"]:"));
@@ -438,7 +437,7 @@ namespace arger {
 					/* collect the list of all names to be used (ignore all-children for descriptions as
 					*	they are shown on the right side, add the help and version entries for menus) */
 					std::map<std::wstring, NameCache> selected;
-					if (pConfig.config->program.empty()) {
+					if (pConfig.burned->program.empty()) {
 						if (pConfig.help != 0)
 							selected.insert({ pConfig.help->name, NameCache{ &pConfig.help->description.text, 0, pConfig.help->abbreviation } });
 						if (pConfig.version != 0)

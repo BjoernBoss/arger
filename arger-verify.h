@@ -8,39 +8,39 @@
 
 namespace arger::detail {
 	struct ValidEndpoint {
-		const std::vector<detail::Positionals::Entry>* positionals = 0;
-		const std::vector<arger::Checker>* constraints = 0;
-		const std::wstring* description = 0;
+		const std::vector<detail::Positionals::Entry>* positionals = nullptr;
+		const std::vector<arger::Checker>* constraints = nullptr;
+		const std::wstring* description = nullptr;
 		size_t minimum = 0;
 		size_t maximum = 0;
 		size_t id = 0;
 	};
 	struct ValidArguments {
-		const std::vector<arger::Checker>* constraints = 0;
-		const detail::ValidArguments* super = 0;
 		std::map<std::wstring, detail::ValidArguments> sub;
 		std::map<wchar_t, detail::ValidArguments*> abbreviations;
 		std::vector<detail::ValidEndpoint> endpoints;
-		const detail::Group* group = 0;
 		std::wstring groupName;
+		const std::vector<arger::Checker>* constraints = nullptr;
+		const detail::ValidArguments* super = nullptr;
+		const detail::Group* group = nullptr;
 		size_t depth = 0;
 		bool nestedPositionals = false;
 	};
 	struct ValidOption {
-		const detail::Option* option = 0;
 		std::set<const detail::ValidArguments*> users;
-		const detail::ValidArguments* owner = 0;
+		const detail::Option* option = nullptr;
+		const detail::ValidArguments* owner = nullptr;
 		size_t minimum = 0;
 		size_t maximum = 0;
 		bool payload = false;
 	};
 	struct ValidConfig : public detail::ValidArguments {
+		const detail::Config* burned = nullptr;
 		std::map<std::wstring, detail::ValidOption> options;
 		std::map<wchar_t, detail::ValidOption*> abbreviations;
 		std::map<size_t, detail::ValidOption*> optionIds;
-		const arger::Config* config = 0;
-		const detail::SpecialEntry* help = 0;
-		const detail::SpecialEntry* version = 0;
+		const detail::SpecialEntry* help = nullptr;
+		const detail::SpecialEntry* version = nullptr;
 	};
 
 	inline bool CheckParent(const detail::ValidArguments* parent, const detail::ValidArguments* child) {
@@ -161,7 +161,7 @@ namespace arger::detail {
 				detail::ValidateDefValue(positionals[i].type, positionals[i].defValue.value());
 		}
 	}
-	inline void ValidateOption(const arger::Config& config, const detail::Option& option, detail::ValidConfig& state, const detail::ValidArguments* owner) {
+	inline void ValidateOption(detail::ValidConfig& state, const detail::Option& option, const detail::ValidArguments* owner) {
 		if (option.name.size() <= 1)
 			throw arger::ConfigException{ L"Option name must at least be two characters long." };
 		if (option.name.starts_with(L"-"))
@@ -188,7 +188,7 @@ namespace arger::detail {
 		state.optionIds.insert({ option.id, &entry });
 
 		/* check if the name or abbreviation clashes with the help/version entries (for options only necessary for programs) */
-		if (!config.program.empty())
+		if (!state.burned->program.empty())
 			detail::ValidateSpecialEntry(state, option.name, option.abbreviation);
 
 		/* validate the payload */
@@ -212,7 +212,7 @@ namespace arger::detail {
 				detail::ValidateDefValue(option.payload.type, value);
 		}
 	}
-	inline void ValidateArguments(const arger::Config& config, const detail::Arguments& arguments, const detail::Group* group, detail::ValidConfig& state, detail::ValidArguments& entry, detail::ValidArguments* super) {
+	inline void ValidateArguments(detail::ValidConfig& state, const detail::Arguments& arguments, const detail::Group* group, detail::ValidArguments& entry, detail::ValidArguments* super) {
 		/* populate the entry */
 		entry.constraints = &arguments.constraints;
 		entry.nestedPositionals = !arguments.positionals.empty();
@@ -251,16 +251,16 @@ namespace arger::detail {
 				}
 
 				/* check if the name or abbreviation clashes with the help/version entries (for groups only necessary for menus) */
-				if (config.program.empty())
+				if (state.burned->program.empty())
 					detail::ValidateSpecialEntry(state, sub.name, sub.abbreviation);
 
 				/* validate the arguments */
-				detail::ValidateArguments(config, sub, &sub, state, next, &entry);
+				detail::ValidateArguments(state, sub, &sub, next, &entry);
 				entry.nestedPositionals = (entry.nestedPositionals || next.nestedPositionals);
 
 				/* register all new options */
 				for (const auto& option : sub.options)
-					detail::ValidateOption(config, option, state, &next);
+					detail::ValidateOption(state, option, &next);
 
 				/* validate the information attributes */
 				detail::ValidateInformation(sub);
@@ -309,35 +309,42 @@ namespace arger::detail {
 			detail::ValidateFinalizeArguments(state, child);
 	}
 	inline void ValidateConfig(const arger::Config& config, detail::ValidConfig& state) {
-		state.config = &config;
+		/* burn the config and reset the state (validated state must not
+		*	outlive original config and config must not be modified inbetween) */
+		state.burned = &detail::ConfigBurner::GetBurned(config);
+		state.options.clear();
+		state.abbreviations.clear();
+		state.optionIds.clear();
+		state.help = nullptr;
+		state.version = nullptr;
 
 		/* validate the special-purpose entries attributes */
-		if (!config.special.help.name.empty()) {
-			if (config.special.help.name.size() <= 1)
+		if (!state.burned->special.help.name.empty()) {
+			if (state.burned->special.help.name.size() <= 1)
 				throw arger::ConfigException{ L"Help entry name must at least be two characters long." };
-			if (config.special.version.name == config.special.help.name)
+			if (state.burned->special.version.name == state.burned->special.help.name)
 				throw arger::ConfigException{ L"Help entry and version entry cannot have the same name." };
-			if (!config.special.version.name.empty()) {
-				if (config.special.help.abbreviation != 0 && config.special.help.abbreviation == config.special.version.abbreviation)
+			if (!state.burned->special.version.name.empty()) {
+				if (state.burned->special.help.abbreviation != 0 && state.burned->special.help.abbreviation == state.burned->special.version.abbreviation)
 					throw arger::ConfigException{ L"Help entry and version entry cannot have the same abbreviation." };
 			}
-			state.help = &config.special.help;
+			state.help = &state.burned->special.help;
 		}
-		if (!config.special.version.name.empty()) {
-			if (config.special.version.name.size() <= 1)
+		if (!state.burned->special.version.name.empty()) {
+			if (state.burned->special.version.name.size() <= 1)
 				throw arger::ConfigException{ L"Version entry name must at least be two characters long." };
-			if (config.version.empty())
+			if (state.burned->version.empty())
 				throw arger::ConfigException{ L"Version string must be set when using a version entry." };
-			state.version = &config.special.version;
+			state.version = &state.burned->special.version;
 		}
 
 		/* validate the information attributes */
-		detail::ValidateInformation(config);
+		detail::ValidateInformation(*state.burned);
 
 		/* validate the options and arguments */
-		for (const auto& option : config.options)
-			detail::ValidateOption(config, option, state, &state);
-		detail::ValidateArguments(config, config, 0, state, state, 0);
+		for (const auto& option : state.burned->options)
+			detail::ValidateOption(state, option, &state);
+		detail::ValidateArguments(state, *state.burned, 0, state, 0);
 
 		/* post-validate all groups after all groups and flags have been loaded */
 		for (const auto& [_, group] : state.sub)
