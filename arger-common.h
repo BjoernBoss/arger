@@ -15,18 +15,27 @@
 #include <concepts>
 #include <cinttypes>
 #include <algorithm>
+#include <typeindex>
 
 namespace arger {
 	class Parsed;
 	namespace detail {
 		class Parser;
+
+		struct EnumId {
+		public:
+			std::type_index type;
+			size_t id = 0;
+
+		public:
+			EnumId() : type{ typeid(void) }, id{ 0 } {}
+			EnumId(auto val) : type{ typeid(val) }, id{ static_cast<size_t>(val) } {}
+		};
 	}
 
-	/* any type statically castable to a size_t (such as integers or enums) are considered ids */
+	/* any enum or integer is considered an id */
 	template <class Type>
-	concept IsId = requires(Type t) {
-		{ static_cast<size_t>(t) } -> std::same_as<size_t>;
-	};
+	concept IsId = std::is_integral_v<Type> || std::is_enum_v<Type>;
 
 	enum class Primitive : uint8_t {
 		any,

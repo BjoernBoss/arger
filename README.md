@@ -36,10 +36,12 @@ arger::Endpoint(arger::IsId auto id, const arger::IsConfig<arger::Endpoint> auto
 *	Note: if passed to a group, it is implicitly only bound to that group - but all names and abbreviations must be unique */
 arger::Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Option> auto&... configs);
 
-/* configure the key to be used as option for argument mode and any group name for menu mode, which triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
+/* configure the key to be used as option for argument mode and any group name for menu mode, which
+*	triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
 arger::HelpEntry(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs);
 
-/* configure the key to be used as option for argument mode and any group name for menu mode, which triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
+/* configure the key to be used as option for argument mode and any group name for menu mode, which
+*	triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
 arger::VersionEntry(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs);
 
 /* version text for the current configuration (preceeded by program name, if not in menu-mode) */
@@ -48,7 +50,8 @@ arger::VersionText(std::wstring text);
 /* default alternative program name for the configuration (no program implies menu mode) */
 arger::Program(std::wstring program);
 
-/* description to the corresponding object (all children only applies to optional descriptions; configures if the text should be printed for all subsequent children as well) */
+/* description to the corresponding object (all children configures if the text should be printed for all subsequent children
+*	as well; only applies to optional descriptions, such as group descriptions of parents or the config description) */
 arger::Description(std::wstring desc, bool allChildren = true);
 
 /* add information-string to the corresponding object (all children configures if the text should be printed for all subsequent children as well) */
@@ -70,25 +73,22 @@ arger::Abbreviation(wchar_t c);
 *	Note: cannot be used in conjunction with explicitly defined endpoints */
 arger::EndpointId(arger::IsId auto id);
 
-/* add a payload to an option with a given name and of a given type, and optional default values (must meet the requirement-counts) */
+/* add a payload to an option with a given name and of a given type, and optional default values (must
+*	meet the requirement-counts), will be used to fill up parsed values, if less were provided */
 arger::Payload(std::wstring name, arger::Type type, arger::Value defValue);
 arger::Payload(std::wstring name, arger::Type type, std::vector<arger::Value> defValue = {});
 
-/* add usage-constraints to let the corresponding options only be used by groups, which add them as usage (by default every group/argument can use all options) */
+/* add usage-constraints to let the corresponding options only be used by groups,
+*	which add them as usage (by default every group/argument can use all options) */
 arger::Use(arger::IsId auto... options);
-
-/* mark this flag/group as being the help-indicating flag, which triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
-arger::HelpFlag();
-
-/* mark this flag as being the version-indicating flag, which triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
-arger::VersionFlag();
 
 /* setup the descriptive name for the sub-groups to be used (the default name is 'mode') */
 arger::GroupName(std::wstring name);
 
-/* add an additional positional argument to the configuration/group using the given name, type, description, and optional default value (must meet the requirement-counts)
+/* add an additional positional argument to the configuration/group using the given name, type, description, and optional default value
+*	Note: Must meet the requirement-counts
 *	Note: Groups/Configs can can only have sub-groups or positional arguments
-*	Note: Default values will be used, when no argument is given, or the argument string is empty */
+*	Note: Default values will be used, when no argument is given */
 arger::Positional(std::wstring name, arger::Type type, std::wstring description);
 arger::Positional(std::wstring name, arger::Type type, std::wstring description, arger::Value defValue);
 ```

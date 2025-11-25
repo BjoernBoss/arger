@@ -5,12 +5,6 @@
 #include "arger-common.h"
 
 namespace arger {
-	namespace detail {
-		struct EnumId {
-			size_t id = 0;
-		};
-	}
-
 	/* representation of a single argument value (performs primitive type-conversions when accessing values) */
 	struct Value : private std::variant<uint64_t, int64_t, double, bool, std::wstring, detail::EnumId> {
 	private:

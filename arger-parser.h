@@ -123,8 +123,10 @@ namespace arger {
 			void fUnpackDefValue(arger::Value& value, const arger::Type& type) const {
 				/* check if the type is an enum, in which case the type needs to be unpacked (as default enums are stored as
 				*	strings, for printing; cannot fail, as default values have already been verified to be part of the type) */
-				if (std::holds_alternative<arger::Enum>(type))
-					fResolveEnum(L"", value, std::get<arger::Enum>(type));
+				if (std::holds_alternative<arger::Enum>(type)) {
+					const arger::Enum& list = std::get<arger::Enum>(type);
+					value = arger::Value{ detail::EnumId{ std::find_if(list.begin(), list.end(), [&](const arger::EnumEntry& e) { return e.name == value.str(); })->id } };
+				}
 			}
 			void fVerifyValue(const std::wstring& name, arger::Value& value, const arger::Type& type) const {
 				/* check if an enum was expected */
@@ -200,13 +202,8 @@ namespace arger {
 					}
 					size_t index = std::min<size_t>(i, endpoint->positionals->size() - 1);
 
-					/* check if the value is empty and the default value should be used and otherwise unpack the value */
-					if (pParsed.pPositional[i].str().empty() && (*endpoint->positionals)[index].defValue.has_value()) {
-						pParsed.pPositional[i] = (*endpoint->positionals)[index].defValue.value();
-						fUnpackDefValue(pParsed.pPositional[i], (*endpoint->positionals)[index].type);
-					}
-					else
-						fVerifyValue((*endpoint->positionals)[index].name, pParsed.pPositional[i], (*endpoint->positionals)[index].type);
+					/* unpack and verify the value */
+					fVerifyValue((*endpoint->positionals)[index].name, pParsed.pPositional[i], (*endpoint->positionals)[index].type);
 				}
 
 				/* fill the positional arguments up on default values (ensures later verification and makes unpacking
@@ -243,20 +240,20 @@ namespace arger {
 					auto it = pParsed.pOptions.find(option.option->id);
 					size_t count = (it == pParsed.pOptions.end() ? 0 : it->second.size());
 
-					/* check if the default values should be assigned (limits are already ensured to be valid) */
-					if (count == 0 && !option.option->payload.defValue.empty()) {
-						it = pParsed.pOptions.insert({ option.option->id, option.option->payload.defValue }).first;
-						for (size_t i = 0; i < it->second.size(); ++i)
+					/* check if default values should be assigned (limits are already ensured to be valid) */
+					if (count < option.option->payload.defValue.size()) {
+						if (count == 0)
+							it = pParsed.pOptions.insert({ option.option->id, option.option->payload.defValue }).first;
+						else
+							it->second.insert(it->second.end(), option.option->payload.defValue.begin() + count, option.option->payload.defValue.end());
+						for (size_t i = count; i < it->second.size(); ++i)
 							fUnpackDefValue(it->second[i], option.option->payload.type);
-						continue;
 					}
 
-					/* check if the optional-argument has been found */
-					if (option.minimum > count)
+					/* validate the limits of the supplied optional arguments */
+					else if (option.minimum > count)
 						throw arger::ParsingException{ L"Argument [", name, L"] is missing." };
-
-					/* check if too many instances were found */
-					if (option.maximum > 0 && count > option.maximum)
+					else if (option.maximum > 0 && count > option.maximum)
 						throw arger::ParsingException{ L"Argument [", name, L"] can at most be specified ", option.maximum, " times." };
 
 					/* verify and unpack the values themselves */

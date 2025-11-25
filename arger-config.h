@@ -58,6 +58,14 @@ namespace arger {
 		struct Use {
 			std::set<size_t> use;
 		};
+		struct Endpoints {
+			std::vector<arger::Endpoint> endpoints;
+		};
+		struct EndpointId {
+			size_t endpointId = 0;
+		};
+
+
 		struct Positionals {
 		public:
 			struct Entry {
@@ -73,12 +81,15 @@ namespace arger {
 		struct Options {
 			std::vector<arger::Option> options;
 		};
+
+
 		struct Groups {
 			struct {
 				std::vector<arger::Group> list;
 				std::wstring name;
 			} groups;
 		};
+
 		struct SpecialEntry :
 			public detail::Description,
 			public detail::Abbreviation {
@@ -92,22 +103,6 @@ namespace arger {
 				detail::SpecialEntry version;
 			} special;
 		};
-		struct Endpoints {
-			std::vector<arger::Endpoint> endpoints;
-		};
-		struct EndpointId {
-			size_t endpointId = 0;
-		};
-
-		template <class Base, class Config>
-		constexpr void ApplyConfigs(Base& base, const Config& config) {
-			config.apply(base);
-		}
-		template <class Base, class Config, class... Configs>
-		constexpr void ApplyConfigs(Base& base, const Config& config, const Configs&... configs) {
-			config.apply(base);
-			ApplyConfigs<Base, Configs...>(base, configs...);
-		}
 
 		struct Arguments :
 			public detail::Require,
@@ -117,12 +112,29 @@ namespace arger {
 			public detail::Endpoints,
 			public detail::EndpointId {
 		};
+		struct Group :
+			public detail::Config,
+			public detail::Description,
+			public detail::Information,
+			public detail::Use,
+			public detail::Arguments,
+			public detail::Abbreviation,
+			public detail::Options {
+		};
+
+		struct ConfigApply {
+			template <class Base>
+			static constexpr void Apply(Base& base) {}
+			template <class Base, class Config, class... Configs>
+			static constexpr void Apply(Base& base, const Config& config, const Configs&... configs) {
+				config.apply(base);
+				detail::ConfigApply::Apply<Base, Configs...>(base, configs...);
+			}
+		};
 	}
 
 	template <class Type, class Base>
-	concept IsConfig = std::is_base_of_v<detail::Config, Type>&& requires(const Type t, Base b) {
-		t.apply(b);
-	};
+	concept IsConfig = std::is_base_of_v<detail::Config, Type>;
 
 	/* general arger-configuration to be parsed */
 	struct Config :
@@ -134,7 +146,6 @@ namespace arger {
 		public detail::Program,
 		public detail::SpecialEntries {
 	public:
-		constexpr Config();
 		constexpr Config(const arger::IsConfig<arger::Config> auto&... configs);
 	};
 
@@ -147,13 +158,15 @@ namespace arger {
 		public detail::Require,
 		public detail::Abbreviation,
 		public detail::Payload {
+		friend struct detail::ConfigApply;
 	public:
 		std::wstring name;
 		size_t id = 0;
 
 	public:
-		Option(std::wstring name, arger::IsId auto id);
 		constexpr Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Option> auto&... configs);
+
+	private:
 		constexpr void apply(detail::Options& base) const {
 			base.options.push_back(*this);
 		}
@@ -167,14 +180,15 @@ namespace arger {
 		public detail::Positionals,
 		public detail::Constraint,
 		public detail::Description {
+		friend struct detail::ConfigApply;
 	public:
 		size_t id = 0;
 
 	public:
-		Endpoint();
-		Endpoint(arger::IsId auto id);
 		constexpr Endpoint(const arger::IsConfig<arger::Endpoint> auto&... configs);
 		constexpr Endpoint(arger::IsId auto id, const arger::IsConfig<arger::Endpoint> auto&... configs);
+
+	private:
 		constexpr void apply(detail::Endpoints& base) const {
 			base.endpoints.push_back(*this);
 		}
@@ -190,117 +204,107 @@ namespace arger {
 		public detail::Arguments,
 		public detail::Abbreviation,
 		public detail::Options {
+		friend struct detail::ConfigApply;
 	public:
 		std::wstring name;
 		size_t id = 0;
 
 	public:
-		Group(std::wstring name);
-		Group(std::wstring name, arger::IsId auto id);
 		constexpr Group(std::wstring name, const arger::IsConfig<arger::Group> auto&... configs);
 		constexpr Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Group> auto&... configs);
+
+	private:
 		constexpr void apply(detail::Groups& base) const {
 			base.groups.list.push_back(*this);
 		}
 	};
 
-	/* configure the key to be used as option for argument mode and any group name for menu mode, which triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
+	/* configure the key to be used as option for argument mode and any group name for menu mode, which
+	*	triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
 	struct HelpEntry :
 		public detail::Config,
 		public detail::SpecialEntry {
+		friend struct detail::ConfigApply;
 	public:
-		constexpr HelpEntry(std::wstring name) : SpecialEntry{ name } {}
-		constexpr HelpEntry(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs) : SpecialEntry{ name } {
-			detail::ApplyConfigs(*this, configs...);
+		constexpr HelpEntry(std::wstring name, const arger::IsConfig<arger::HelpEntry> auto&... configs) : SpecialEntry{ name } {
+			detail::ConfigApply::Apply(*this, configs...);
 		}
+
+	private:
 		constexpr void apply(detail::SpecialEntries& base) const {
 			base.special.help = *this;
 		}
 	};
 
-	/* configure the key to be used as option for argument mode and any group name for menu mode, which triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
+	/* configure the key to be used as option for argument mode and any group name for menu mode, which
+	*	triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
 	struct VersionEntry :
 		public detail::Config,
 		public detail::SpecialEntry {
+		friend struct detail::ConfigApply;
 	public:
-		constexpr VersionEntry(std::wstring name) : SpecialEntry{ name } {}
-		constexpr VersionEntry(std::wstring name, const arger::IsConfig<arger::Option> auto&... configs) : SpecialEntry{ name } {
-			detail::ApplyConfigs(*this, configs...);
+		constexpr VersionEntry(std::wstring name, const arger::IsConfig<arger::VersionEntry> auto&... configs) : SpecialEntry{ name } {
+			detail::ConfigApply::Apply(*this, configs...);
 		}
+
+	private:
 		constexpr void apply(detail::SpecialEntries& base) const {
 			base.special.version = *this;
 		}
 	};
 
-	constexpr arger::Config::Config() {}
-	constexpr arger::Config::Config(const arger::IsConfig<arger::Config> auto&... configs) {
-		detail::ApplyConfigs(*this, configs...);
-	}
-
-	inline arger::Option::Option(std::wstring name, arger::IsId auto id) : name{ name }, id{ static_cast<size_t>(id) } {}
-	constexpr arger::Option::Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Option> auto&... configs) : name{ name }, id{ static_cast<size_t>(id) } {
-		detail::ApplyConfigs(*this, configs...);
-	}
-
-	inline arger::Endpoint::Endpoint() : id{ 0 } {}
-	inline arger::Endpoint::Endpoint(arger::IsId auto id) : id{ static_cast<size_t>(id) } {}
-	constexpr arger::Endpoint::Endpoint(const arger::IsConfig<arger::Endpoint> auto&... configs) : id{ 0 } {
-		detail::ApplyConfigs(*this, configs...);
-	}
-	constexpr arger::Endpoint::Endpoint(arger::IsId auto id, const arger::IsConfig<arger::Endpoint> auto&... configs) : id{ static_cast<size_t>(id) } {
-		detail::ApplyConfigs(*this, configs...);
-	}
-
-	inline arger::Group::Group(std::wstring name) : name{ name }, id{ 0 } {}
-	inline arger::Group::Group(std::wstring name, arger::IsId auto id) : name{ name }, id{ static_cast<size_t>(id) } {}
-	constexpr arger::Group::Group(std::wstring name, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ 0 } {
-		detail::ApplyConfigs(*this, configs...);
-	}
-	constexpr arger::Group::Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ static_cast<size_t>(id) } {
-		detail::ApplyConfigs(*this, configs...);
-	}
-
 	/* version text for the current configuration (preceeded by program name, if not in menu-mode) */
 	struct VersionText : public detail::Config {
-	public:
-		std::wstring text;
+		friend struct detail::ConfigApply;
+	private:
+		std::wstring pText;
 
 	public:
-		constexpr VersionText(std::wstring text) : text{ text } {}
+		constexpr VersionText(std::wstring text) : pText{ text } {}
+
+	private:
 		constexpr void apply(detail::VersionText& base) const {
-			base.version = text;
+			base.version = pText;
 		}
 	};
 
 	/* default alternative program name for the configuration (no program implies menu mode) */
 	struct Program : public detail::Config {
-	public:
-		std::wstring program;
+		friend struct detail::ConfigApply;
+	private:
+		std::wstring pProgram;
 
 	public:
-		constexpr Program(std::wstring program) : program{ program } {}
+		constexpr Program(std::wstring program) : pProgram{ program } {}
+
+	private:
 		constexpr void apply(detail::Program& base) const {
-			base.program = program;
+			base.program = pProgram;
 		}
 	};
 
-	/* description to the corresponding object (all children only applies to optional descriptions) */
+	/* description to the corresponding object (all children configures if the text should be printed for all subsequent children
+	*	as well; only applies to optional descriptions, such as group descriptions of parents or the config description) */
 	struct Description : public detail::Config {
-	public:
-		std::wstring desc;
-		bool allChildren = false;
+		friend struct detail::ConfigApply;
+	private:
+		std::wstring pDescription;
+		bool pAllChildren = false;
 
 	public:
-		constexpr Description(std::wstring desc, bool allChildren = true) : desc{ desc }, allChildren{ allChildren } {}
+		constexpr Description(std::wstring desc, bool allChildren = true) : pDescription{ desc }, pAllChildren{ allChildren } {}
+
+	private:
 		constexpr void apply(detail::Description& base) const {
-			base.description.text = desc;
-			base.description.allChildren = allChildren;
+			base.description.text = pDescription;
+			base.description.allChildren = pAllChildren;
 		}
 	};
 
 	/* add information-string to the corresponding object (all children configures if the text should be printed for all subsequent children as well) */
 	struct Information : public detail::Config {
-	public:
+		friend struct detail::ConfigApply;
+	private:
 		detail::Information::Entry entry;
 
 	public:
@@ -312,7 +316,8 @@ namespace arger {
 
 	/* add a constraint to be executed if the corresponding object is selected via the arguments */
 	struct Constraint : public detail::Config {
-	public:
+		friend struct detail::ConfigApply;
+	private:
 		arger::Checker constraint;
 
 	public:
@@ -327,16 +332,19 @@ namespace arger {
 	*	- [Otherwise]: constrains the number of positional arguments with a default of [min = max = number-of-positionals];
 	*		if greater than number of positional arguments, last type is used as catch-all */
 	struct Require : public detail::Config {
-	public:
-		size_t minimum = 0;
-		std::optional<size_t> maximum;
+		friend struct detail::ConfigApply;
+	private:
+		size_t pMinimum = 0;
+		std::optional<size_t> pMaximum;
 
 	public:
-		constexpr Require(size_t min = 1) : minimum{ min } {}
-		constexpr Require(size_t min, size_t max) : minimum{ min }, maximum{ max } {}
+		constexpr Require(size_t min = 1) : pMinimum{ min } {}
+		constexpr Require(size_t min, size_t max) : pMinimum{ min }, pMaximum{ max } {}
+
+	private:
 		constexpr void apply(detail::Require& base) const {
-			base.require.minimum = minimum;
-			base.require.maximum = maximum;
+			base.require.minimum = pMinimum;
+			base.require.maximum = pMaximum;
 		}
 
 	public:
@@ -350,82 +358,125 @@ namespace arger {
 
 	/* add an abbreviation character for an option, group, or help/version entry to allow it to be accessible as single letters or, for example, -x */
 	struct Abbreviation : public detail::Config {
-	public:
-		wchar_t chr = 0;
+		friend struct detail::ConfigApply;
+	private:
+		wchar_t pChar = 0;
 
 	public:
-		constexpr Abbreviation(wchar_t c) : chr{ c } {}
+		constexpr Abbreviation(wchar_t c) : pChar{ c } {}
+
+	private:
 		constexpr void apply(detail::Abbreviation& base) const {
-			base.abbreviation = chr;
+			base.abbreviation = pChar;
 		}
 	};
 
 	/* set the endpoint id of the implicitly defined endpoint
 	*	Note: cannot be used in conjunction with explicitly defined endpoints */
 	struct EndpointId : public detail::Config {
-	public:
-		size_t id = 0;
+		friend struct detail::ConfigApply;
+	private:
+		size_t pId = 0;
 
 	public:
-		constexpr EndpointId(arger::IsId auto id) : id{ static_cast<size_t>(id) } {}
+		constexpr EndpointId(arger::IsId auto id) : pId{ static_cast<size_t>(id) } {}
+
+	private:
 		constexpr void apply(detail::EndpointId& base) const {
-			base.endpointId = id;
+			base.endpointId = pId;
 		}
 	};
 
-	/* add a payload to an option with a given name and of a given type, and optional default values (must meet the requirement-counts) */
+	/* add a payload to an option with a given name and of a given type, and optional default values (must
+	*	meet the requirement-counts), will be used to fill up parsed values, if less were provided */
 	struct Payload : public detail::Config {
-	public:
-		std::vector<arger::Value> defValue;
-		std::wstring name;
-		arger::Type type;
+		friend struct detail::ConfigApply;
+	private:
+		std::vector<arger::Value> pDefValue;
+		std::wstring pName;
+		arger::Type pType;
 
 	public:
-		Payload(std::wstring name, arger::Type type, std::vector<arger::Value> defValue = {}) : defValue{ defValue }, name{ name }, type{ type } {}
-		Payload(std::wstring name, arger::Type type, arger::Value defValue) : defValue{ defValue }, name{ name }, type{ type } {}
+		Payload(std::wstring name, arger::Type type, std::vector<arger::Value> defValue = {}) : pDefValue{ defValue }, pName{ name }, pType{ type } {}
+		Payload(std::wstring name, arger::Type type, arger::Value defValue) : pDefValue{ defValue }, pName{ name }, pType{ type } {}
+
+	private:
 		constexpr void apply(detail::Payload& base) const {
-			base.payload.defValue = defValue;
-			base.payload.name = name;
-			base.payload.type = type;
+			base.payload.defValue = pDefValue;
+			base.payload.name = pName;
+			base.payload.type = pType;
 		}
 	};
 
-	/* add usage-constraints to let the corresponding options only be used by groups, which add them as usage (by default every group/argument can use all options) */
+	/* add usage-constraints to let the corresponding options only be used by groups,
+	*	which add them as usage (by default every group/argument can use all options) */
 	struct Use : public detail::Config {
-	public:
-		std::set<size_t> options;
+		friend struct detail::ConfigApply;
+	private:
+		std::set<size_t> pOptions;
 
 	public:
-		Use(arger::IsId auto... options) : options{ static_cast<size_t>(options)... } {}
+		Use(arger::IsId auto... options) : pOptions{ static_cast<size_t>(options)... } {}
+
+	private:
 		void apply(detail::Use& base) const {
-			base.use.insert(options.begin(), options.end());
+			base.use.insert(pOptions.begin(), pOptions.end());
 		}
 	};
 
 	/* setup the descriptive name for the sub-groups to be used (the default name is 'mode') */
 	struct GroupName : detail::Config {
-	public:
-		std::wstring name;
+		friend struct detail::ConfigApply;
+	private:
+		std::wstring pName;
 
 	public:
-		constexpr GroupName(std::wstring name) : name{ name } {}
+		constexpr GroupName(std::wstring name) : pName{ name } {}
+
+	private:
 		constexpr void apply(detail::Groups& base) const {
-			base.groups.name = name;
+			base.groups.name = pName;
 		}
 	};
 
-	/* add an additional positional argument to the configuration/group using the given name, type, description, and optional default value (must meet the requirement-counts)
+	/* add an additional positional argument to the configuration/group using the given name, type, description, and optional default value
+	*	Note: Must meet the requirement-counts
 	*	Note: Groups/Configs can can only have sub-groups or positional arguments
-	*	Note: Default values will be used, when no argument is given, or the argument string is empty */
+	*	Note: Default values will be used, when no argument is given */
 	struct Positional : public detail::Config {
-	public:
-		detail::Positionals::Entry entry;
+		friend struct detail::ConfigApply;
+	private:
+		detail::Positionals::Entry pEntry;
 
 	public:
-		Positional(std::wstring name, arger::Type type, std::wstring description) : entry{ std::nullopt, name, type, description } {}
-		Positional(std::wstring name, arger::Type type, std::wstring description, arger::Value defValue) : entry{ defValue, name, type, description } {}
+		Positional(std::wstring name, arger::Type type, std::wstring description) : pEntry{ std::nullopt, name, type, description } {}
+		Positional(std::wstring name, arger::Type type, std::wstring description, arger::Value defValue) : pEntry{ defValue, name, type, description } {}
+
+	private:
 		constexpr void apply(detail::Positionals& base) const {
-			base.positionals.push_back(entry);
+			base.positionals.push_back(pEntry);
 		}
 	};
+
+	constexpr arger::Config::Config(const arger::IsConfig<arger::Config> auto&... configs) {
+		detail::ConfigApply::Apply(*this, configs...);
+	}
+
+	constexpr arger::Option::Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Option> auto&... configs) : name{ name }, id{ static_cast<size_t>(id) } {
+		detail::ConfigApply::Apply(*this, configs...);
+	}
+
+	constexpr arger::Endpoint::Endpoint(const arger::IsConfig<arger::Endpoint> auto&... configs) : id{ 0 } {
+		detail::ConfigApply::Apply(*this, configs...);
+	}
+	constexpr arger::Endpoint::Endpoint(arger::IsId auto id, const arger::IsConfig<arger::Endpoint> auto&... configs) : id{ static_cast<size_t>(id) } {
+		detail::ConfigApply::Apply(*this, configs...);
+	}
+
+	constexpr arger::Group::Group(std::wstring name, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ 0 } {
+		detail::ConfigApply::Apply(*this, configs...);
+	}
+	constexpr arger::Group::Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<arger::Group> auto&... configs) : name{ name }, id{ static_cast<size_t>(id) } {
+		detail::ConfigApply::Apply(*this, configs...);
+	}
 }
