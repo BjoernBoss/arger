@@ -6,10 +6,8 @@
 #include "arger-value.h"
 
 namespace arger {
-	struct Endpoint;
-
 	namespace detail {
-		struct Config {};
+		struct Configurator {};
 
 		struct VersionText {
 			std::wstring version;
@@ -148,11 +146,16 @@ namespace arger {
 				config.burnConfig(base);
 				detail::ConfigBurner::Apply<Base, Configs...>(base, configs...);
 			}
+
+			template <class Base, class Config>
+			static decltype(std::declval<Config>().burnConfig(std::declval<Base&>()), std::true_type{}) CanBurn(int) { return {}; }
+			template <class, class>
+			static std::false_type CanBurn(...) { return {}; }
 		};
 	}
 
 	template <class Type, class Base>
-	concept IsConfig = std::is_base_of_v<detail::Config, Type>&& requires(const Type t, Base b) { t.burnConfig(b); };
+	concept IsConfig = std::is_base_of_v<detail::Configurator, Type>&& decltype(detail::ConfigBurner::CanBurn<Base, Type>(0))::value;
 
 	/* general arger-configuration to be parsed */
 	struct Config :
@@ -165,17 +168,21 @@ namespace arger {
 		public detail::SpecialEntries {
 	public:
 		constexpr Config(const arger::IsConfig<arger::Config> auto&... configs);
+		constexpr arger::Config& add(const arger::IsConfig<arger::Config> auto&... configs);
 	};
 
 	/* general optional flag/payload
 	*	Note: if passed to a group, it is implicitly only bound to that group - but all names and abbreviations must be unique */
-	struct Option : public detail::Config {
+	struct Option : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	public:
 		detail::Option pOption;
 
 	public:
 		constexpr Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<detail::Option> auto&... configs);
+		constexpr arger::Option& add(const arger::IsConfig<detail::Option> auto&... configs);
+
+	private:
 		constexpr void burnConfig(detail::Options& base) const {
 			base.options.push_back(pOption);
 		}
@@ -183,7 +190,7 @@ namespace arger {
 
 	/* endpoint for positional arguments for a configuration/group (to enable a group to have multiple variations of positional counts)
 	*	 Note: If Groups/Configs define positional arguments directly, an implicit endpoint is defined and no further endpoints can be added */
-	struct Endpoint : public detail::Config {
+	struct Endpoint : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	public:
 		detail::Endpoint pEndpoint;
@@ -191,14 +198,17 @@ namespace arger {
 	public:
 		constexpr Endpoint(const arger::IsConfig<detail::Endpoint> auto&... configs);
 		constexpr Endpoint(arger::IsId auto id, const arger::IsConfig<detail::Endpoint> auto&... configs);
+		constexpr arger::Endpoint& add(const arger::IsConfig<detail::Endpoint> auto&... configs);
+
+	private:
 		constexpr void burnConfig(detail::Endpoints& base) const {
 			base.endpoints.push_back(pEndpoint);
 		}
 	};
 
 	/* general sub-group of options for a configuration/group
-	*	 Note: Groups/Configs can can only have sub-groups or positional arguments */
-	struct Group : public detail::Config {
+	*	 Note: Groups/Configs can only either have sub-groups or positional arguments */
+	struct Group : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	public:
 		detail::Group pGroup;
@@ -206,6 +216,9 @@ namespace arger {
 	public:
 		constexpr Group(std::wstring name, const arger::IsConfig<detail::Group> auto&... configs);
 		constexpr Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<detail::Group> auto&... configs);
+		constexpr arger::Group& add(const arger::IsConfig<detail::Group> auto&... configs);
+
+	private:
 		constexpr void burnConfig(detail::Groups& base) const {
 			base.groups.list.push_back(pGroup);
 		}
@@ -213,7 +226,7 @@ namespace arger {
 
 	/* configure the key to be used as option for argument mode and any group name for menu mode, which
 	*	triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
-	struct HelpEntry : public detail::Config {
+	struct HelpEntry : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		detail::SpecialEntry pSpecial;
@@ -222,6 +235,12 @@ namespace arger {
 		constexpr HelpEntry(std::wstring name, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name } {
 			detail::ConfigBurner::Apply(pSpecial, configs...);
 		}
+		constexpr arger::HelpEntry& add(const arger::IsConfig<detail::SpecialEntry> auto&... configs) {
+			detail::ConfigBurner::Apply(pSpecial, configs...);
+			return *this;
+		}
+
+	private:
 		constexpr void burnConfig(detail::SpecialEntries& base) const {
 			base.special.help = pSpecial;
 		}
@@ -229,7 +248,7 @@ namespace arger {
 
 	/* configure the key to be used as option for argument mode and any group name for menu mode, which
 	*	triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
-	struct VersionEntry : public detail::Config {
+	struct VersionEntry : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		detail::SpecialEntry pSpecial;
@@ -238,32 +257,42 @@ namespace arger {
 		constexpr VersionEntry(std::wstring name, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name } {
 			detail::ConfigBurner::Apply(pSpecial, configs...);
 		}
+		constexpr arger::VersionEntry& add(const arger::IsConfig<detail::SpecialEntry> auto&... configs) {
+			detail::ConfigBurner::Apply(pSpecial, configs...);
+			return *this;
+		}
+
+	private:
 		constexpr void burnConfig(detail::SpecialEntries& base) const {
 			base.special.version = pSpecial;
 		}
 	};
 
 	/* version text for the current configuration (preceeded by program name, if not in menu-mode) */
-	struct VersionText : public detail::Config {
+	struct VersionText : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		std::wstring pText;
 
 	public:
 		constexpr VersionText(std::wstring text) : pText{ text } {}
+
+	private:
 		constexpr void burnConfig(detail::VersionText& base) const {
 			base.version = pText;
 		}
 	};
 
 	/* default alternative program name for the configuration (no program implies menu mode) */
-	struct Program : public detail::Config {
+	struct Program : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		std::wstring pProgram;
 
 	public:
 		constexpr Program(std::wstring program) : pProgram{ program } {}
+
+	private:
 		constexpr void burnConfig(detail::Program& base) const {
 			base.program = pProgram;
 		}
@@ -271,7 +300,7 @@ namespace arger {
 
 	/* description to the corresponding object (all children configures if the text should be printed for all subsequent children
 	*	as well; only applies to optional descriptions, such as group descriptions of parents or the config description) */
-	struct Description : public detail::Config {
+	struct Description : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		std::wstring pDescription;
@@ -279,6 +308,8 @@ namespace arger {
 
 	public:
 		constexpr Description(std::wstring desc, bool allChildren = true) : pDescription{ desc }, pAllChildren{ allChildren } {}
+
+	private:
 		constexpr void burnConfig(detail::Description& base) const {
 			base.description.text = pDescription;
 			base.description.allChildren = pAllChildren;
@@ -286,26 +317,30 @@ namespace arger {
 	};
 
 	/* add information-string to the corresponding object (all children configures if the text should be printed for all subsequent children as well) */
-	struct Information : public detail::Config {
+	struct Information : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		detail::Information::Entry entry;
 
 	public:
 		constexpr Information(std::wstring name, std::wstring text, bool allChildren = true) : entry{ name, text, allChildren } {}
+
+	private:
 		constexpr void burnConfig(detail::Information& base) const {
 			base.information.push_back(entry);
 		}
 	};
 
 	/* add a constraint to be executed if the corresponding object is selected via the arguments */
-	struct Constraint : public detail::Config {
+	struct Constraint : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		arger::Checker constraint;
 
 	public:
 		Constraint(arger::Checker constraint) : constraint{ constraint } {}
+
+	private:
 		constexpr void burnConfig(detail::Constraint& base) const {
 			base.constraints.push_back(constraint);
 		}
@@ -315,7 +350,7 @@ namespace arger {
 	*	- [Option]: are only acknowledged for non-flags with a default of [min: 0, max: 1]
 	*	- [Otherwise]: constrains the number of positional arguments with a default of [min = max = number-of-positionals];
 	*		if greater than number of positional arguments, last type is used as catch-all */
-	struct Require : public detail::Config {
+	struct Require : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		size_t pMinimum = 0;
@@ -324,28 +359,30 @@ namespace arger {
 	public:
 		constexpr Require(size_t min = 1) : pMinimum{ min } {}
 		constexpr Require(size_t min, size_t max) : pMinimum{ min }, pMaximum{ max } {}
-		constexpr void burnConfig(detail::Require& base) const {
-			base.require.minimum = pMinimum;
-			base.require.maximum = pMaximum;
-		}
-
-	public:
 		static arger::Require AtLeast(size_t min) {
 			return{ min, 0 };
 		}
 		static arger::Require Any() {
 			return{ 0, 0 };
 		}
+
+	private:
+		constexpr void burnConfig(detail::Require& base) const {
+			base.require.minimum = pMinimum;
+			base.require.maximum = pMaximum;
+		}
 	};
 
 	/* add an abbreviation character for an option, group, or help/version entry to allow it to be accessible as single letters or, for example, -x */
-	struct Abbreviation : public detail::Config {
+	struct Abbreviation : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		wchar_t pChar = 0;
 
 	public:
 		constexpr Abbreviation(wchar_t c) : pChar{ c } {}
+
+	private:
 		constexpr void burnConfig(detail::Abbreviation& base) const {
 			base.abbreviation = pChar;
 		}
@@ -353,13 +390,15 @@ namespace arger {
 
 	/* set the endpoint id of the implicitly defined endpoint
 	*	Note: cannot be used in conjunction with explicitly defined endpoints */
-	struct EndpointId : public detail::Config {
+	struct EndpointId : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		size_t pId = 0;
 
 	public:
 		constexpr EndpointId(arger::IsId auto id) : pId{ static_cast<size_t>(id) } {}
+
+	private:
 		constexpr void burnConfig(detail::EndpointId& base) const {
 			base.endpointId = pId;
 		}
@@ -367,7 +406,7 @@ namespace arger {
 
 	/* add a payload to an option with a given name and of a given type, and optional default values (must
 	*	meet the requirement-counts), will be used to fill up parsed values, if less were provided */
-	struct Payload : public detail::Config {
+	struct Payload : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		std::vector<arger::Value> pDefValue;
@@ -377,6 +416,8 @@ namespace arger {
 	public:
 		Payload(std::wstring name, arger::Type type, std::vector<arger::Value> defValue = {}) : pDefValue{ defValue }, pName{ name }, pType{ type } {}
 		Payload(std::wstring name, arger::Type type, arger::Value defValue) : pDefValue{ defValue }, pName{ name }, pType{ type } {}
+
+	private:
 		constexpr void burnConfig(detail::Payload& base) const {
 			base.payload.defValue = pDefValue;
 			base.payload.name = pName;
@@ -386,26 +427,30 @@ namespace arger {
 
 	/* add usage-constraints to let the corresponding options only be used by groups,
 	*	which add them as usage (by default every group/argument can use all options) */
-	struct Use : public detail::Config {
+	struct Use : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		std::set<size_t> pOptions;
 
 	public:
 		Use(arger::IsId auto... options) : pOptions{ static_cast<size_t>(options)... } {}
+
+	private:
 		void burnConfig(detail::Use& base) const {
 			base.use.insert(pOptions.begin(), pOptions.end());
 		}
 	};
 
 	/* setup the descriptive name for the sub-groups to be used (the default name is 'mode') */
-	struct GroupName : detail::Config {
+	struct GroupName : detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		std::wstring pName;
 
 	public:
 		constexpr GroupName(std::wstring name) : pName{ name } {}
+
+	private:
 		constexpr void burnConfig(detail::Groups& base) const {
 			base.groups.name = pName;
 		}
@@ -415,7 +460,7 @@ namespace arger {
 	*	Note: Must meet the requirement-counts
 	*	Note: Groups/Configs can can only have sub-groups or positional arguments
 	*	Note: Default values will be used, when no argument is given */
-	struct Positional : public detail::Config {
+	struct Positional : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		detail::Positionals::Entry pEntry;
@@ -423,6 +468,8 @@ namespace arger {
 	public:
 		Positional(std::wstring name, arger::Type type, std::wstring description) : pEntry{ std::nullopt, name, type, description } {}
 		Positional(std::wstring name, arger::Type type, std::wstring description, arger::Value defValue) : pEntry{ defValue, name, type, description } {}
+
+	private:
 		constexpr void burnConfig(detail::Positionals& base) const {
 			base.positionals.push_back(pEntry);
 		}
@@ -431,9 +478,17 @@ namespace arger {
 	constexpr arger::Config::Config(const arger::IsConfig<arger::Config> auto&... configs) {
 		detail::ConfigBurner::Apply(*this, configs...);
 	}
+	constexpr arger::Config& arger::Config::add(const arger::IsConfig<arger::Config> auto&... configs) {
+		detail::ConfigBurner::Apply(*this, configs...);
+		return *this;
+	}
 
 	constexpr arger::Option::Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<detail::Option> auto&... configs) : pOption{ name, static_cast<size_t>(id) } {
 		detail::ConfigBurner::Apply(pOption, configs...);
+	}
+	constexpr arger::Option& arger::Option::add(const arger::IsConfig<detail::Option> auto&... configs) {
+		detail::ConfigBurner::Apply(pOption, configs...);
+		return *this;
 	}
 
 	constexpr arger::Endpoint::Endpoint(const arger::IsConfig<detail::Endpoint> auto&... configs) : pEndpoint{ 0 } {
@@ -442,11 +497,19 @@ namespace arger {
 	constexpr arger::Endpoint::Endpoint(arger::IsId auto id, const arger::IsConfig<detail::Endpoint> auto&... configs) : pEndpoint{ static_cast<size_t>(id) } {
 		detail::ConfigBurner::Apply(pEndpoint, configs...);
 	}
+	constexpr arger::Endpoint& arger::Endpoint::add(const arger::IsConfig<detail::Endpoint> auto&... configs) {
+		detail::ConfigBurner::Apply(pEndpoint, configs...);
+		return *this;
+	}
 
 	constexpr arger::Group::Group(std::wstring name, const arger::IsConfig<detail::Group> auto&... configs) : pGroup{ name, 0 } {
 		detail::ConfigBurner::Apply(pGroup, configs...);
 	}
 	constexpr arger::Group::Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<detail::Group> auto&... configs) : pGroup{ name, static_cast<size_t>(id) } {
 		detail::ConfigBurner::Apply(pGroup, configs...);
+	}
+	constexpr arger::Group& arger::Group::add(const arger::IsConfig<detail::Group> auto&... configs) {
+		detail::ConfigBurner::Apply(pGroup, configs...);
+		return *this;
 	}
 }
