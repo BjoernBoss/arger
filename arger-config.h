@@ -18,17 +18,14 @@ namespace arger {
 			std::wstring program;
 		};
 		struct Description {
-			struct {
-				std::wstring text;
-				bool allChildren = false;
-			} description;
+			std::wstring description;
 		};
 		struct Information {
 		public:
 			struct Entry {
 				std::wstring name;
 				std::wstring text;
-				bool allChildren = false;
+				bool always = false;
 			};
 
 		public:
@@ -111,8 +108,9 @@ namespace arger {
 			public detail::Abbreviation {
 			std::wstring name;
 			bool allChildren = false;
+			bool reducible = false;
 			constexpr SpecialEntry() {}
-			constexpr SpecialEntry(std::wstring name, bool allChildren) : name{ name }, allChildren{ allChildren } {}
+			constexpr SpecialEntry(std::wstring name, bool allChildren, bool reducible) : name{ name }, allChildren{ allChildren }, reducible{ reducible } {}
 		};
 		struct SpecialEntries {
 			struct {
@@ -237,14 +235,16 @@ namespace arger {
 	};
 
 	/* configure the key to be used as option for argument mode and any group name for menu mode, which
-	*	triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
+	*	triggers the help-menu to be printed (prior to verifying the remainder of the argument structure)
+	*	Note: if reducible is enabled, the usage of the abbreviation will not print any additional information
+	*	Note: if all-children is enabled, the help entry will be printed as option in all sub-groups as well */
 	struct HelpEntry : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		detail::SpecialEntry pSpecial;
 
 	public:
-		constexpr HelpEntry(std::wstring name, bool allChildren, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name, allChildren } {
+		constexpr HelpEntry(std::wstring name, bool allChildren, bool reducible, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name, allChildren, reducible } {
 			detail::ConfigBurner::Apply(pSpecial, configs...);
 		}
 		constexpr arger::HelpEntry& add(const arger::IsConfig<detail::SpecialEntry> auto&... configs) {
@@ -259,14 +259,15 @@ namespace arger {
 	};
 
 	/* configure the key to be used as option for argument mode and any group name for menu mode, which
-	*	triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
+	*	triggers the version-menu to be printed (prior to verifying the remainder of the argument structure)
+	*	Note: if all-children is enabled, the help entry will be printed as option in all sub-groups as well */
 	struct VersionEntry : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		detail::SpecialEntry pSpecial;
 
 	public:
-		constexpr VersionEntry(std::wstring name, bool allChildren, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name, allChildren } {
+		constexpr VersionEntry(std::wstring name, bool allChildren, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name, allChildren, false } {
 			detail::ConfigBurner::Apply(pSpecial, configs...);
 		}
 		constexpr arger::VersionEntry& add(const arger::IsConfig<detail::SpecialEntry> auto&... configs) {
@@ -310,33 +311,30 @@ namespace arger {
 		}
 	};
 
-	/* description to the corresponding object (all children configures if the text should be printed for all subsequent children
-	*	as well; only applies to optional descriptions, such as group descriptions of parents or the config description) */
+	/* description to the corresponding object */
 	struct Description : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		std::wstring pDescription;
-		bool pAllChildren = false;
 
 	public:
-		constexpr Description(std::wstring desc, bool allChildren = true) : pDescription{ desc }, pAllChildren{ allChildren } {}
+		constexpr Description(std::wstring desc) : pDescription{ desc } {}
 
 	private:
 		constexpr void burnConfig(detail::Description& base) const {
-			base.description.text = pDescription;
-			base.description.allChildren = pAllChildren;
+			base.description = pDescription;
 		}
 	};
 
-	/* add information-string to the corresponding object (all children configures
-	*	if the text should be printed for all subsequent children as well) */
+	/* add information-string to the corresponding config/group
+	*	Note: if always is set, will print the information, even if only the reducible help is printed */
 	struct Information : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		detail::Information::Entry entry;
 
 	public:
-		constexpr Information(std::wstring name, bool allChildren, std::wstring text) : entry{ name, text, allChildren } {}
+		constexpr Information(std::wstring name, bool always, std::wstring text) : entry{ name, text, always } {}
 
 	private:
 		constexpr void burnConfig(detail::Information& base) const {

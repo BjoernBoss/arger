@@ -136,7 +136,7 @@ namespace arger::detail {
 		detail::ValidEndpoint& next = entry.endpoints.emplace_back();
 		next.positionals = &positionals;
 		next.constraints = (args == 0 ? &endpoint->constraints : 0);
-		next.description = (args == 0 ? &endpoint->description.text : 0);
+		next.description = (args == 0 ? &endpoint->description : 0);
 		next.id = (args == 0 ? endpoint->id : args->endpointId);
 
 		/* validate and configure the minimum */
@@ -208,8 +208,10 @@ namespace arger::detail {
 		if (entry.payload)
 			detail::ValidateType(option.payload.type);
 
-		/* configure the minimum */
+		/* validate and configure the minimum */
 		entry.minimum = option.require.minimum.value_or(0);
+		if (!entry.payload && (option.require.minimum.has_value() || option.require.maximum.has_value()))
+			throw arger::ConfigException{ L"Flags cannot have requirements defined" };
 
 		/* validate and configure the maximum */
 		if (!option.require.maximum.has_value())
@@ -341,6 +343,8 @@ namespace arger::detail {
 				throw arger::ConfigException{ L"Help entry name must at least be two characters long." };
 			if (state.burned->special.version.name == state.burned->special.help.name)
 				throw arger::ConfigException{ L"Help entry and version entry cannot have the same name." };
+			if (state.burned->special.help.reducible && state.burned->special.help.abbreviation == 0)
+				throw arger::ConfigException{ L"Reducible help entry requires a defined abbreviarion." };
 			if (!state.burned->special.version.name.empty()) {
 				if (state.burned->special.help.abbreviation != 0 && state.burned->special.help.abbreviation == state.burned->special.version.abbreviation)
 					throw arger::ConfigException{ L"Help entry and version entry cannot have the same abbreviation." };

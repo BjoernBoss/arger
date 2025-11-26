@@ -37,11 +37,14 @@ arger::Endpoint(arger::IsId auto id, const arger::IsConfig<detail::Endpoint> aut
 arger::Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<detail::Option> auto&... configs);
 
 /* configure the key to be used as option for argument mode and any group name for menu mode, which
-*	triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
-arger::HelpEntry(std::wstring name, bool allChildren, const arger::IsConfig<detail::Option> auto&... configs);
+*	triggers the help-menu to be printed (prior to verifying the remainder of the argument structure)
+*	Note: if reducible is enabled, the usage of the abbreviation will not print any additional information
+*	Note: if all-children is enabled, the help entry will be printed as option in all sub-groups as well */
+arger::HelpEntry(std::wstring name, bool allChildren, bool reducible, const arger::IsConfig<detail::Option> auto&... configs);
 
 /* configure the key to be used as option for argument mode and any group name for menu mode, which
-*	triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
+*	triggers the version-menu to be printed (prior to verifying the remainder of the argument structure)
+*	Note: if all-children is enabled, the help entry will be printed as option in all sub-groups as well */
 arger::VersionEntry(std::wstring name, bool allChildren, const arger::IsConfig<detail::Option> auto&... configs);
 
 /* version text for the current configuration (preceeded by program name, if not in menu-mode) */
@@ -50,13 +53,12 @@ arger::VersionText(std::wstring text);
 /* default alternative program name for the configuration (no program implies menu mode) */
 arger::Program(std::wstring program);
 
-/* description to the corresponding object (all children configures if the text should be printed for all subsequent children
-*	as well; only applies to optional descriptions, such as group descriptions of parents or the config description) */
-arger::Description(std::wstring desc, bool allChildren = true);
+/* description to the corresponding object */
+arger::Description(std::wstring desc);
 
-/* add information-string to the corresponding object (all children configures
-*	if the text should be printed for all subsequent children as well) */
-arger::Information(std::wstring name, bool allChildren, std::wstring text);
+/* add information-string to the corresponding config/group
+*	Note: if always is set, will print the information, even if only the reducible help is printed */
+arger::Information(std::wstring name, std::wstring text);
 
 /* add a constraint to be executed if the corresponding object is selected via the arguments */
 arger::Constraint(arger::Checker constraint);

@@ -9,6 +9,12 @@
 
 namespace arger {
 	namespace detail {
+		enum class PrintOption : uint8_t {
+			none,
+			reduced,
+			full
+		};
+
 		class Parser {
 		private:
 			const std::vector<std::wstring>& pArgs;
@@ -17,7 +23,7 @@ namespace arger {
 			arger::Parsed pParsed;
 			std::wstring pDeferred;
 			size_t pIndex = 0;
-			bool pPrintHelp = false;
+			detail::PrintOption pPrintHelp = detail::PrintOption::none;
 			bool pPrintVersion = false;
 			bool pPositionalLocked = false;
 
@@ -32,7 +38,7 @@ namespace arger {
 				size_t i = 0;
 				if (fullName && !pConfig.burned->program.empty()) {
 					if (pConfig.help != 0 && pConfig.help->name == arg) {
-						pPrintHelp = true;
+						pPrintHelp = detail::PrintOption::full;
 						i = arg.size();
 					}
 					else if (pConfig.version != 0 && pConfig.version->name == arg) {
@@ -61,7 +67,8 @@ namespace arger {
 
 					/* check if its one of the special entries (only relevant for programs) */
 					else if (!pConfig.burned->program.empty() && pConfig.help != 0 && pConfig.help->abbreviation == arg[i]) {
-						pPrintHelp = true;
+						if (pPrintHelp != detail::PrintOption::full)
+							pPrintHelp = detail::PrintOption::reduced;
 						continue;
 					}
 					else if (!pConfig.burned->program.empty() && pConfig.version != 0 && pConfig.version->abbreviation == arg[i]) {
@@ -301,7 +308,7 @@ namespace arger {
 					/* check if its the version or help group (only relevant for menus and only if no positional arguments have yet been pushed) */
 					if (pConfig.burned->program.empty() && pParsed.pPositional.empty()) {
 						if (pConfig.help != 0 && (next.size() != 1 ? (next == pConfig.help->name) : (pConfig.help->abbreviation == next[0] && next[0] != 0))) {
-							pPrintHelp = true;
+							pPrintHelp = ((next.size() > 1 || pPrintHelp == detail::PrintOption::full) ? detail::PrintOption::full : detail::PrintOption::reduced);
 							continue;
 						}
 						if (pConfig.version != 0 && (next.size() != 1 ? (next == pConfig.version->name) : (pConfig.version->abbreviation == next[0] && next[0] != 0))) {
@@ -368,8 +375,10 @@ namespace arger {
 
 				/* check if the help or version should be printed */
 				std::wstring print = (pPrintVersion ? base.buildVersionString() : L"");
-				if (pPrintHelp)
-					print.append(print.empty() ? L"" : L"\n\n").append(detail::HelpBuilder{ base, pConfig, pTopMost, lineLength }.buildHelpString());
+				if (pPrintHelp != detail::PrintOption::none) {
+					bool reduced = (pPrintHelp == detail::PrintOption::reduced && pConfig.help->reducible);
+					print.append(print.empty() ? L"" : L"\n\n").append(detail::HelpBuilder{ base, pConfig, pTopMost, lineLength, reduced }.buildHelpString());
+				}
 				if (!print.empty())
 					throw arger::PrintMessage{ print };
 
