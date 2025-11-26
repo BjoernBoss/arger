@@ -149,7 +149,7 @@ namespace arger::detail {
 			next.maximum = std::max<size_t>(next.minimumActual, positionals.size());
 		else if (*maximum < next.minimumActual)
 			next.maximum = 0;
-		else if (*maximum < positionals.size())
+		else if (*maximum < positionals.size() && *maximum > 0)
 			throw arger::ConfigException{ L"Maximum must be at least the number of positionals" };
 		else
 			next.maximum = *maximum;
@@ -160,7 +160,6 @@ namespace arger::detail {
 			--next.minimumEffective;
 
 		/* validate the positionals */
-		bool defaulted = false;
 		for (size_t i = 0; i < positionals.size(); ++i) {
 			/* validate the name and type */
 			if (positionals[i].name.empty())
@@ -168,12 +167,11 @@ namespace arger::detail {
 			detail::ValidateType(positionals[i].type);
 
 			/* validate the default-value */
-			if (positionals[i].defValue.has_value()) {
-				detail::ValidateDefValue(positionals[i].type, positionals[i].defValue.value());
-				defaulted = true;
-			}
-			else if (defaulted)
-				throw arger::ConfigException{ L"All positionals must be default initialized once one is defaulted" };
+			if (!positionals[i].defValue.has_value())
+				continue;
+			detail::ValidateDefValue(positionals[i].type, positionals[i].defValue.value());
+			if (i < next.minimumEffective)
+				throw arger::ConfigException{ L"All positionals up to the minimum must be defaulted once one is defaulted" };
 		}
 	}
 	inline void ValidateOption(detail::ValidConfig& state, const detail::Option& option, const detail::ValidArguments* owner) {

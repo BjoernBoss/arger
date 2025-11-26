@@ -110,8 +110,9 @@ namespace arger {
 			public detail::Description,
 			public detail::Abbreviation {
 			std::wstring name;
+			bool allChildren = false;
 			constexpr SpecialEntry() {}
-			constexpr SpecialEntry(std::wstring name) : name{ name } {}
+			constexpr SpecialEntry(std::wstring name, bool allChildren) : name{ name }, allChildren{ allChildren } {}
 		};
 		struct SpecialEntries {
 			struct {
@@ -243,7 +244,7 @@ namespace arger {
 		detail::SpecialEntry pSpecial;
 
 	public:
-		constexpr HelpEntry(std::wstring name, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name } {
+		constexpr HelpEntry(std::wstring name, bool allChildren, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name, allChildren } {
 			detail::ConfigBurner::Apply(pSpecial, configs...);
 		}
 		constexpr arger::HelpEntry& add(const arger::IsConfig<detail::SpecialEntry> auto&... configs) {
@@ -265,7 +266,7 @@ namespace arger {
 		detail::SpecialEntry pSpecial;
 
 	public:
-		constexpr VersionEntry(std::wstring name, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name } {
+		constexpr VersionEntry(std::wstring name, bool allChildren, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name, allChildren } {
 			detail::ConfigBurner::Apply(pSpecial, configs...);
 		}
 		constexpr arger::VersionEntry& add(const arger::IsConfig<detail::SpecialEntry> auto&... configs) {
@@ -335,7 +336,7 @@ namespace arger {
 		detail::Information::Entry entry;
 
 	public:
-		constexpr Information(std::wstring name, std::wstring text, bool allChildren = true) : entry{ name, text, allChildren } {}
+		constexpr Information(std::wstring name, bool allChildren, std::wstring text) : entry{ name, text, allChildren } {}
 
 	private:
 		constexpr void burnConfig(detail::Information& base) const {

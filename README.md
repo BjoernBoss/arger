@@ -38,11 +38,11 @@ arger::Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<deta
 
 /* configure the key to be used as option for argument mode and any group name for menu mode, which
 *	triggers the help-menu to be printed (prior to verifying the remainder of the argument structure) */
-arger::HelpEntry(std::wstring name, const arger::IsConfig<detail::Option> auto&... configs);
+arger::HelpEntry(std::wstring name, bool allChildren, const arger::IsConfig<detail::Option> auto&... configs);
 
 /* configure the key to be used as option for argument mode and any group name for menu mode, which
 *	triggers the version-menu to be printed (prior to verifying the remainder of the argument structure) */
-arger::VersionEntry(std::wstring name, const arger::IsConfig<detail::Option> auto&... configs);
+arger::VersionEntry(std::wstring name, bool allChildren, const arger::IsConfig<detail::Option> auto&... configs);
 
 /* version text for the current configuration (preceeded by program name, if not in menu-mode) */
 arger::VersionText(std::wstring text);
@@ -56,7 +56,7 @@ arger::Description(std::wstring desc, bool allChildren = true);
 
 /* add information-string to the corresponding object (all children configures
 *	if the text should be printed for all subsequent children as well) */
-arger::Information(std::wstring name, std::wstring text, bool allChildren = true);
+arger::Information(std::wstring name, bool allChildren, std::wstring text);
 
 /* add a constraint to be executed if the corresponding object is selected via the arguments */
 arger::Constraint(arger::Checker constraint);

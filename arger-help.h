@@ -169,7 +169,7 @@ namespace arger {
 		private:
 			constexpr std::wstring fLimitDescription(size_t minimum, size_t maximum) {
 				/* check if no limit needs to be added */
-				if (minimum == 0 && maximum == 0)
+				if (minimum == maximum && (minimum == 0 || minimum == 1))
 					return L"";
 
 				/* check if an upper and lower bound has been defined */
@@ -350,11 +350,11 @@ namespace arger {
 				*	shown on the right side, also add the help/version options for programs, and select
 				*	the used-by lists, which will automatically be lexicographically sorted in itself) */
 				if (!pConfig.burned->program.empty() && !required) {
-					if (pConfig.help != nullptr) {
+					if (pConfig.help != nullptr && (pTopMost->super == nullptr || pConfig.help->allChildren)) {
 						selected.insert({ pConfig.help->name, NameCache{ L"",  &pConfig.help->description.text, nullptr, pConfig.help->abbreviation} });
 						usedList.insert(L"");
 					}
-					if (pConfig.version != nullptr) {
+					if (pConfig.version != nullptr && (pTopMost->super == nullptr || pConfig.version->allChildren)) {
 						selected.insert({ pConfig.version->name, NameCache{ L"", &pConfig.version->description.text, nullptr, pConfig.version->abbreviation } });
 						usedList.insert(L"");
 					}
@@ -416,9 +416,7 @@ namespace arger {
 						/* add the description text and custom usage-limits and default values */
 						temp = *cache.description;
 						if (option != nullptr) {
-							std::wstring limit, defDesc;
-							if (option->minimum != 1 || option->maximum != 1)
-								limit = fLimitDescription(option->minimum, option->maximum > 1 ? option->maximum : 0);
+							std::wstring limit = fLimitDescription(option->minimum, option->maximum > 1 ? option->maximum : 0), defDesc;
 							if (!option->option->payload.defValue.empty())
 								defDesc = fDefaultDescription(&option->option->payload.defValue.front(), &option->option->payload.defValue.back() + 1);
 							if (!limit.empty() || !defDesc.empty())
@@ -429,6 +427,84 @@ namespace arger {
 						fAddString(temp, arger::NumCharsHelpLeft, arger::AutoIndentLongText);
 						if (option != nullptr)
 							fAddEnumDescription(option->option->payload.type);
+					}
+				}
+			}
+			void fBuildGroups() {
+				/* collect the list of all names to be used (ignore all-children for descriptions as
+				*	they are shown on the right side, add the help and version entries for menus) */
+				std::map<std::wstring, NameCache> selected;
+				if (pConfig.burned->program.empty()) {
+					if (pConfig.help != nullptr && (pTopMost->super == nullptr || pConfig.help->allChildren))
+						selected.insert({ pConfig.help->name, NameCache{ L"", &pConfig.help->description.text, nullptr, pConfig.help->abbreviation} });
+					if (pConfig.version != nullptr && (pTopMost->super == nullptr || pConfig.version->allChildren))
+						selected.insert({ pConfig.version->name, NameCache{ L"", &pConfig.version->description.text, nullptr, pConfig.version->abbreviation } });
+				}
+				if (pTopMost->endpoints.empty()) for (const auto& [name, group] : pTopMost->sub)
+					selected.insert({ name, NameCache{ L"", &group.group->description.text, nullptr, group.group->abbreviation } });
+
+				/* check if anything actually needs to be printed */
+				if (selected.empty())
+					return;
+
+				/* print the header */
+				fAddNewLine(true);
+				if (pTopMost->endpoints.empty())
+					fAddString(str::wd::Build(L"Defined for [", pTopMost->groupName, L"]:"));
+				else
+					fAddString(str::wd::Build(L"Optional Keywords:"));
+
+				/* print all of the selected entries */
+				for (const auto& [name, cache] : selected) {
+					fAddNewLine(false);
+					fAddString(str::wd::Build(L"  ", name));
+					if (cache.abbreviation != 0)
+						fAddString(str::wd::Build(L", ", cache.abbreviation));
+					if (!cache.description->empty())
+						fAddString(*cache.description, arger::NumCharsHelpLeft, arger::AutoIndentLongText);
+				}
+			}
+			void fBuildEndpoints() {
+				if (pTopMost->endpoints.empty())
+					return;
+
+				/* add the separate endpoints */
+				for (size_t i = 0; i < pTopMost->endpoints.size(); ++i) {
+					fAddNewLine(true);
+					if (pTopMost->endpoints.size() == 1)
+						fAddString(L"Positional Arguments:");
+					else {
+						fAddString(str::wd::Build(L"Variation ", i + 1, L':'));
+						fAddEndpointDescription(pTopMost->endpoints[i]);
+					}
+					const detail::ValidEndpoint& endpoint = pTopMost->endpoints[i];
+
+					/* add the positional arguments descriptions (will automatically be sorted by position) */
+					for (size_t j = 0; j < endpoint.positionals->size(); ++j) {
+						const detail::Positionals::Entry& positional = (*endpoint.positionals)[j];
+						fAddNewLine(false);
+
+						/* add the name and corresponding type and description (add visual separation in the end) */
+						fAddString(str::wd::Build("  ", positional.name, fTypeString(positional.type), L"    "));
+						std::wstring temp = positional.description, limit, defDesc;
+
+						/* add the limit and default values and write the value out */
+						if (j + 1 >= endpoint.positionals->size())
+							limit = fLimitDescription((endpoint.minimumEffective > j ? endpoint.minimumEffective - j : 0), (endpoint.maximum > j ? endpoint.maximum - j : 0));
+						if (positional.defValue.has_value())
+							defDesc = fDefaultDescription(&positional.defValue.value(), &positional.defValue.value() + 1);
+						if (!limit.empty() || !defDesc.empty())
+							temp.append(L" [").append(limit).append((limit.empty() || defDesc.empty()) ? L"" : L"; ").append(defDesc).append(1, L']');
+						fAddString(temp, arger::NumCharsHelpLeft, arger::AutoIndentLongText);
+
+						/* add the enum value description */
+						fAddEnumDescription(positional.type);
+					}
+
+					/* add the description of the endpoint */
+					if (endpoint.description != nullptr) {
+						fAddNewLine(true);
+						fAddString(*endpoint.description, arger::IndentInformation);
 					}
 				}
 			}
@@ -444,82 +520,10 @@ namespace arger {
 					fAddString(pConfig.burned->description.text, arger::IndentInformation);
 				}
 
-				/* add the group description */
+				/* add the group description, the description of all sub-groups, and the description of the endpoints */
 				fRecGroupDescription(pTopMost, true);
-
-				/* add the description of all sub-groups (for menus, help/version are considered groups as well) */
-				if (pTopMost->endpoints.empty() || (pConfig.burned->program.empty() && (pConfig.help != nullptr || pConfig.version != nullptr))) {
-					fAddNewLine(true);
-					if (pTopMost->endpoints.empty())
-						fAddString(str::wd::Build(L"Defined for [", pTopMost->groupName, L"]:"));
-					else
-						fAddString(str::wd::Build(L"Optional Keywords:"));
-
-					/* collect the list of all names to be used (ignore all-children for descriptions as
-					*	they are shown on the right side, add the help and version entries for menus) */
-					std::map<std::wstring, NameCache> selected;
-					if (pConfig.burned->program.empty()) {
-						if (pConfig.help != nullptr)
-							selected.insert({ pConfig.help->name, NameCache{ L"", &pConfig.help->description.text, nullptr, pConfig.help->abbreviation} });
-						if (pConfig.version != nullptr)
-							selected.insert({ pConfig.version->name, NameCache{ L"", &pConfig.version->description.text, nullptr, pConfig.version->abbreviation } });
-					}
-					for (const auto& [name, group] : pTopMost->sub)
-						selected.insert({ name, NameCache{ L"", &group.group->description.text, nullptr, group.group->abbreviation } });
-
-					/* print all of the selected entries */
-					for (const auto& [name, cache] : selected) {
-						fAddNewLine(false);
-						fAddString(str::wd::Build(L"  ", name));
-						if (cache.abbreviation != 0)
-							fAddString(str::wd::Build(L", ", cache.abbreviation));
-						if (!cache.description->empty())
-							fAddString(*cache.description, arger::NumCharsHelpLeft, arger::AutoIndentLongText);
-					}
-				}
-
-				/* add the endpoints */
-				if (!pTopMost->endpoints.empty()) {
-					/* add the separate endpoints */
-					for (size_t i = 0; i < pTopMost->endpoints.size(); ++i) {
-						fAddNewLine(true);
-						if (pTopMost->endpoints.size() == 1)
-							fAddString(L"Positional Arguments:");
-						else {
-							fAddString(str::wd::Build(L"Variation ", i + 1, L':'));
-							fAddEndpointDescription(pTopMost->endpoints[i]);
-						}
-						const detail::ValidEndpoint& endpoint = pTopMost->endpoints[i];
-
-						/* add the positional arguments descriptions (will automatically be sorted by position) */
-						for (size_t j = 0; j < endpoint.positionals->size(); ++j) {
-							const detail::Positionals::Entry& positional = (*endpoint.positionals)[j];
-							fAddNewLine(false);
-
-							/* add the name and corresponding type and description (add visual separation in the end) */
-							fAddString(str::wd::Build("  ", positional.name, fTypeString(positional.type), L"    "));
-							std::wstring temp = positional.description, limit, defDesc;
-
-							/* add the limit and default values and write the value out */
-							if (j + 1 >= endpoint.positionals->size())
-								limit = fLimitDescription((endpoint.minimumEffective > i ? endpoint.minimumEffective - j : 0), (endpoint.maximum > j ? endpoint.maximum - j : 0));
-							if (positional.defValue.has_value())
-								defDesc = fDefaultDescription(&positional.defValue.value(), &positional.defValue.value() + 1);
-							if (!limit.empty() || !defDesc.empty())
-								temp.append(L" [").append(limit).append((limit.empty() || defDesc.empty()) ? L"" : L"; ").append(defDesc).append(1, L']');
-							fAddString(temp, arger::NumCharsHelpLeft, arger::AutoIndentLongText);
-
-							/* add the enum value description */
-							fAddEnumDescription(positional.type);
-						}
-
-						/* add the description of the endpoint */
-						if (endpoint.description != nullptr) {
-							fAddNewLine(true);
-							fAddString(*endpoint.description, arger::IndentInformation);
-						}
-					}
-				}
+				fBuildGroups();
+				fBuildEndpoints();
 
 				/* check if there are optional/required options */
 				bool optArgs = false, reqArgs = false;
@@ -546,7 +550,7 @@ namespace arger {
 	}
 
 	/* construct help-hint suggesting to use the help entry (for example 'try --help', or 'use help') */
-	inline constexpr std::wstring HelpHint(const std::vector<std::wstring>& args, const arger::Config& config) {
+	inline std::wstring HelpHint(const std::vector<std::wstring>& args, const arger::Config& config) {
 		return detail::BaseBuilder{ (args.empty() ? L"" : args[0]), config }.buildHelpHintString();
 	}
 }
