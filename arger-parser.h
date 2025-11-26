@@ -102,7 +102,7 @@ namespace arger {
 					auto it = pParsed.pOptions.find(entry->option->id);
 					if (it == pParsed.pOptions.end())
 						it = pParsed.pOptions.insert({ entry->option->id, {} }).first;
-					it->second.emplace_back(arger::Value{ hasPayload ? payload : pArgs[pIndex++] });
+					it->second.first.emplace_back(arger::Value{ hasPayload ? payload : pArgs[pIndex++] });
 				}
 
 				/* check if a payload was supplied but not consumed */
@@ -215,6 +215,9 @@ namespace arger {
 					throw arger::ParsingException{ L"Argument [", (*endpoint->positionals)[index].name, L"] is missing for ", pTopMost->super->groupName, L" [", pTopMost->group->name, L"]." };
 				}
 
+				/* update the actual supplied-counter of the positionals (before adding the default-values) */
+				pParsed.pSuppliedPositionals = pParsed.pPositional.size();
+
 				/* fill the positional arguments up on default values (cannot violate maximum,
 				*	as maximum will always at least fit the number of defined positionals) */
 				size_t minimum = std::max<size_t>(endpoint->positionals->size(), endpoint->minimumActual);
@@ -240,16 +243,16 @@ namespace arger {
 
 					/* lookup the option */
 					auto it = pParsed.pOptions.find(option.option->id);
-					size_t count = (it == pParsed.pOptions.end() ? 0 : it->second.size());
+					size_t count = (it == pParsed.pOptions.end() ? 0 : it->second.first.size());
 
 					/* check if default values should be assigned (limits are already ensured to be valid) */
 					if (count < option.option->payload.defValue.size()) {
 						if (count == 0)
-							it = pParsed.pOptions.insert({ option.option->id, option.option->payload.defValue }).first;
+							it = pParsed.pOptions.insert({ option.option->id, { option.option->payload.defValue, 0 } }).first;
 						else
-							it->second.insert(it->second.end(), option.option->payload.defValue.begin() + count, option.option->payload.defValue.end());
-						for (size_t i = count; i < it->second.size(); ++i)
-							fUnpackDefValue(it->second[i], option.option->payload.type);
+							it->second.first.insert(it->second.first.end(), option.option->payload.defValue.begin() + count, option.option->payload.defValue.end());
+						for (size_t i = count; i < it->second.first.size(); ++i)
+							fUnpackDefValue(it->second.first[i], option.option->payload.type);
 					}
 
 					/* validate the limits of the supplied optional arguments */
@@ -260,7 +263,11 @@ namespace arger {
 
 					/* verify and unpack the values themselves */
 					for (size_t i = 0; i < count; ++i)
-						fVerifyValue(name, it->second[i], option.option->payload.type);
+						fVerifyValue(name, it->second.first[i], option.option->payload.type);
+
+					/* update the supplied count */
+					if (it != pParsed.pOptions.end())
+						it->second.second = count;
 				}
 			}
 			void fCheckConstraints(const std::vector<arger::Checker>& constraints) {

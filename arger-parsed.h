@@ -11,9 +11,10 @@ namespace arger {
 		friend class detail::Parser;
 	private:
 		std::set<size_t> pFlags;
-		std::map<size_t, std::vector<arger::Value>> pOptions;
+		std::map<size_t, std::pair<std::vector<arger::Value>, size_t>> pOptions;
 		std::vector<arger::Value> pPositional;
 		std::vector<size_t> pGroupIds;
+		size_t pSuppliedPositionals = 0;
 		size_t pEndpoint = 0;
 
 	public:
@@ -31,15 +32,22 @@ namespace arger {
 		}
 
 	public:
+		size_t suppliedOptions(arger::IsId auto id) const {
+			auto it = pOptions.find(static_cast<size_t>(id));
+			return (it == pOptions.end() ? 0 : it->second.second);
+		}
 		size_t options(arger::IsId auto id) const {
 			auto it = pOptions.find(static_cast<size_t>(id));
-			return (it == pOptions.end() ? 0 : it->second.size());
+			return (it == pOptions.end() ? 0 : it->second.first.size());
 		}
 		std::optional<arger::Value> option(arger::IsId auto id, size_t index = 0) const {
 			auto it = pOptions.find(static_cast<size_t>(id));
-			if (it == pOptions.end() || index >= it->second.size())
+			if (it == pOptions.end() || index >= it->second.first.size())
 				return {};
-			return it->second[index];
+			return it->second.first[index];
+		}
+		constexpr size_t suppliedPositionals() const {
+			return pSuppliedPositionals;
 		}
 		constexpr size_t positionals() const {
 			return pPositional.size();
