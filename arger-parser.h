@@ -111,27 +111,28 @@ namespace arger {
 			}
 
 		private:
-			void fResolveEnum(const std::wstring& name, arger::Value& value, const arger::Enum& allowed) const {
-				/* resolve the id of the string */
-				auto it = std::find_if(allowed.begin(), allowed.end(), [&](const arger::EnumEntry& e) { return e.name == value.str(); });
-				if (it == allowed.end())
-					throw arger::ParsingException{ L"Invalid enum for argument [", name, L"] encountered." };
-
-				/* assign the new enum-id */
-				value = arger::Value{ detail::EnumId{ it->id } };
-			}
 			void fUnpackDefValue(arger::Value& value, const arger::Type& type) const {
-				/* check if the type is an enum, in which case the type needs to be unpacked (as default enums are stored as
-				*	strings, for printing; cannot fail, as default values have already been verified to be part of the type) */
-				if (std::holds_alternative<arger::Enum>(type)) {
-					const arger::Enum& list = std::get<arger::Enum>(type);
-					value = arger::Value{ detail::EnumId{ std::find_if(list.begin(), list.end(), [&](const arger::EnumEntry& e) { return e.name == value.str(); })->id } };
-				}
+				/* check if the type is an enum, in which case the type needs to be unpacked (as default enums are stored as strings, for printing) */
+				if (!std::holds_alternative<arger::Enum>(type))
+					return;
+
+				/* cannot fail, as default values have already been verified to be part of the type */
+				const arger::Enum& list = std::get<arger::Enum>(type);
+				size_t id = std::find_if(list.begin(), list.end(), [&](const arger::EnumEntry& e) { return e.name == value.str(); })->id;
+				value = arger::Value{ detail::EnumId{.id = id } };
 			}
 			void fVerifyValue(const std::wstring& name, arger::Value& value, const arger::Type& type) const {
 				/* check if an enum was expected */
 				if (std::holds_alternative<arger::Enum>(type)) {
-					fResolveEnum(name, value, std::get<arger::Enum>(type));
+					const arger::Enum& list = std::get<arger::Enum>(type);
+
+					/* resolve the id of the string */
+					auto it = std::find_if(list.begin(), list.end(), [&](const arger::EnumEntry& e) { return e.name == value.str(); });
+					if (it == list.end())
+						throw arger::ParsingException{ L"Invalid enum for argument [", name, L"] encountered." };
+
+					/* assign the new enum-id */
+					value = arger::Value{ detail::EnumId{.id = it->id } };
 					return;
 				}
 

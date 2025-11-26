@@ -23,13 +23,7 @@ namespace arger {
 		class Parser;
 
 		struct EnumId {
-		public:
-			std::type_index type;
 			size_t id = 0;
-
-		public:
-			EnumId() : type{ typeid(void) }, id{ 0 } {}
-			EnumId(auto val) : type{ typeid(val) }, id{ static_cast<size_t>(val) } {}
 		};
 	}
 
