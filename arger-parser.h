@@ -179,11 +179,11 @@ namespace arger {
 				if (pTopMost->endpoints.empty())
 					throw arger::ParsingException{ str::View{ pTopMost->groupName }.title(), L" missing." };
 
-				/* select the endpoint to be used (this ensures that for too few arguments, the first one is picked, too many
-				*	arguments, the last one is picked, and for in-between, the one next in line is picked) */
+				/* select the endpoint to be used (this ensures that for too few arguments, the first one is picked, too
+				*	many arguments, the last one is picked, and for in-between, the one next in line is picked) */
 				const detail::ValidEndpoint* endpoint = &pTopMost->endpoints[0];
 				for (size_t i = 1; i < pTopMost->endpoints.size(); ++i) {
-					if (pTopMost->endpoints[i].minimum <= pParsed.pPositional.size()) {
+					if (pTopMost->endpoints[i].minimumEffective <= pParsed.pPositional.size()) {
 						endpoint = &pTopMost->endpoints[i];
 						continue;
 					}
@@ -206,22 +206,24 @@ namespace arger {
 					fVerifyValue((*endpoint->positionals)[index].name, pParsed.pPositional[i], (*endpoint->positionals)[index].type);
 				}
 
-				/* fill the positional arguments up on default values (ensures later verification and makes unpacking
-				*	easier - cannot violate maximum, as maximum will always at least fit the number of defined positionals) */
-				for (size_t i = pParsed.pPositional.size(); i < endpoint->positionals->size(); ++i) {
-					if (!(*endpoint->positionals)[i].defValue.has_value())
-						break;
-					pParsed.pPositional.push_back((*endpoint->positionals)[i].defValue.value());
-					fUnpackDefValue(pParsed.pPositional.back(), (*endpoint->positionals)[i].type);
-				}
-
-				/* check if the minimum required number of parameters has not been reached
-				*	(maximum not necessary to be checked, as it will be checked implicitly by the verification-loop) */
-				if (pParsed.pPositional.size() < endpoint->minimum) {
+				/* check if the minimum required number of parameters has not been reached (maximum not
+				*	necessary to be checked, as it was checked implicitly by the verification-loop) */
+				if (pParsed.pPositional.size() < endpoint->minimumEffective) {
 					size_t index = std::min<size_t>(endpoint->positionals->size() - 1, pParsed.pPositional.size());
 					if (pTopMost->super == 0)
 						throw arger::ParsingException{ L"Argument [", (*endpoint->positionals)[index].name, L"] is missing." };
 					throw arger::ParsingException{ L"Argument [", (*endpoint->positionals)[index].name, L"] is missing for ", pTopMost->super->groupName, L" [", pTopMost->group->name, L"]." };
+				}
+
+				/* fill the positional arguments up on default values (cannot violate maximum,
+				*	as maximum will always at least fit the number of defined positionals) */
+				size_t minimum = std::max<size_t>(endpoint->positionals->size(), endpoint->minimumActual);
+				for (size_t i = pParsed.pPositional.size(); i < minimum; ++i) {
+					size_t index = std::min<size_t>(endpoint->positionals->size() - 1, i);
+					if (!(*endpoint->positionals)[index].defValue.has_value())
+						break;
+					pParsed.pPositional.push_back((*endpoint->positionals)[index].defValue.value());
+					fUnpackDefValue(pParsed.pPositional.back(), (*endpoint->positionals)[index].type);
 				}
 				return endpoint;
 			}

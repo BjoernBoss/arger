@@ -169,13 +169,13 @@ namespace arger {
 				if (minimum > 0 && maximum > 0) {
 					if (minimum == maximum)
 						return str::wd::Build(L" [", minimum, L"x]");
-					return str::wd::Build(L" [", minimum, L" <= _ <= ", maximum, L']');
+					return str::wd::Build(L" [", minimum, L"...", maximum, L']');
 				}
 
 				/* construct the one-sided limit string */
 				if (minimum > 0)
-					return str::wd::Build(L" [>= ", minimum, L']');
-				return str::wd::Build(L" [<= ", maximum, L']');
+					return str::wd::Build(L" [", minimum, L"...]");
+				return str::wd::Build(L" [...", maximum, L']');
 			}
 			void fEnumDescription(const arger::Type& type) {
 				/* check if this is an enum to be added */
@@ -273,9 +273,11 @@ namespace arger {
 				for (size_t i = 0; i < endpoint.positionals->size(); ++i) {
 					std::wstring token = (*endpoint.positionals)[i].name;
 
-					if (i + 1 >= endpoint.positionals->size() && (endpoint.maximum == 0 || i + 1 < endpoint.maximum))
+					if (i + 1 >= endpoint.positionals->size() && (endpoint.maximum == 0 || i + 1 < endpoint.maximum)) {
 						token += L"...";
-					if (i >= endpoint.minimum)
+
+					}
+					if (i >= endpoint.minimumEffective)
 						token = L"[" + token + L']';
 					fAddSpacedToken(token);
 				}
@@ -478,8 +480,8 @@ namespace arger {
 							/* add the name and corresponding type and description */
 							fAddString(str::wd::Build("  ", positional.name, fTypeString(positional.type), L" "));
 							std::wstring temp = positional.description;
-							if (j + 1 >= endpoint.positionals->size() && j + 1 < endpoint.maximum)
-								temp.append(fLimitString(std::max<intptr_t>(endpoint.minimum - intptr_t(j), 0), endpoint.maximum - j));
+							if (j + 1 >= endpoint.positionals->size())
+								temp.append(fLimitString(std::max<intptr_t>(endpoint.minimumEffective - intptr_t(j), 0), (endpoint.maximum > 0 ? endpoint.maximum - j : 0)));
 							fAddString(temp, arger::NumCharsHelpLeft, 1);
 
 							/* add the enum value description */

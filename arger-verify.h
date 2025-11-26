@@ -11,7 +11,8 @@ namespace arger::detail {
 		const std::vector<detail::Positionals::Entry>* positionals = nullptr;
 		const std::vector<arger::Checker>* constraints = nullptr;
 		const std::wstring* description = nullptr;
-		size_t minimum = 0;
+		size_t minimumEffective = 0;
+		size_t minimumActual = 0;
 		size_t maximum = 0;
 		size_t id = 0;
 	};
@@ -138,18 +139,28 @@ namespace arger::detail {
 		next.description = (args == 0 ? &endpoint->description.text : 0);
 		next.id = (args == 0 ? endpoint->id : args->endpointId);
 
-		/* configure the limits */
-		next.minimum = ((minimum.has_value() && !positionals.empty()) ? *minimum : positionals.size());
-		if (maximum.has_value())
-			next.maximum = (*maximum == 0 ? 0 : std::max<size_t>({ next.minimum, *maximum, positionals.size() }));
+		/* validate and configure the minimum */
+		if (minimum.has_value() && positionals.empty())
+			throw arger::ConfigException{ L"Minimum requires at least one positional to be defined" };
+		next.minimumActual = minimum.value_or(positionals.size());
+
+		/* validate and configure the maximum */
+		if (!maximum.has_value())
+			next.maximum = std::max<size_t>(next.minimumActual, positionals.size());
+		else if (*maximum < next.minimumActual)
+			next.maximum = 0;
+		else if (*maximum < positionals.size())
+			throw arger::ConfigException{ L"Maximum must be at least the number of positionals" };
 		else
-			next.maximum = std::max<size_t>(next.minimum, positionals.size());
+			next.maximum = *maximum;
 
 		/* patch the minimum to be aware of default parameters (minimum will be zero for empty positionals) */
-		while (next.minimum > 0 && positionals[std::min<size_t>(positionals.size(), next.minimum) - 1].defValue.has_value())
-			--next.minimum;
+		next.minimumEffective = next.minimumActual;
+		while (next.minimumEffective > 0 && positionals[std::min<size_t>(positionals.size(), next.minimumEffective) - 1].defValue.has_value())
+			--next.minimumEffective;
 
 		/* validate the positionals */
+		bool defaulted = false;
 		for (size_t i = 0; i < positionals.size(); ++i) {
 			/* validate the name and type */
 			if (positionals[i].name.empty())
@@ -157,8 +168,12 @@ namespace arger::detail {
 			detail::ValidateType(positionals[i].type);
 
 			/* validate the default-value */
-			if (positionals[i].defValue.has_value())
+			if (positionals[i].defValue.has_value()) {
 				detail::ValidateDefValue(positionals[i].type, positionals[i].defValue.value());
+				defaulted = true;
+			}
+			else if (defaulted)
+				throw arger::ConfigException{ L"All positionals must be default initialized once one is defaulted" };
 		}
 	}
 	inline void ValidateOption(detail::ValidConfig& state, const detail::Option& option, const detail::ValidArguments* owner) {
@@ -195,12 +210,16 @@ namespace arger::detail {
 		if (entry.payload)
 			detail::ValidateType(option.payload.type);
 
-		/* configure the limits */
+		/* configure the minimum */
 		entry.minimum = option.require.minimum.value_or(0);
-		if (option.require.maximum.has_value())
-			entry.maximum = (*option.require.maximum == 0 ? 0 : std::max<size_t>(entry.minimum, *option.require.maximum));
-		else
+
+		/* validate and configure the maximum */
+		if (!option.require.maximum.has_value())
 			entry.maximum = std::max<size_t>(entry.minimum, 1);
+		else if (*option.require.maximum < entry.minimum)
+			entry.maximum = 0;
+		else
+			entry.maximum = *option.require.maximum;
 
 		/* validate the default-values */
 		if (entry.payload && !option.payload.defValue.empty()) {
@@ -282,11 +301,11 @@ namespace arger::detail {
 
 		/* sort all endpoints and ensure that they can be uniquely differentiated */
 		std::sort(entry.endpoints.begin(), entry.endpoints.end(), [](const detail::ValidEndpoint& a, const detail::ValidEndpoint& b) -> bool {
-			return (a.minimum < b.minimum);
+			return (a.minimumEffective < b.minimumEffective);
 			});
 		for (size_t i = 1; i < entry.endpoints.size(); ++i) {
-			if (entry.endpoints[i - 1].maximum >= entry.endpoints[i].minimum)
-				throw arger::ConfigException{ L"Endpoint positional requirement counts must not overlap in order to ensure each endpoint can be matched uniquely." };
+			if (entry.endpoints[i - 1].maximum >= entry.endpoints[i].minimumEffective)
+				throw arger::ConfigException{ L"Endpoint positional effective requirement counts must not overlap in order to ensure each endpoint can be matched uniquely." };
 		}
 	}
 	inline void ValidateFinalizeArguments(detail::ValidConfig& state, const detail::ValidArguments& group) {

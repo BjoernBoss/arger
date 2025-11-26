@@ -358,7 +358,8 @@ namespace arger {
 		}
 	};
 
-	/* add a minimum/maximum requirement [maximum=0 implies no maximum]
+	/* add a minimum/maximum requirement [maximum < minimum implies no maximum]
+	*	if only minimum is supplied, default maximum will be used
 	*	- [Option]: are only acknowledged for non-flags with a default of [min: 0, max: 1]
 	*	- [Otherwise]: constrains the number of positional arguments with a default of [min = max = number-of-positionals];
 	*		if greater than number of positional arguments, last type is used as catch-all */
