@@ -331,14 +331,16 @@ namespace arger {
 				if (hasOptionals)
 					fAddSpacedToken(L"[options...]");
 
-				/* add the hint to the arguments after the final group has been selected */
+				/* add the hint to the arguments after the final group has been selected and add the endpoint hint */
 				if (pTopMost->endpoints.empty() && pTopMost->nestedPositionals)
 					fAddSpacedToken(L"[params...]");
-
-				/* add all of the separate endpoints */
 				if (pTopMost->endpoints.size() > 1)
 					fAddString(L" variation...");
-				for (size_t i = 0; i < pTopMost->endpoints.size(); ++i) {
+
+				/* add all of the separate endpoints */
+				if (pTopMost->endpoints.size() == 1)
+					fAddEndpointUsage(pTopMost->endpoints.front());
+				else if (!pReduced) for (size_t i = 0; i < pTopMost->endpoints.size(); ++i) {
 					if (pTopMost->endpoints.size() > 1) {
 						fAddNewLine(false);
 						fAddString(str::wd::Build(L"  [Variation ", i + 1, L"]:"));
