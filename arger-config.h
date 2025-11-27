@@ -8,6 +8,26 @@
 namespace arger {
 	struct Config;
 
+	enum class Primitive : uint8_t {
+		any,
+		inum,
+		unum,
+		real,
+		boolean
+	};
+	struct EnumEntry {
+		std::wstring name;
+		std::wstring normal;
+		std::wstring reduced;
+		size_t id = 0;
+		constexpr EnumEntry(std::wstring name, arger::IsId auto id, std::wstring description) : name{ name }, normal{ description }, id{ static_cast<size_t>(id) } {}
+		constexpr EnumEntry(std::wstring name, arger::IsId auto id, std::wstring reduced, std::wstring description) : name{ name }, reduced{ reduced }, normal{ description }, id{ static_cast<size_t>(id) } {}
+	};
+	using Enum = std::vector<arger::EnumEntry>;
+	using Type = std::variant<arger::Primitive, arger::Enum>;
+
+	using Checker = std::function<std::wstring(const arger::Parsed&)>;
+
 	namespace detail {
 		struct Configurator {};
 

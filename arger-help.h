@@ -220,7 +220,8 @@ namespace arger {
 				/* add the separate keys  */
 				for (const auto& val : std::get<arger::Enum>(type)) {
 					fAddNewLine(false);
-					fAddString(str::wd::Format(L" - [{:<{}}]: {}", val.name, length, val.description), arger::NumCharsHelpLeft, 7 + length);
+					const std::wstring& text = ((pReduced && !val.reduced.empty()) ? val.reduced : val.normal);
+					fAddString(str::wd::Format(L" - [{:<{}}]: {}", val.name, length, text), arger::NumCharsHelpLeft, 7 + length);
 				}
 			}
 			constexpr const wchar_t* fTypeString(const arger::Type& type) {

@@ -89,9 +89,18 @@ namespace arger::detail {
 				throw arger::ConfigException{ L"Reduced information requires reduced help to be possible." };
 		}
 	}
-	inline constexpr void ValidateType(const arger::Type& type) {
-		if (std::holds_alternative<arger::Enum>(type) && std::get<arger::Enum>(type).empty())
+	inline constexpr void ValidateType(detail::ValidConfig& state, const arger::Type& type) {
+		if (!std::holds_alternative<arger::Enum>(type))
+			return;
+		const arger::Enum& list = std::get<arger::Enum>(type);
+		if (list.empty())
 			throw arger::ConfigException{ L"Enum must not be empty." };
+		for (const auto& entry : list) {
+			if (entry.normal.empty() && !entry.reduced.empty())
+				throw arger::ConfigException{ L"Reduced description requires normal description as well." };
+			if (!entry.reduced.empty() && (state.help == nullptr || !state.help->reducible))
+				throw arger::ConfigException{ L"Reduced description requires reduced help to be possible." };
+		}
 	}
 	inline constexpr void ValidateDefValue(const arger::Type& type, const arger::Value& value) {
 		/* check if the value must be an enum */
@@ -181,7 +190,7 @@ namespace arger::detail {
 			/* validate the name and type */
 			if (positionals[i].name.empty())
 				throw arger::ConfigException{ L"Positional argument must not have an empty name." };
-			detail::ValidateType(positionals[i].type);
+			detail::ValidateType(state, positionals[i].type);
 
 			/* validate the default-value */
 			if (!positionals[i].defValue.has_value())
@@ -232,7 +241,7 @@ namespace arger::detail {
 
 		/* validate the payload */
 		if (entry.payload)
-			detail::ValidateType(option.payload.type);
+			detail::ValidateType(state, option.payload.type);
 		else if (option.require.minimum.has_value() || option.require.maximum.has_value())
 			throw arger::ConfigException{ L"Flags cannot have requirements defined." };
 		else if (!option.payload.defValue.empty())

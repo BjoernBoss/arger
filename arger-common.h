@@ -31,24 +31,6 @@ namespace arger {
 	template <class Type>
 	concept IsId = std::is_integral_v<Type> || std::is_enum_v<Type>;
 
-	enum class Primitive : uint8_t {
-		any,
-		inum,
-		unum,
-		real,
-		boolean
-	};
-	struct EnumEntry {
-		std::wstring name;
-		std::wstring description;
-		size_t id = 0;
-		constexpr EnumEntry(std::wstring name, std::wstring description, arger::IsId auto id) : name{ name }, description{ description }, id{ static_cast<size_t>(id) } {}
-	};
-	using Enum = std::vector<arger::EnumEntry>;
-	using Type = std::variant<arger::Primitive, arger::Enum>;
-
-	using Checker = std::function<std::wstring(const arger::Parsed&)>;
-
 	/* exception thrown when using the library in an invalid way */
 	struct Exception : public str::BuildException {
 		template <class... Args>
