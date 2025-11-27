@@ -28,7 +28,8 @@ namespace arger {
 			struct Entry {
 				std::wstring name;
 				std::wstring text;
-				bool always = false;
+				bool normal = false;
+				bool reduced = false;
 			};
 
 		public:
@@ -328,15 +329,15 @@ namespace arger {
 		}
 	};
 
-	/* add information-string to the corresponding config/group
-	*	Note: if always is set, will print the information, even if only the reducible help is printed */
+	/* add information-string to the corresponding config/group and show them for entry and all children
+	*	Note: will print the information optionally in the normal, reduced, or both menus */
 	struct Information : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		detail::Information::Entry entry;
 
 	public:
-		constexpr Information(std::wstring name, bool always, std::wstring text) : entry{ name, text, always } {}
+		constexpr Information(std::wstring name, bool normal, bool reduced, std::wstring text) : entry{ name, text, normal, reduced } {}
 
 	private:
 		constexpr void burnConfig(detail::Information& base) const {
@@ -418,22 +419,18 @@ namespace arger {
 		}
 	};
 
-	/* add a payload to an option with a given name and of a given type, and optional default values (must
-	*	meet the requirement-counts), will be used to fill up parsed values, if less were provided */
+	/* add a payload to an option with a given name and of a given type */
 	struct Payload : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
-		std::vector<arger::Value> pDefValue;
 		std::wstring pName;
 		arger::Type pType;
 
 	public:
-		Payload(std::wstring name, arger::Type type, std::vector<arger::Value> defValue = {}) : pDefValue{ defValue }, pName{ name }, pType{ type } {}
-		Payload(std::wstring name, arger::Type type, arger::Value defValue) : pDefValue{ defValue }, pName{ name }, pType{ type } {}
+		Payload(std::wstring name, arger::Type type) : pName{ name }, pType{ type } {}
 
 	private:
 		constexpr void burnConfig(detail::Payload& base) const {
-			base.payload.defValue = pDefValue;
 			base.payload.name = pName;
 			base.payload.type = pType;
 		}
@@ -470,18 +467,16 @@ namespace arger {
 		}
 	};
 
-	/* add an additional positional argument to the configuration/group using the given name, type, description, and optional default value
+	/* add an additional positional argument to the configuration/group using the given name, type, description
 	*	Note: Must meet the requirement-counts
-	*	Note: Groups/Configs can can only have sub-groups or positional arguments
-	*	Note: Default values will be used, when no argument is given */
+	*	Note: Groups/Configs can can only have sub-groups or positional arguments */
 	struct Positional : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		detail::Positional pPositional;
 
 	public:
-		constexpr Positional(std::wstring name, arger::Type type, const arger::IsConfig<detail::Positional> auto&... configs) : pPositional{ std::nullopt, name, type } {}
-		constexpr Positional(std::wstring name, arger::Type type, arger::Value defValue, const arger::IsConfig<detail::Positional> auto&... configs) : pPositional{ defValue, name, type } {
+		constexpr Positional(std::wstring name, arger::Type type, const arger::IsConfig<detail::Positional> auto&... configs) : pPositional{ std::nullopt, name, type } {
 			detail::ConfigBurner::Apply(pPositional, configs...);
 		}
 		constexpr arger::Positional& add(const arger::IsConfig<detail::Positional> auto&... configs) {
@@ -492,6 +487,26 @@ namespace arger {
 	private:
 		constexpr void burnConfig(detail::Positionals& base) const {
 			base.positionals.push_back(pPositional);
+		}
+	};
+
+	/* add a default value to a positional or one or more default values to optionals - will be used when
+	*	no values are povided and to fill up remaining values, if less were provided and must meet requirement
+	*	counts for optionals/must be applied to all upcoming positionals for the requirement count */
+	struct Default : public detail::Configurator {
+		friend struct detail::ConfigBurner;
+	private:
+		arger::Value pDefValue;
+
+	public:
+		Default(arger::Value defValue) : pDefValue{ defValue } {}
+
+	private:
+		constexpr void burnConfig(detail::Positional& base) const {
+			base.defValue = pDefValue;
+		}
+		constexpr void burnConfig(detail::Payload& base) const {
+			base.payload.defValue.push_back(pDefValue);
 		}
 	};
 

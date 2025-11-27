@@ -73,15 +73,19 @@ namespace arger::detail {
 
 	inline constexpr void ValidateDescription(detail::ValidConfig& state, const detail::Description& description) {
 		if (description.description.normal.empty() && !description.description.reduced.empty())
-			throw arger::ConfigException{ L"Reduced description requires normal description as well" };
+			throw arger::ConfigException{ L"Reduced description requires normal description as well." };
 		if (state.help == nullptr || !state.help->reducible)
-			throw arger::ConfigException{ L"Reduced description requires reduced help to be possible" };
+			throw arger::ConfigException{ L"Reduced description requires reduced help to be possible." };
 
 	}
-	inline constexpr void ValidateInformation(const detail::Information& information) {
-		for (size_t i = 0; i < information.information.size(); ++i) {
-			if (information.information[i].name.empty() || information.information[i].text.empty())
+	inline constexpr void ValidateInformation(detail::ValidConfig& state, const detail::Information& information) {
+		for (const auto& info : information.information) {
+			if (info.name.empty() || info.text.empty())
 				throw arger::ConfigException{ L"Information name and description must not be empty." };
+			if (info.reduced && (state.help == nullptr || !state.help->reducible))
+				throw arger::ConfigException{ L"Reduced information requires reduced help to be possible." };
+			if (!info.reduced && !info.normal)
+				throw arger::ConfigException{ L"Information must either be bound to the normal or reduced menu." };
 		}
 	}
 	inline constexpr void ValidateType(const arger::Type& type) {
@@ -152,7 +156,7 @@ namespace arger::detail {
 
 		/* validate and configure the minimum */
 		if (minimum.has_value() && positionals.empty())
-			throw arger::ConfigException{ L"Minimum requires at least one positional to be defined" };
+			throw arger::ConfigException{ L"Minimum requires at least one positional to be defined." };
 		next.minimumActual = minimum.value_or(positionals.size());
 
 		/* validate and configure the maximum */
@@ -161,7 +165,7 @@ namespace arger::detail {
 		else if (*maximum < next.minimumActual)
 			next.maximum = 0;
 		else if (*maximum < positionals.size() && *maximum > 0)
-			throw arger::ConfigException{ L"Maximum must be at least the number of positionals" };
+			throw arger::ConfigException{ L"Maximum must be at least the number of positionals." };
 		else
 			next.maximum = *maximum;
 
@@ -182,7 +186,7 @@ namespace arger::detail {
 				continue;
 			detail::ValidateDefValue(positionals[i].type, positionals[i].defValue.value());
 			if (i < next.minimumEffective)
-				throw arger::ConfigException{ L"All positionals up to the minimum must be defaulted once one is defaulted" };
+				throw arger::ConfigException{ L"All positionals up to the minimum must be defaulted once one is defaulted." };
 
 			/* validat ethe description */
 			detail::ValidateDescription(state, positionals[i]);
@@ -225,7 +229,7 @@ namespace arger::detail {
 		if (entry.payload)
 			detail::ValidateType(option.payload.type);
 		else if (option.require.minimum.has_value() || option.require.maximum.has_value())
-			throw arger::ConfigException{ L"Flags cannot have requirements defined" };
+			throw arger::ConfigException{ L"Flags cannot have requirements defined." };
 
 		/* configure the minimum */
 		entry.minimum = option.require.minimum.value_or(0);
@@ -241,9 +245,9 @@ namespace arger::detail {
 		/* validate the default-values */
 		if (entry.payload && !option.payload.defValue.empty()) {
 			if (option.payload.defValue.size() < entry.minimum)
-				throw arger::ConfigException{ L"Default values for option must not violate its own minimum requirements" };
+				throw arger::ConfigException{ L"Default values for option must not violate its own minimum requirements." };
 			if (entry.maximum > 0 && option.payload.defValue.size() > entry.maximum)
-				throw arger::ConfigException{ L"Default values for option must not violate its own maximum requirements" };
+				throw arger::ConfigException{ L"Default values for option must not violate its own maximum requirements." };
 			for (const auto& value : option.payload.defValue)
 				detail::ValidateDefValue(option.payload.type, value);
 		}
@@ -302,7 +306,7 @@ namespace arger::detail {
 					detail::ValidateOption(state, option, &next);
 
 				/* validate the information attributes */
-				detail::ValidateInformation(sub);
+				detail::ValidateInformation(state, sub);
 			}
 			return;
 		}
@@ -382,7 +386,7 @@ namespace arger::detail {
 		}
 
 		/* validate the information attributes */
-		detail::ValidateInformation(*state.burned);
+		detail::ValidateInformation(state, *state.burned);
 
 		/* validate the options and arguments */
 		for (const auto& option : state.burned->options)

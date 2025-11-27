@@ -264,23 +264,6 @@ namespace arger {
 				std::wstring parents = fGroupNameHistory(topMost->super);
 				return str::wd::Build(parents, (parents.empty() ? L"[" : L" > ["), str::View{ topMost->super->groupName }.title(), L": ", topMost->group->name, L']');
 			}
-			constexpr void fAddGroupDescription(const detail::ValidArguments* topMost) {
-				/* add the description of all parents */
-				if (topMost == nullptr || topMost->super == nullptr)
-					return;
-				if (!pReduced)
-					fAddGroupDescription(topMost->super);
-
-				/* select the proper description to be used */
-				const std::wstring* desc = fGetDescription(topMost->group);
-				if (desc == nullptr)
-					return;
-
-				/* add the newline, description header, and description itself */
-				fAddNewLine(true);
-				fAddString(fGroupNameHistory(topMost));
-				fAddString(*desc, arger::IndentInformation);
-			}
 			constexpr void fRecInformationStrings(const detail::ValidArguments* topMost) {
 				if (topMost == nullptr)
 					return;
@@ -289,7 +272,7 @@ namespace arger {
 				/* iterate over the information-content and append it to the information-buffer */
 				const detail::Information* information = (topMost->group == nullptr ? (detail::Information*)pConfig.burned : (detail::Information*)topMost->group);
 				for (size_t i = 0; i < information->information.size(); ++i) {
-					if (pReduced && !information->information[i].always)
+					if (!(pReduced ? information->information[i].reduced : information->information[i].normal))
 						continue;
 					fAddNewLine(true);
 					fAddString(information->information[i].name + L": ");
@@ -527,6 +510,23 @@ namespace arger {
 					}
 				}
 			}
+			void fBuildGroupDescription(const detail::ValidArguments* topMost) {
+				/* add the description of all parents */
+				if (topMost == nullptr || topMost->super == nullptr)
+					return;
+				if (!pReduced)
+					fBuildGroupDescription(topMost->super);
+
+				/* select the proper description to be used */
+				const std::wstring* desc = fGetDescription(topMost->group);
+				if (desc == nullptr)
+					return;
+
+				/* add the newline, description header, and description itself */
+				fAddNewLine(true);
+				fAddString(fGroupNameHistory(topMost));
+				fAddString(*desc, arger::IndentInformation);
+			}
 
 		public:
 			std::wstring buildHelpString() {
@@ -541,7 +541,7 @@ namespace arger {
 
 				/* add the group description, the description of all sub-groups, the description of the endpoints,
 				*	and the required and optional option descriptions (will automatically be sorted lexicographically) */
-				fAddGroupDescription(pTopMost);
+				fBuildGroupDescription(pTopMost);
 				fBuildGroups();
 				fBuildEndpoints();
 				fBuildOptions(true);
