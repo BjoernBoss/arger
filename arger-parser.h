@@ -56,7 +56,7 @@ namespace arger {
 						auto it = pConfig.options.find(arg);
 						if (it == pConfig.options.end()) {
 							if (pDeferred.empty())
-								str::BuildTo(pDeferred, L"Unknown optional argument [", arg, L"] encountered.");
+								str::BuildTo(pDeferred, L"Unknown option [", arg, L"] encountered.");
 
 							/* continue parsing, as the special entries might still occur */
 							continue;
@@ -81,7 +81,7 @@ namespace arger {
 						auto it = pConfig.abbreviations.find(arg[i]);
 						if (it == pConfig.abbreviations.end()) {
 							if (pDeferred.empty())
-								str::BuildTo(pDeferred, L"Unknown optional argument-abbreviation [", arg[i], L"] encountered.");
+								str::BuildTo(pDeferred, L"Unknown option abbreviation [", arg[i], L"] encountered.");
 
 							/* continue parsing, as the special entries might still occur */
 							continue;
@@ -95,10 +95,15 @@ namespace arger {
 						continue;
 					}
 
-					/* check if the payload has already been consumed */
+					/* allocate the entry as found option */
+					auto it = pParsed.pOptions.find(entry->option->id);
+					if (it == pParsed.pOptions.end())
+						it = pParsed.pOptions.insert({ entry->option->id, { {}, 0 } }).first;
+
+					/* check if the payload has already been consumed (if so, mark it as forgotten;
+					*	will be handled once ensured that the flag is relevant for this group) */
 					if (payloadUsed || (!hasPayload && pIndex >= pArgs.size())) {
-						if (pDeferred.empty())
-							str::BuildTo(pDeferred, L"Value [", entry->option->payload.name, L"] missing for optional argument [", entry->option->name, L"].");
+						it->second.first.clear();
 
 						/* continue parsing, as the special entries might still occur */
 						continue;
@@ -106,15 +111,12 @@ namespace arger {
 					payloadUsed = true;
 
 					/* write the value as raw string into the buffer (dont perform any validations or limit checks for now) */
-					auto it = pParsed.pOptions.find(entry->option->id);
-					if (it == pParsed.pOptions.end())
-						it = pParsed.pOptions.insert({ entry->option->id, {} }).first;
 					it->second.first.emplace_back(arger::Value{ hasPayload ? payload : pArgs[pIndex++] });
 				}
 
 				/* check if a payload was supplied but not consumed */
 				if (hasPayload && !payloadUsed && pDeferred.empty())
-					str::BuildTo(pDeferred, L"Value [", payload, L"] not used by optional arguments.");
+					str::BuildTo(pDeferred, L"Value [", payload, L"] not used by option.");
 			}
 
 		private:
@@ -239,11 +241,11 @@ namespace arger {
 				return endpoint;
 			}
 			void fVerifyOptional() {
-				/* iterate over the optional arguments and verify them */
+				/* iterate over the options and verify them */
 				for (auto& [name, option] : pConfig.options) {
 					/* check if the current option can be used by the selected group or any of its ancestors */
 					if (!detail::CheckUsage(&option, pTopMost) && (option.payload ? pParsed.pOptions.contains(option.option->id) : pParsed.pFlags.contains(option.option->id)))
-						throw arger::ParsingException{ L"Argument [", name, L"] not meant for ", pTopMost->super->groupName, L" [", pTopMost->group->name, L"]." };
+						throw arger::ParsingException{ L"Option [", name, L"] not meant for ", pTopMost->super->groupName, L" [", pTopMost->group->name, L"]." };
 
 					/* check if this is a flag, in which case nothing more needs to be checked */
 					if (!option.payload)
@@ -253,21 +255,24 @@ namespace arger {
 					auto it = pParsed.pOptions.find(option.option->id);
 					size_t count = (it == pParsed.pOptions.end() ? 0 : it->second.first.size());
 
+					/* check if the payload was forgotten - at least once, in which case the entry will exist but without any values */
+					if (it != pParsed.pOptions.end() && count == 0)
+						throw arger::ParsingException{ L"Payload [", option.option->payload.name, L"] of option [", option.option->name, L"] missing." };
+
 					/* check if default values should be assigned (limits are already ensured to be valid) */
 					if (count < option.option->payload.defValue.size()) {
-						if (count == 0)
-							it = pParsed.pOptions.insert({ option.option->id, { option.option->payload.defValue, 0 } }).first;
-						else
-							it->second.first.insert(it->second.first.end(), option.option->payload.defValue.begin() + count, option.option->payload.defValue.end());
+						if (it == pParsed.pOptions.end())
+							it = pParsed.pOptions.insert({ option.option->id, { {}, 0 } }).first;
+						it->second.first.insert(it->second.first.end(), option.option->payload.defValue.begin() + count, option.option->payload.defValue.end());
 						for (size_t i = count; i < it->second.first.size(); ++i)
 							fUnpackDefValue(it->second.first[i], option.option->payload.type);
 					}
 
-					/* validate the limits of the supplied optional arguments */
+					/* validate the limits of the supplied options */
 					else if (option.minimumActual > count)
-						throw arger::ParsingException{ L"Argument [", name, L"] is missing." };
+						throw arger::ParsingException{ L"Option [", name, L"] is missing." };
 					else if (option.maximum > 0 && count > option.maximum)
-						throw arger::ParsingException{ L"Argument [", name, L"] can at most be specified ", option.maximum, " times." };
+						throw arger::ParsingException{ L"Option [", name, L"] can at most be specified ", option.maximum, " times." };
 
 					/* verify and unpack the values themselves */
 					for (size_t i = 0; i < count; ++i)
@@ -317,7 +322,7 @@ namespace arger {
 						}
 					}
 
-					/* check if its an optional argument or positional-lock */
+					/* check if its an options or positional-lock */
 					if (!pPositionalLocked && !next.empty() && next[0] == L'-') {
 						if (next == L"--") {
 							pPositionalLocked = true;
@@ -332,7 +337,7 @@ namespace arger {
 							if (next[i] != L'=')
 								continue;
 
-							/* extract the payload and mark the actual end of the optional argument */
+							/* extract the payload and mark the actual end of the options */
 							hasPayload = true;
 							payload = next.substr(i + 1);
 							end = i;
@@ -390,7 +395,7 @@ namespace arger {
 				const detail::ValidEndpoint* endpoint = fVerifyPositional();
 				pParsed.pEndpoint = endpoint->id;
 
-				/* verify the optional arguments */
+				/* verify the options */
 				fVerifyOptional();
 
 				/* validate all root/selection constraints */

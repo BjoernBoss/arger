@@ -264,19 +264,21 @@ namespace arger {
 				std::wstring parents = fGroupNameHistory(topMost->super);
 				return str::wd::Build(parents, (parents.empty() ? L"[" : L" > ["), str::View{ topMost->super->groupName }.title(), L": ", topMost->group->name, L']');
 			}
-			constexpr void fRecInformationStrings(const detail::ValidArguments* topMost) {
+			constexpr void fRecInformationStrings(const detail::ValidArguments* topMost, bool top) {
 				if (topMost == nullptr)
 					return;
-				fRecInformationStrings(topMost->super);
+				fRecInformationStrings(topMost->super, false);
 
 				/* iterate over the information-content and append it to the information-buffer */
 				const detail::Information* information = (topMost->group == nullptr ? (detail::Information*)pConfig.burned : (detail::Information*)topMost->group);
-				for (size_t i = 0; i < information->information.size(); ++i) {
-					if (!(pReduced ? information->information[i].reduced : information->information[i].normal))
+				for (const auto& info : information->information) {
+					if (!(pReduced ? info.reduced : info.normal))
+						continue;
+					if (!info.allChildren && !top)
 						continue;
 					fAddNewLine(true);
-					fAddString(information->information[i].name + L": ");
-					fAddString(information->information[i].text, arger::NumCharsHelpLeft);
+					fAddString(info.name + L": ");
+					fAddString(info.text, arger::NumCharsHelpLeft);
 				}
 			}
 			void fAddEndpointUsage(const detail::ValidEndpoint& endpoint) {
@@ -334,6 +336,8 @@ namespace arger {
 					fAddSpacedToken(L"[params...]");
 
 				/* add all of the separate endpoints */
+				if (pTopMost->endpoints.size() > 1)
+					fAddString(L" variation...");
 				for (size_t i = 0; i < pTopMost->endpoints.size(); ++i) {
 					if (pTopMost->endpoints.size() > 1) {
 						fAddNewLine(false);
@@ -524,7 +528,8 @@ namespace arger {
 
 				/* add the newline, description header, and description itself */
 				fAddNewLine(true);
-				fAddString(fGroupNameHistory(topMost));
+				if (!pReduced)
+					fAddString(fGroupNameHistory(topMost));
 				fAddString(*desc, arger::IndentInformation);
 			}
 
@@ -548,7 +553,7 @@ namespace arger {
 				fBuildOptions(false);
 
 				/* add all of the information descriptions for the selected group */
-				fRecInformationStrings(pTopMost);
+				fRecInformationStrings(pTopMost, true);
 
 				/* return the constructed help-string */
 				std::wstring out;

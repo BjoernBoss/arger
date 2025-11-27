@@ -58,9 +58,9 @@ arger::Program(std::wstring program);
 arger::Description(std::wstring desc);
 arger::Description(std::wstring reduced, std::wstring desc);
 
-/* add information-string to the corresponding config/group and show them for entry and all children
+/* add information-string to the corresponding config/group and show them for entry and optionally all children
 *	Note: will print the information optionally in the normal, reduced, or both menus */
-arger::Information(std::wstring name, bool normal, bool reduced, std::wstring text);
+arger::Information(std::wstring name, bool normal, bool reduced, bool allChildren, std::wstring text);
 
 /* add a constraint to be executed if the corresponding object is selected via the arguments */
 arger::Constraint(arger::Checker constraint);

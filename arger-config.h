@@ -30,6 +30,7 @@ namespace arger {
 				std::wstring text;
 				bool normal = false;
 				bool reduced = false;
+				bool allChildren = false;
 			};
 
 		public:
@@ -235,7 +236,7 @@ namespace arger {
 
 	/* configure the key to be used as option for argument mode and any group name for menu mode, which
 	*	triggers the help-menu to be printed (prior to verifying the remainder of the argument structure)
-	*	Note: if reducible is enabled, the usage of the abbreviation will not print any additional information
+	*	Note: if reducible is enabled, the usage of the abbreviation will only print the reduced help menu
 	*	Note: if all-children is enabled, the help entry will be printed as option in all sub-groups as well */
 	struct HelpEntry : public detail::Configurator {
 		friend struct detail::ConfigBurner;
@@ -329,7 +330,7 @@ namespace arger {
 		}
 	};
 
-	/* add information-string to the corresponding config/group and show them for entry and all children
+	/* add information-string to the corresponding config/group and show them for entry and optionally all children
 	*	Note: will print the information optionally in the normal, reduced, or both menus */
 	struct Information : public detail::Configurator {
 		friend struct detail::ConfigBurner;
@@ -337,7 +338,7 @@ namespace arger {
 		detail::Information::Entry entry;
 
 	public:
-		constexpr Information(std::wstring name, bool normal, bool reduced, std::wstring text) : entry{ name, text, normal, reduced } {}
+		constexpr Information(std::wstring name, bool normal, bool reduced, bool allChildren, std::wstring text) : entry{ name, text, normal, reduced, allChildren } {}
 
 	private:
 		constexpr void burnConfig(detail::Information& base) const {
