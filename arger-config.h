@@ -474,7 +474,7 @@ namespace arger {
 		}
 	};
 
-	/* add an additional positional argument to the configuration/group using the given name, type, description
+	/* add an additional positional argument to the configuration/group using the given name and type (and optional immediate description)
 	*	Note: Must meet the requirement-counts
 	*	Note: Groups/Configs can can only have sub-groups or positional arguments */
 	struct Positional : public detail::Configurator {
@@ -483,7 +483,10 @@ namespace arger {
 		detail::Positional pPositional;
 
 	public:
-		constexpr Positional(std::wstring name, arger::Type type, const arger::IsConfig<detail::Positional> auto&... configs) : pPositional{ std::nullopt, name, type } {
+		Positional(std::wstring name, arger::Type type, std::wstring desc) : pPositional{ std::nullopt, name, type } {
+			pPositional.description.normal = desc;
+		}
+		Positional(std::wstring name, arger::Type type, const arger::IsConfig<detail::Positional> auto&... configs) : pPositional{ std::nullopt, name, type } {
 			detail::ConfigBurner::Apply(pPositional, configs...);
 		}
 		constexpr arger::Positional& add(const arger::IsConfig<detail::Positional> auto&... configs) {

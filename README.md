@@ -89,9 +89,10 @@ arger::Use(arger::IsId auto... options);
 /* setup the descriptive name for the sub-groups to be used (the default name is 'mode') */
 arger::GroupName(std::wstring name);
 
-/* add an additional positional argument to the configuration/group using the given name, type, description
+/* add an additional positional argument to the configuration/group using the given name and type (and optional immediate description)
 *	Note: Must meet the requirement-counts
 *	Note: Groups/Configs can can only have sub-groups or positional arguments */
+arger::Positional(std::wstring name, arger::Type type, std::wstring desc);
 arger::Positional(std::wstring name, arger::Type type, const arger::IsConfig<detail::Positional> auto&... configs);
 
 /* add a default value to a positional or one or more default values to optionals - will be used when

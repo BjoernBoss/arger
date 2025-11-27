@@ -78,9 +78,8 @@ namespace arger::detail {
 	inline constexpr void ValidateDescription(detail::ValidConfig& state, const detail::Description& description) {
 		if (description.description.normal.empty() && !description.description.reduced.empty())
 			throw arger::ConfigException{ L"Reduced description requires normal description as well." };
-		if (state.help == nullptr || !state.help->reducible)
+		if (!description.description.reduced.empty() && (state.help == nullptr || !state.help->reducible))
 			throw arger::ConfigException{ L"Reduced description requires reduced help to be possible." };
-
 	}
 	inline constexpr void ValidateInformation(detail::ValidConfig& state, const detail::Information& information) {
 		for (const auto& info : information.information) {
