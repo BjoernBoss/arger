@@ -271,21 +271,33 @@ namespace arger {
 				fRecInformationStrings(topMost->super, false);
 
 				/* iterate over the information-content and append it to the information-buffer */
-				const detail::Information* information = (topMost->group == nullptr ? (detail::Information*)pConfig.burned : (detail::Information*)topMost->group);
-				for (const auto& info : information->information) {
-					if (!(pReduced ? info.reduced : info.normal))
+				const detail::InformationList* list = (topMost->group == nullptr ? static_cast<const detail::InformationList*>(pConfig.burned) : static_cast<const detail::InformationList*>(topMost->group));
+				for (const auto& info : list->information) {
+					if (pReduced && info.reduced.empty())
 						continue;
-					if (!info.allChildren && !top)
+					if (!info.allChildren.value_or(false) && !top)
 						continue;
 					fAddNewLine(true);
 					fAddString(info.name + L": ");
-					fAddString(info.text, arger::NumCharsHelpLeft);
+					fAddString((pReduced ? info.reduced : info.text), arger::NumCharsHelpLeft);
 				}
 			}
 			void fAddEndpointUsage(const detail::ValidEndpoint& endpoint) {
 				/* add the positional parameter for the topmost argument-object */
 				for (size_t i = 0; i < endpoint.positionals->size(); ++i)
 					fAddSpacedToken(fEndpointName(endpoint, i));
+			}
+			bool fSelectSpecial(std::map<std::wstring, NameCache>& selected) {
+				bool added = false;
+				if (pConfig.help != nullptr && (pTopMost->super == nullptr || pConfig.help->allChildren.value_or(true))) {
+					selected.insert({ pConfig.help->name, NameCache{ L"", pConfig.help, nullptr, pConfig.help->abbreviation } });
+					added = true;
+				}
+				if (pConfig.version != nullptr && (pTopMost->super == nullptr || pConfig.version->allChildren.value_or(true))) {
+					selected.insert({ pConfig.version->name, NameCache{ L"", pConfig.version, nullptr, pConfig.version->abbreviation } });
+					added = true;
+				}
+				return added;
 			}
 
 		private:
@@ -365,19 +377,10 @@ namespace arger {
 				std::map<std::wstring, NameCache> selected;
 				std::set<std::wstring> usedList;
 
-				/* collect all of the names to be used (ignore all-children for descriptions as they are
-				*	shown on the right side, also add the help/version options for programs, and select
+				/* collect all of the names to be used (add the help/version options for programs and select
 				*	the used-by lists, which will automatically be lexicographically sorted in itself) */
-				if (!pConfig.burned->program.empty() && !required) {
-					if (pConfig.help != nullptr && (pTopMost->super == nullptr || pConfig.help->allChildren)) {
-						selected.insert({ pConfig.help->name, NameCache{ L"", pConfig.help, nullptr, pConfig.help->abbreviation} });
-						usedList.insert(L"");
-					}
-					if (pConfig.version != nullptr && (pTopMost->super == nullptr || pConfig.version->allChildren)) {
-						selected.insert({ pConfig.version->name, NameCache{ L"", pConfig.version, nullptr, pConfig.version->abbreviation } });
-						usedList.insert(L"");
-					}
-				}
+				if (!pConfig.burned->program.empty() && !required && fSelectSpecial(selected))
+					usedList.insert(L"");
 				for (const auto& [name, option] : pConfig.options) {
 					if (option.hidden)
 						continue;
@@ -454,15 +457,10 @@ namespace arger {
 				}
 			}
 			void fBuildGroups() {
-				/* collect the list of all names to be used (ignore all-children for descriptions as
-				*	they are shown on the right side, add the help and version entries for menus) */
+				/* collect the list of all names to be used (add the help and version entries for menus) */
 				std::map<std::wstring, NameCache> selected;
-				if (pConfig.burned->program.empty()) {
-					if (pConfig.help != nullptr && (pTopMost->super == nullptr || pConfig.help->allChildren))
-						selected.insert({ pConfig.help->name, NameCache{ L"", pConfig.help, nullptr, pConfig.help->abbreviation} });
-					if (pConfig.version != nullptr && (pTopMost->super == nullptr || pConfig.version->allChildren))
-						selected.insert({ pConfig.version->name, NameCache{ L"", pConfig.version, nullptr, pConfig.version->abbreviation } });
-				}
+				if (pConfig.burned->program.empty())
+					fSelectSpecial(selected);
 				if (pTopMost->endpoints.empty()) for (const auto& [name, group] : pTopMost->sub) {
 					if (!group.hidden)
 						selected.insert({ name, NameCache{ L"", group.group, nullptr, group.group->abbreviation } });

@@ -23,21 +23,11 @@ namespace arger {
 				std::wstring reduced;
 			} description;
 		};
-		struct Information {
-		public:
-			struct Entry {
-				std::wstring name;
-				std::wstring text;
-				bool normal = false;
-				bool reduced = false;
-				bool allChildren = false;
-			};
-
-		public:
-			std::vector<Entry> information;
-		};
 		struct Hidden {
 			bool hidden = false;
+		};
+		struct Reach {
+			std::optional<bool> allChildren;
 		};
 		struct Constraint {
 			std::vector<arger::Checker> constraints;
@@ -60,6 +50,16 @@ namespace arger {
 		};
 		struct Use {
 			std::set<size_t> use;
+		};
+		struct Information :
+			public detail::Reach {
+			std::wstring name;
+			std::wstring text;
+			std::wstring reduced;
+			Information(std::wstring name, std::wstring text, std::wstring reduced) : name{ name }, text{ text }, reduced{ reduced } {}
+		};
+		struct InformationList {
+			std::vector<detail::Information> information;
 		};
 		struct Positional :
 			public detail::Description {
@@ -84,7 +84,7 @@ namespace arger {
 			size_t id = 0;
 			Endpoint(size_t id) : id{ id } {}
 		};
-		struct Endpoints {
+		struct EndpointList {
 			std::vector<detail::Endpoint> endpoints;
 		};
 
@@ -99,12 +99,12 @@ namespace arger {
 			size_t id = 0;
 			Option(std::wstring name, size_t id) : name{ name }, id{ id } {}
 		};
-		struct Options {
+		struct OptionList {
 			std::vector<detail::Option> options;
 		};
 
 		struct Group;
-		struct Groups {
+		struct GroupList {
 			struct {
 				std::vector<detail::Group> list;
 				std::wstring name;
@@ -113,12 +113,12 @@ namespace arger {
 
 		struct SpecialEntry :
 			public detail::Description,
-			public detail::Abbreviation {
+			public detail::Abbreviation,
+			public detail::Reach {
 			std::wstring name;
-			bool allChildren = false;
 			bool reducible = false;
 			constexpr SpecialEntry() {}
-			constexpr SpecialEntry(std::wstring name, bool allChildren, bool reducible) : name{ name }, allChildren{ allChildren }, reducible{ reducible } {}
+			constexpr SpecialEntry(std::wstring name, bool reducible) : name{ name }, reducible{ reducible } {}
 		};
 		struct SpecialEntries {
 			struct {
@@ -131,11 +131,11 @@ namespace arger {
 			public detail::Require,
 			public detail::Positionals,
 			public detail::Constraint,
-			public detail::Groups,
-			public detail::Options,
+			public detail::GroupList,
+			public detail::OptionList,
 			public detail::Description,
-			public detail::Information,
-			public detail::Endpoints,
+			public detail::InformationList,
+			public detail::EndpointList,
 			public detail::EndpointId {
 		};
 		struct Group :
@@ -199,7 +199,7 @@ namespace arger {
 		constexpr arger::Option& add(const arger::IsConfig<detail::Option> auto&... configs);
 
 	private:
-		constexpr void burnConfig(detail::Options& base) const {
+		constexpr void burnConfig(detail::OptionList& base) const {
 			base.options.push_back(pOption);
 		}
 	};
@@ -217,7 +217,7 @@ namespace arger {
 		constexpr arger::Endpoint& add(const arger::IsConfig<detail::Endpoint> auto&... configs);
 
 	private:
-		constexpr void burnConfig(detail::Endpoints& base) const {
+		constexpr void burnConfig(detail::EndpointList& base) const {
 			base.endpoints.push_back(pEndpoint);
 		}
 	};
@@ -235,22 +235,21 @@ namespace arger {
 		constexpr arger::Group& add(const arger::IsConfig<detail::Group> auto&... configs);
 
 	private:
-		constexpr void burnConfig(detail::Groups& base) const {
+		constexpr void burnConfig(detail::GroupList& base) const {
 			base.groups.list.push_back(pGroup);
 		}
 	};
 
 	/* configure the key to be used as option for argument mode and any group name for menu mode, which
 	*	triggers the help-menu to be printed (prior to verifying the remainder of the argument structure)
-	*	Note: if reducible is enabled, the usage of the abbreviation will only print the reduced help menu
-	*	Note: if all-children is enabled, the help entry will be printed as option in all sub-groups as well */
+	*	Note: if reducible is enabled, the usage of the abbreviation will only print the reduced help menu */
 	struct HelpEntry : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		detail::SpecialEntry pSpecial;
 
 	public:
-		constexpr HelpEntry(std::wstring name, bool allChildren, bool reducible, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name, allChildren, reducible } {
+		constexpr HelpEntry(std::wstring name, bool reducible, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name, reducible } {
 			detail::ConfigBurner::Apply(pSpecial, configs...);
 		}
 		constexpr arger::HelpEntry& add(const arger::IsConfig<detail::SpecialEntry> auto&... configs) {
@@ -273,7 +272,7 @@ namespace arger {
 		detail::SpecialEntry pSpecial;
 
 	public:
-		constexpr VersionEntry(std::wstring name, bool allChildren, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name, allChildren, false } {
+		constexpr VersionEntry(std::wstring name, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name, false } {
 			detail::ConfigBurner::Apply(pSpecial, configs...);
 		}
 		constexpr arger::VersionEntry& add(const arger::IsConfig<detail::SpecialEntry> auto&... configs) {
@@ -336,19 +335,28 @@ namespace arger {
 		}
 	};
 
-	/* add information-string to the corresponding config/group and show them for entry and optionally all children
-	*	Note: will print the information optionally in the normal, reduced, or both menus */
+	/* add information-string to the corresponding config/group and show them for entry and optionally all children (depending on reach)
+	*	Note: will print the information in the normal mode, and optionally adjusted in the reduced view */
 	struct Information : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
-		detail::Information::Entry entry;
+		detail::Information pEntry;
 
 	public:
-		constexpr Information(std::wstring name, bool normal, bool reduced, bool allChildren, std::wstring text) : entry{ name, text, normal, reduced, allChildren } {}
+		constexpr Information(std::wstring name, std::wstring text, const arger::IsConfig<detail::Information> auto&... configs) : pEntry{ name, text, L"" } {
+			detail::ConfigBurner::Apply(pEntry, configs...);
+		}
+		constexpr Information(std::wstring name, std::wstring reduced, std::wstring text, const arger::IsConfig<detail::Information> auto&... configs) : pEntry{ name, text, reduced } {
+			detail::ConfigBurner::Apply(pEntry, configs...);
+		}
+		constexpr arger::Information& add(const arger::IsConfig<detail::Information> auto&... configs) {
+			detail::ConfigBurner::Apply(pEntry, configs...);
+			return *this;
+		}
 
 	private:
-		constexpr void burnConfig(detail::Information& base) const {
-			base.information.push_back(entry);
+		constexpr void burnConfig(detail::InformationList& base) const {
+			base.information.push_back(pEntry);
 		}
 	};
 
@@ -469,7 +477,7 @@ namespace arger {
 		constexpr GroupName(std::wstring name) : pName{ name } {}
 
 	private:
-		constexpr void burnConfig(detail::Groups& base) const {
+		constexpr void burnConfig(detail::GroupList& base) const {
 			base.groups.name = pName;
 		}
 	};
@@ -521,17 +529,34 @@ namespace arger {
 	};
 
 	/* set the visibility of options/groups/endpoints and their children in the help menu (does not affect parsing) */
-	struct Hidden : public detail::Configurator {
+	struct Visibility : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
-		bool pHidden = false;
+		bool pVisible = false;
 
 	public:
-		Hidden(bool hidden = true) : pHidden{ hidden } {}
+		Visibility(bool visible) : pVisible{ visible } {}
 
 	private:
 		constexpr void burnConfig(detail::Hidden& base) const {
-			base.hidden = pHidden;
+			base.hidden = !pVisible;
+		}
+	};
+
+	/* configure if the visibility of the entry for children
+	*	Note: for help/version, defaults to true, otherwise will only be printed in help menu of the root
+	*	Note: for information, defaults to false and will only be printed for the level it was defined at */
+	struct Reach : public detail::Configurator {
+		friend struct detail::ConfigBurner;
+	private:
+		bool pAllChildren = false;
+
+	public:
+		Reach(bool allChildren) : pAllChildren{ allChildren } {}
+
+	private:
+		constexpr void burnConfig(detail::Reach& base) const {
+			base.allChildren = pAllChildren;
 		}
 	};
 

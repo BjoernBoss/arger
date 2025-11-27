@@ -81,14 +81,12 @@ namespace arger::detail {
 		if (!description.description.reduced.empty() && (state.help == nullptr || !state.help->reducible))
 			throw arger::ConfigException{ L"Reduced description requires reduced help to be possible." };
 	}
-	inline constexpr void ValidateInformation(detail::ValidConfig& state, const detail::Information& information) {
+	inline constexpr void ValidateInformation(detail::ValidConfig& state, const detail::InformationList& information) {
 		for (const auto& info : information.information) {
 			if (info.name.empty() || info.text.empty())
 				throw arger::ConfigException{ L"Information name and description must not be empty." };
-			if (info.reduced && (state.help == nullptr || !state.help->reducible))
+			if (!info.reduced.empty() && (state.help == nullptr || !state.help->reducible))
 				throw arger::ConfigException{ L"Reduced information requires reduced help to be possible." };
-			if (!info.reduced && !info.normal)
-				throw arger::ConfigException{ L"Information must either be bound to the normal or reduced menu." };
 		}
 	}
 	inline constexpr void ValidateType(const arger::Type& type) {
