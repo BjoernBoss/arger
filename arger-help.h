@@ -316,7 +316,7 @@ namespace arger {
 				bool hasOptionals = false;
 				for (const auto& [name, option] : pConfig.options) {
 					/* check if options exist in theory */
-					if (detail::CheckUsage(&option, pTopMost) && option.minimum == 0) {
+					if (detail::CheckUsage(&option, pTopMost) && option.minimumEffective == 0) {
 						hasOptionals = true;
 						continue;
 					}
@@ -363,7 +363,7 @@ namespace arger {
 					std::wstring used;
 
 					/* check if the option can be discarded based on the selection */
-					if ((option.minimum > 0) != required || !fCheckOptionPrint(&option))
+					if ((option.minimumEffective > 0) != required || !fCheckOptionPrint(&option))
 						continue;
 
 					/* collect the usages (if groups still need to be selected and not all are users) */
@@ -416,7 +416,7 @@ namespace arger {
 						/* add the custom usage-limits and default values */
 						temp.clear();
 						if (option != nullptr) {
-							std::wstring limit = fLimitDescription(option->minimum, option->maximum > 1 ? option->maximum : 0), defDesc;
+							std::wstring limit = fLimitDescription(option->minimumActual, option->maximum > 1 ? option->maximum : 0), defDesc;
 							if (!option->option->payload.defValue.empty())
 								defDesc = fDefaultDescription(&option->option->payload.defValue.front(), &option->option->payload.defValue.back() + 1);
 							if (!limit.empty() || !defDesc.empty())

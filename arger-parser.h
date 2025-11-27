@@ -264,7 +264,7 @@ namespace arger {
 					}
 
 					/* validate the limits of the supplied optional arguments */
-					else if (option.minimum > count)
+					else if (option.minimumActual > count)
 						throw arger::ParsingException{ L"Argument [", name, L"] is missing." };
 					else if (option.maximum > 0 && count > option.maximum)
 						throw arger::ParsingException{ L"Argument [", name, L"] can at most be specified ", option.maximum, " times." };

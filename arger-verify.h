@@ -31,7 +31,8 @@ namespace arger::detail {
 		std::set<const detail::ValidArguments*> users;
 		const detail::Option* option = nullptr;
 		const detail::ValidArguments* owner = nullptr;
-		size_t minimum = 0;
+		size_t minimumEffective = 0;
+		size_t minimumActual = 0;
 		size_t maximum = 0;
 		bool payload = false;
 	};
@@ -230,21 +231,24 @@ namespace arger::detail {
 			detail::ValidateType(option.payload.type);
 		else if (option.require.minimum.has_value() || option.require.maximum.has_value())
 			throw arger::ConfigException{ L"Flags cannot have requirements defined." };
+		else if (!option.payload.defValue.empty())
+			throw arger::ConfigException{ L"Default values are not allowed for flags without payload." };
 
 		/* configure the minimum */
-		entry.minimum = option.require.minimum.value_or(0);
+		entry.minimumActual = option.require.minimum.value_or(0);
+		entry.minimumEffective = (option.payload.defValue.empty() ? entry.minimumActual : 0);
 
 		/* validate and configure the maximum */
 		if (!option.require.maximum.has_value())
-			entry.maximum = std::max<size_t>(entry.minimum, 1);
-		else if (*option.require.maximum < entry.minimum)
+			entry.maximum = std::max<size_t>(entry.minimumActual, 1);
+		else if (*option.require.maximum < entry.minimumActual)
 			entry.maximum = 0;
 		else
 			entry.maximum = *option.require.maximum;
 
 		/* validate the default-values */
 		if (entry.payload && !option.payload.defValue.empty()) {
-			if (option.payload.defValue.size() < entry.minimum)
+			if (option.payload.defValue.size() < entry.minimumActual)
 				throw arger::ConfigException{ L"Default values for option must not violate its own minimum requirements." };
 			if (entry.maximum > 0 && option.payload.defValue.size() > entry.maximum)
 				throw arger::ConfigException{ L"Default values for option must not violate its own maximum requirements." };
