@@ -26,6 +26,7 @@ namespace arger::detail {
 		const detail::Group* group = nullptr;
 		size_t depth = 0;
 		bool nestedPositionals = false;
+		bool hidden = false;
 	};
 	struct ValidOption {
 		std::set<const detail::ValidArguments*> users;
@@ -35,6 +36,7 @@ namespace arger::detail {
 		size_t minimumActual = 0;
 		size_t maximum = 0;
 		bool payload = false;
+		bool hidden = false;
 	};
 	struct ValidConfig : public detail::ValidArguments {
 		const detail::Config* burned = nullptr;
@@ -193,7 +195,7 @@ namespace arger::detail {
 			detail::ValidateDescription(state, positionals[i]);
 		}
 	}
-	inline void ValidateOption(detail::ValidConfig& state, const detail::Option& option, const detail::ValidArguments* owner) {
+	inline void ValidateOption(detail::ValidConfig& state, const detail::Option& option, const detail::ValidArguments* owner, bool hidden) {
 		if (option.name.size() <= 1)
 			throw arger::ConfigException{ L"Option name must at least be two characters long." };
 		if (option.name.starts_with(L"-"))
@@ -202,10 +204,13 @@ namespace arger::detail {
 		/* check if the name is unique */
 		if (state.options.contains(option.name))
 			throw arger::ConfigException{ L"Option names must be unique." };
+
+		/* setup the new entry */
 		detail::ValidOption& entry = state.options[option.name];
 		entry.option = &option;
 		entry.payload = !option.payload.name.empty();
 		entry.owner = owner;
+		entry.hidden = (hidden || option.hidden);
 
 		/* check if the abbreviation is unique */
 		if (option.abbreviation != 0) {
@@ -256,13 +261,14 @@ namespace arger::detail {
 				detail::ValidateDefValue(option.payload.type, value);
 		}
 	}
-	inline void ValidateArguments(detail::ValidConfig& state, const detail::Arguments& arguments, const detail::Group* group, detail::ValidArguments& entry, detail::ValidArguments* super) {
+	inline void ValidateArguments(detail::ValidConfig& state, const detail::Arguments& arguments, const detail::Group* group, detail::ValidArguments& entry, detail::ValidArguments* super, bool hidden) {
 		/* populate the entry */
 		entry.constraints = &arguments.constraints;
 		entry.nestedPositionals = !arguments.positionals.empty();
 		entry.super = super;
 		entry.depth = (super == nullptr ? 0 : super->depth + 1);
 		entry.group = group;
+		entry.hidden = (hidden || (group != nullptr && group->hidden));
 
 		/* validate and configure the group name */
 		if (arguments.groups.name.empty())
@@ -302,12 +308,12 @@ namespace arger::detail {
 					detail::ValidateSpecialEntry(state, sub.name, sub.abbreviation);
 
 				/* validate the arguments */
-				detail::ValidateArguments(state, sub, &sub, next, &entry);
+				detail::ValidateArguments(state, sub, &sub, next, &entry, entry.hidden);
 				entry.nestedPositionals = (entry.nestedPositionals || next.nestedPositionals);
 
 				/* register all new options */
 				for (const auto& option : sub.options)
-					detail::ValidateOption(state, option, &next);
+					detail::ValidateOption(state, option, &next, entry.hidden);
 
 				/* validate the information attributes */
 				detail::ValidateInformation(state, sub);
@@ -394,8 +400,8 @@ namespace arger::detail {
 
 		/* validate the options and arguments */
 		for (const auto& option : state.burned->options)
-			detail::ValidateOption(state, option, &state);
-		detail::ValidateArguments(state, *state.burned, nullptr, state, nullptr);
+			detail::ValidateOption(state, option, &state, false);
+		detail::ValidateArguments(state, *state.burned, nullptr, state, nullptr, false);
 
 		/* post-validate all groups after all groups and flags have been loaded */
 		for (const auto& [_, group] : state.sub)

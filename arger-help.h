@@ -317,6 +317,9 @@ namespace arger {
 				/* add all required options (must all consume a payload, as flags are never required) */
 				bool hasOptionals = false;
 				for (const auto& [name, option] : pConfig.options) {
+					if (option.hidden)
+						continue;
+
 					/* check if options exist in theory */
 					if (detail::CheckUsage(&option, pTopMost) && option.minimumEffective == 0) {
 						hasOptionals = true;
@@ -366,11 +369,13 @@ namespace arger {
 					}
 				}
 				for (const auto& [name, option] : pConfig.options) {
-					std::wstring used;
+					if (option.hidden)
+						continue;
 
 					/* check if the option can be discarded based on the selection */
 					if ((option.minimumEffective > 0) != required || !fCheckOptionPrint(&option))
 						continue;
+					std::wstring used;
 
 					/* collect the usages (if groups still need to be selected and not all are users) */
 					if (pTopMost->endpoints.empty()) {
@@ -448,8 +453,10 @@ namespace arger {
 					if (pConfig.version != nullptr && (pTopMost->super == nullptr || pConfig.version->allChildren))
 						selected.insert({ pConfig.version->name, NameCache{ L"", pConfig.version, nullptr, pConfig.version->abbreviation } });
 				}
-				if (pTopMost->endpoints.empty()) for (const auto& [name, group] : pTopMost->sub)
-					selected.insert({ name, NameCache{ L"", group.group, nullptr, group.group->abbreviation } });
+				if (pTopMost->endpoints.empty()) for (const auto& [name, group] : pTopMost->sub) {
+					if (!group.hidden)
+						selected.insert({ name, NameCache{ L"", group.group, nullptr, group.group->abbreviation } });
+				}
 
 				/* check if anything actually needs to be printed */
 				if (selected.empty())

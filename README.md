@@ -98,6 +98,9 @@ arger::Positional(std::wstring name, arger::Type type, const arger::IsConfig<det
 *	no values are povided and to fill up remaining values, if less were provided and must meet requirement
 *	counts for optionals/must be applied to all upcoming positionals for the requirement count */
 arger::Default(arger::Value defValue);
+
+/* set the visibility of options/groups and their children in the help menu (does not affect parsing) */
+arger::Hidden(bool hidden);
 ```
 
 ## Common Command Line Mode

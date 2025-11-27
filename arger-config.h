@@ -36,6 +36,9 @@ namespace arger {
 		public:
 			std::vector<Entry> information;
 		};
+		struct Hidden {
+			bool hidden = false;
+		};
 		struct Constraint {
 			std::vector<arger::Checker> constraints;
 		};
@@ -89,7 +92,8 @@ namespace arger {
 			public detail::Constraint,
 			public detail::Require,
 			public detail::Abbreviation,
-			public detail::Payload {
+			public detail::Payload,
+			public detail::Hidden {
 			std::wstring name;
 			size_t id = 0;
 			Option(std::wstring name, size_t id) : name{ name }, id{ id } {}
@@ -136,7 +140,8 @@ namespace arger {
 		struct Group :
 			public detail::Use,
 			public detail::Arguments,
-			public detail::Abbreviation {
+			public detail::Abbreviation,
+			public detail::Hidden {
 			std::wstring name;
 			size_t id = 0;
 			Group(std::wstring name, size_t id) : name{ name }, id{ id } {}
@@ -508,6 +513,21 @@ namespace arger {
 		}
 		constexpr void burnConfig(detail::Payload& base) const {
 			base.payload.defValue.push_back(pDefValue);
+		}
+	};
+
+	/* set the visibility of options/groups and their children in the help menu (does not affect parsing) */
+	struct Hidden : public detail::Configurator {
+		friend struct detail::ConfigBurner;
+	private:
+		bool pHidden = false;
+
+	public:
+		Hidden(bool hidden = true) : pHidden{ hidden } {}
+
+	private:
+		constexpr void burnConfig(detail::Hidden& base) const {
+			base.hidden = pHidden;
 		}
 	};
 
