@@ -9,6 +9,7 @@
 namespace arger {
 	static constexpr size_t NumCharsHelp = 100;
 	static constexpr size_t NumCharsHelpLeft = 28;
+	static constexpr size_t MinNumCharsRight = 8;
 	static constexpr size_t IndentInformation = 4;
 	static constexpr size_t AutoIndentLongText = 2;
 
@@ -74,7 +75,7 @@ namespace arger {
 
 		public:
 			constexpr HelpBuilder(const detail::BaseBuilder& base, const detail::ValidConfig& config, const detail::ValidArguments* topMost, size_t numChars, bool reduced) : pBase{ base }, pConfig{ config }, pTopMost{ topMost }, pReduced{ reduced } {
-				pNumChars = std::max(arger::NumCharsHelpLeft + 8, numChars);
+				pNumChars = std::max(arger::NumCharsHelpLeft + arger::MinNumCharsRight, numChars);
 			}
 
 		private:
@@ -556,6 +557,10 @@ namespace arger {
 
 		public:
 			std::wstring buildHelpString() {
+				/* update top-most to the first not-hidden entry (root config can never be hidden) */
+				while (pTopMost->super != nullptr && pTopMost->hidden)
+					pTopMost = pTopMost->super;
+
 				/* add the example-usage descriptive line */
 				fBuildUsage();
 
