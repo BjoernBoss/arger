@@ -203,8 +203,13 @@ namespace arger {
 		detail::Config pConfig;
 
 	public:
-		constexpr Config(const arger::IsConfig<detail::Config> auto&... configs);
-		constexpr arger::Config& add(const arger::IsConfig<detail::Config> auto&... configs);
+		constexpr Config(const arger::IsConfig<detail::Config> auto&... configs) {
+			detail::ConfigBurner::Apply(pConfig, configs...);
+		}
+		constexpr arger::Config& add(const arger::IsConfig<detail::Config> auto&... configs) {
+			detail::ConfigBurner::Apply(pConfig, configs...);
+			return *this;
+		}
 	};
 
 	/* general optional flag/payload
@@ -215,8 +220,13 @@ namespace arger {
 		detail::Option pOption;
 
 	public:
-		constexpr Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<detail::Option> auto&... configs);
-		constexpr arger::Option& add(const arger::IsConfig<detail::Option> auto&... configs);
+		constexpr Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<detail::Option> auto&... configs) : pOption{ name, static_cast<size_t>(id) } {
+			detail::ConfigBurner::Apply(pOption, configs...);
+		}
+		constexpr arger::Option& add(const arger::IsConfig<detail::Option> auto&... configs) {
+			detail::ConfigBurner::Apply(pOption, configs...);
+			return *this;
+		}
 
 	private:
 		constexpr void burnConfig(detail::OptionList& base) const {
@@ -232,9 +242,16 @@ namespace arger {
 		detail::Endpoint pEndpoint;
 
 	public:
-		constexpr Endpoint(const arger::IsConfig<detail::Endpoint> auto&... configs);
-		constexpr Endpoint(arger::IsId auto id, const arger::IsConfig<detail::Endpoint> auto&... configs);
-		constexpr arger::Endpoint& add(const arger::IsConfig<detail::Endpoint> auto&... configs);
+		constexpr Endpoint(const arger::IsConfig<detail::Endpoint> auto&... configs) : pEndpoint{ 0 } {
+			detail::ConfigBurner::Apply(pEndpoint, configs...);
+		}
+		constexpr Endpoint(arger::IsId auto id, const arger::IsConfig<detail::Endpoint> auto&... configs) : pEndpoint{ static_cast<size_t>(id) } {
+			detail::ConfigBurner::Apply(pEndpoint, configs...);
+		}
+		constexpr arger::Endpoint& add(const arger::IsConfig<detail::Endpoint> auto&... configs) {
+			detail::ConfigBurner::Apply(pEndpoint, configs...);
+			return *this;
+		}
 
 	private:
 		constexpr void burnConfig(detail::EndpointList& base) const {
@@ -250,9 +267,16 @@ namespace arger {
 		detail::Group pGroup;
 
 	public:
-		constexpr Group(std::wstring name, const arger::IsConfig<detail::Group> auto&... configs);
-		constexpr Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<detail::Group> auto&... configs);
-		constexpr arger::Group& add(const arger::IsConfig<detail::Group> auto&... configs);
+		constexpr Group(std::wstring name, const arger::IsConfig<detail::Group> auto&... configs) : pGroup{ name, 0 } {
+			detail::ConfigBurner::Apply(pGroup, configs...);
+		}
+		constexpr Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<detail::Group> auto&... configs) : pGroup{ name, static_cast<size_t>(id) } {
+			detail::ConfigBurner::Apply(pGroup, configs...);
+		}
+		constexpr arger::Group& add(const arger::IsConfig<detail::Group> auto&... configs) {
+			detail::ConfigBurner::Apply(pGroup, configs...);
+			return *this;
+		}
 
 	private:
 		constexpr void burnConfig(detail::GroupList& base) const {
@@ -582,43 +606,5 @@ namespace arger {
 
 	inline const detail::Config& detail::ConfigBurner::GetBurned(const arger::Config& config) {
 		return config.pConfig;
-	}
-
-	constexpr arger::Config::Config(const arger::IsConfig<detail::Config> auto&... configs) {
-		detail::ConfigBurner::Apply(pConfig, configs...);
-	}
-	constexpr arger::Config& arger::Config::add(const arger::IsConfig<detail::Config> auto&... configs) {
-		detail::ConfigBurner::Apply(pConfig, configs...);
-		return *this;
-	}
-
-	constexpr arger::Option::Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<detail::Option> auto&... configs) : pOption{ name, static_cast<size_t>(id) } {
-		detail::ConfigBurner::Apply(pOption, configs...);
-	}
-	constexpr arger::Option& arger::Option::add(const arger::IsConfig<detail::Option> auto&... configs) {
-		detail::ConfigBurner::Apply(pOption, configs...);
-		return *this;
-	}
-
-	constexpr arger::Endpoint::Endpoint(const arger::IsConfig<detail::Endpoint> auto&... configs) : pEndpoint{ 0 } {
-		detail::ConfigBurner::Apply(pEndpoint, configs...);
-	}
-	constexpr arger::Endpoint::Endpoint(arger::IsId auto id, const arger::IsConfig<detail::Endpoint> auto&... configs) : pEndpoint{ static_cast<size_t>(id) } {
-		detail::ConfigBurner::Apply(pEndpoint, configs...);
-	}
-	constexpr arger::Endpoint& arger::Endpoint::add(const arger::IsConfig<detail::Endpoint> auto&... configs) {
-		detail::ConfigBurner::Apply(pEndpoint, configs...);
-		return *this;
-	}
-
-	constexpr arger::Group::Group(std::wstring name, const arger::IsConfig<detail::Group> auto&... configs) : pGroup{ name, 0 } {
-		detail::ConfigBurner::Apply(pGroup, configs...);
-	}
-	constexpr arger::Group::Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<detail::Group> auto&... configs) : pGroup{ name, static_cast<size_t>(id) } {
-		detail::ConfigBurner::Apply(pGroup, configs...);
-	}
-	constexpr arger::Group& arger::Group::add(const arger::IsConfig<detail::Group> auto&... configs) {
-		detail::ConfigBurner::Apply(pGroup, configs...);
-		return *this;
 	}
 }

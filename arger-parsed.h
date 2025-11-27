@@ -43,7 +43,7 @@ namespace arger {
 		std::optional<arger::Value> option(arger::IsId auto id, size_t index = 0) const {
 			auto it = pOptions.find(static_cast<size_t>(id));
 			if (it == pOptions.end() || index >= it->second.first.size())
-				return {};
+				return std::nullopt;
 			return it->second.first[index];
 		}
 		constexpr size_t suppliedPositionals() const {
@@ -54,7 +54,7 @@ namespace arger {
 		}
 		std::optional<arger::Value> positional(size_t index) const {
 			if (index >= pPositional.size())
-				return {};
+				return std::nullopt;
 			return pPositional[index];
 		}
 	};

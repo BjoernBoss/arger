@@ -476,7 +476,7 @@ namespace arger {
 				if (pTopMost->endpoints.empty())
 					fAddString(str::wd::Build(L"Defined for [", pTopMost->groupName, L"]:"));
 				else
-					fAddString(str::wd::Build(L"Optional Keywords:"));
+					fAddString(L"Additional:");
 
 				/* print all of the selected entries */
 				for (const auto& [name, cache] : selected) {
@@ -502,7 +502,7 @@ namespace arger {
 					/* add the heading (with description for the variations) */
 					fAddNewLine(true);
 					if (pTopMost->endpoints.size() == 1)
-						fAddString(L"Positional Arguments:");
+						fAddString(pConfig.burned->program.empty() ? L"Arguments:" : L"Positional Arguments:");
 					else {
 						fAddString(str::wd::Build(L"Variation ", ++index, L':'));
 						fAddEndpointUsage(pTopMost->endpoints[i]);
