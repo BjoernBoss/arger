@@ -57,7 +57,7 @@ namespace arger {
 		private:
 			struct NameCache {
 				std::wstring used;
-				const std::wstring* description = 0;
+				const detail::Description* description = 0;
 				const detail::ValidOption* option = 0;
 				wchar_t abbreviation = 0;
 			};
@@ -244,6 +244,12 @@ namespace arger {
 					token = L"[" + token + L']';
 				return token;
 			}
+			const std::wstring* fGetDescription(const detail::Description* desc) {
+				if (desc == nullptr)
+					return nullptr;
+				const std::wstring& text = ((!pReduced || desc->description.reduced.empty()) ? desc->description.normal : desc->description.reduced);
+				return (text.empty() ? nullptr : &text);
+			}
 
 		private:
 			constexpr void fRecGroupUsage(const detail::ValidArguments* topMost) {
@@ -264,13 +270,16 @@ namespace arger {
 					return;
 				if (!pReduced)
 					fAddGroupDescription(topMost->super);
-				if (topMost->group->description.empty())
+
+				/* select the proper description to be used */
+				const std::wstring* desc = fGetDescription(topMost->group);
+				if (desc == nullptr)
 					return;
 
 				/* add the newline, description header, and description itself */
 				fAddNewLine(true);
 				fAddString(fGroupNameHistory(topMost));
-				fAddString(topMost->group->description, arger::IndentInformation);
+				fAddString(*desc, arger::IndentInformation);
 			}
 			constexpr void fRecInformationStrings(const detail::ValidArguments* topMost) {
 				if (topMost == nullptr)
@@ -359,11 +368,11 @@ namespace arger {
 				*	the used-by lists, which will automatically be lexicographically sorted in itself) */
 				if (!pConfig.burned->program.empty() && !required) {
 					if (pConfig.help != nullptr && (pTopMost->super == nullptr || pConfig.help->allChildren)) {
-						selected.insert({ pConfig.help->name, NameCache{ L"",  &pConfig.help->description, nullptr, pConfig.help->abbreviation} });
+						selected.insert({ pConfig.help->name, NameCache{ L"", pConfig.help, nullptr, pConfig.help->abbreviation} });
 						usedList.insert(L"");
 					}
 					if (pConfig.version != nullptr && (pTopMost->super == nullptr || pConfig.version->allChildren)) {
-						selected.insert({ pConfig.version->name, NameCache{ L"", &pConfig.version->description, nullptr, pConfig.version->abbreviation } });
+						selected.insert({ pConfig.version->name, NameCache{ L"", pConfig.version, nullptr, pConfig.version->abbreviation } });
 						usedList.insert(L"");
 					}
 				}
@@ -386,7 +395,7 @@ namespace arger {
 								used.append(used.empty() ? L"" : L", ").append(name);
 						}
 					}
-					selected.insert({ name, NameCache{ used, &option.option->description, &option, option.option->abbreviation } });
+					selected.insert({ name, NameCache{ used, option.option, &option, option.option->abbreviation } });
 					usedList.insert(used);
 				}
 
@@ -432,8 +441,8 @@ namespace arger {
 						}
 
 						/* write the description out and check if the enum descriptions need to be written out as well */
-						if (cache.description != nullptr)
-							temp.append((temp.empty() ? 0 : 1), L' ').append(*cache.description);
+						if (const std::wstring* text = fGetDescription(cache.description); text != nullptr)
+							temp.append((temp.empty() ? 0 : 1), L' ').append(*text);
 						fAddString(temp, arger::NumCharsHelpLeft, arger::AutoIndentLongText);
 						if (option != nullptr)
 							fAddEnumDescription(option->option->payload.type);
@@ -446,12 +455,12 @@ namespace arger {
 				std::map<std::wstring, NameCache> selected;
 				if (pConfig.burned->program.empty()) {
 					if (pConfig.help != nullptr && (pTopMost->super == nullptr || pConfig.help->allChildren))
-						selected.insert({ pConfig.help->name, NameCache{ L"", &pConfig.help->description, nullptr, pConfig.help->abbreviation} });
+						selected.insert({ pConfig.help->name, NameCache{ L"", pConfig.help, nullptr, pConfig.help->abbreviation} });
 					if (pConfig.version != nullptr && (pTopMost->super == nullptr || pConfig.version->allChildren))
-						selected.insert({ pConfig.version->name, NameCache{ L"", &pConfig.version->description, nullptr, pConfig.version->abbreviation } });
+						selected.insert({ pConfig.version->name, NameCache{ L"", pConfig.version, nullptr, pConfig.version->abbreviation } });
 				}
 				if (pTopMost->endpoints.empty()) for (const auto& [name, group] : pTopMost->sub)
-					selected.insert({ name, NameCache{ L"", &group.group->description, nullptr, group.group->abbreviation } });
+					selected.insert({ name, NameCache{ L"", group.group, nullptr, group.group->abbreviation } });
 
 				/* check if anything actually needs to be printed */
 				if (selected.empty())
@@ -470,8 +479,8 @@ namespace arger {
 					fAddString(str::wd::Build(L"  ", name));
 					if (cache.abbreviation != 0)
 						fAddString(str::wd::Build(L", ", cache.abbreviation));
-					if (!cache.description->empty())
-						fAddString(*cache.description, arger::NumCharsHelpLeft, arger::AutoIndentLongText);
+					if (const std::wstring* text = fGetDescription(cache.description); text != nullptr)
+						fAddString(*text, arger::NumCharsHelpLeft, arger::AutoIndentLongText);
 				}
 			}
 			void fBuildEndpoints() {
@@ -489,13 +498,13 @@ namespace arger {
 					else {
 						fAddString(str::wd::Build(L"Variation ", i + 1, L':'));
 						fAddEndpointUsage(pTopMost->endpoints[i]);
-						if (endpoint.description != nullptr && !endpoint.description->empty())
-							fAddString(*endpoint.description, arger::NumCharsHelpLeft, arger::AutoIndentLongText);
+						if (const std::wstring* text = fGetDescription(endpoint.description); text != nullptr)
+							fAddString(*text, arger::NumCharsHelpLeft, arger::AutoIndentLongText);
 					}
 
 					/* add the positional arguments descriptions (will automatically be sorted by position) */
 					for (size_t j = 0; j < endpoint.positionals->size(); ++j) {
-						const detail::Positionals::Entry& positional = (*endpoint.positionals)[j];
+						const detail::Positional& positional = (*endpoint.positionals)[j];
 						fAddNewLine(false);
 
 						/* add the name and corresponding type and description (add visual separation in the end) */
@@ -511,7 +520,8 @@ namespace arger {
 							temp = str::wd::Build(L'[', limit, ((limit.empty() || defDesc.empty()) ? L"" : L"; "), defDesc, L']');
 
 						/* add the description and append the enum value description */
-						temp.append((positional.description.empty() ? 0 : 1), L' ').append(positional.description);
+						if (const std::wstring* text = fGetDescription(&positional); text != nullptr)
+							temp.append((temp.empty() ? 0 : 1), L' ').append(*text);
 						fAddString(temp, arger::NumCharsHelpLeft, arger::AutoIndentLongText);
 						fAddEnumDescription(positional.type);
 					}
@@ -524,9 +534,9 @@ namespace arger {
 				fBuildUsage();
 
 				/* add the program description */
-				if (!pConfig.burned->description.empty() && (!pReduced || pTopMost->super == nullptr)) {
+				if (const std::wstring* text = fGetDescription(pConfig.burned); text != nullptr && (!pReduced || pTopMost->super == nullptr)) {
 					fAddNewLine(true);
-					fAddString(pConfig.burned->description, arger::IndentInformation);
+					fAddString(*text, arger::IndentInformation);
 				}
 
 				/* add the group description, the description of all sub-groups, the description of the endpoints,

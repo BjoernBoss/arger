@@ -53,8 +53,10 @@ arger::VersionText(std::wstring text);
 /* default alternative program name for the configuration (no program implies menu mode) */
 arger::Program(std::wstring program);
 
-/* description to the corresponding object */
+/* description to the corresponding object
+*	Note: if reduced text is used, it will be used for reduced help menus */
 arger::Description(std::wstring desc);
+arger::Description(std::wstring reduced, std::wstring desc);
 
 /* add information-string to the corresponding config/group
 *	Note: if always is set, will print the information, even if only the reducible help is printed */
@@ -93,8 +95,8 @@ arger::GroupName(std::wstring name);
 *	Note: Must meet the requirement-counts
 *	Note: Groups/Configs can can only have sub-groups or positional arguments
 *	Note: Default values will be used, when no argument is given */
-arger::Positional(std::wstring name, arger::Type type, std::wstring description);
-arger::Positional(std::wstring name, arger::Type type, std::wstring description, arger::Value defValue);
+arger::Positional(std::wstring name, arger::Type type, const arger::IsConfig<detail::Positional> auto&... configs);
+arger::Positional(std::wstring name, arger::Type type, arger::Value defValue, const arger::IsConfig<detail::Positional> auto&... configs);
 ```
 
 ## Common Command Line Mode

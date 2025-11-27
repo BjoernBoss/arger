@@ -8,9 +8,9 @@
 
 namespace arger::detail {
 	struct ValidEndpoint {
-		const std::vector<detail::Positionals::Entry>* positionals = nullptr;
+		const std::vector<detail::Positional>* positionals = nullptr;
 		const std::vector<arger::Checker>* constraints = nullptr;
-		const std::wstring* description = nullptr;
+		const detail::Description* description = nullptr;
 		size_t minimumEffective = 0;
 		size_t minimumActual = 0;
 		size_t maximum = 0;
@@ -71,6 +71,13 @@ namespace arger::detail {
 		return false;
 	}
 
+	inline constexpr void ValidateDescription(detail::ValidConfig& state, const detail::Description& description) {
+		if (description.description.normal.empty() && !description.description.reduced.empty())
+			throw arger::ConfigException{ L"Reduced description requires normal description as well" };
+		if (state.help == nullptr || !state.help->reducible)
+			throw arger::ConfigException{ L"Reduced description requires reduced help to be possible" };
+
+	}
 	inline constexpr void ValidateInformation(const detail::Information& information) {
 		for (size_t i = 0; i < information.information.size(); ++i) {
 			if (information.information[i].name.empty() || information.information[i].text.empty())
@@ -113,13 +120,13 @@ namespace arger::detail {
 		}
 	}
 	inline constexpr void ValidateSpecialEntry(const detail::ValidConfig& state, const std::wstring& name, wchar_t abbreviation) {
-		if (state.help != 0) {
+		if (state.help != nullptr) {
 			if (name == state.help->name)
 				throw arger::ConfigException{ L"Name clashes with help entry name." };
 			if (abbreviation != 0 && abbreviation == state.help->abbreviation)
 				throw arger::ConfigException{ L"Abbreviation clashes with help entry abbreviation." };
 		}
-		if (state.version != 0) {
+		if (state.version != nullptr) {
 			if (name == state.version->name)
 				throw arger::ConfigException{ L"Name clashes with version entry name." };
 			if (abbreviation != 0 && abbreviation == state.version->abbreviation)
@@ -127,17 +134,21 @@ namespace arger::detail {
 		}
 	}
 
-	inline void ValidateEndpoint(detail::ValidArguments& entry, const detail::Arguments* args, const detail::Endpoint* endpoint) {
-		const std::vector<detail::Positionals::Entry>& positionals = (args == 0 ? endpoint->positionals : args->positionals);
-		std::optional<size_t> minimum = (args == 0 ? endpoint->require : args->require).minimum;
-		std::optional<size_t> maximum = (args == 0 ? endpoint->require : args->require).maximum;
+	inline void ValidateEndpoint(detail::ValidConfig& state, detail::ValidArguments& entry, const detail::Arguments* args, const detail::Endpoint* endpoint) {
+		const std::vector<detail::Positional>& positionals = (args == nullptr ? endpoint->positionals : args->positionals);
+		std::optional<size_t> minimum = (args == nullptr ? endpoint->require : args->require).minimum;
+		std::optional<size_t> maximum = (args == nullptr ? endpoint->require : args->require).maximum;
 
 		/* setup the new endpoint (all-children is ignored for end-points as they do not have children) */
 		detail::ValidEndpoint& next = entry.endpoints.emplace_back();
 		next.positionals = &positionals;
-		next.constraints = (args == 0 ? &endpoint->constraints : 0);
-		next.description = (args == 0 ? &endpoint->description : 0);
-		next.id = (args == 0 ? endpoint->id : args->endpointId);
+		next.constraints = (args == nullptr ? &endpoint->constraints : nullptr);
+		next.description = (args == nullptr ? endpoint : nullptr);
+		next.id = (args == nullptr ? endpoint->id : args->endpointId);
+
+		/* validate the description */
+		if (next.description != nullptr)
+			detail::ValidateDescription(state, *next.description);
 
 		/* validate and configure the minimum */
 		if (minimum.has_value() && positionals.empty())
@@ -172,6 +183,9 @@ namespace arger::detail {
 			detail::ValidateDefValue(positionals[i].type, positionals[i].defValue.value());
 			if (i < next.minimumEffective)
 				throw arger::ConfigException{ L"All positionals up to the minimum must be defaulted once one is defaulted" };
+
+			/* validat ethe description */
+			detail::ValidateDescription(state, positionals[i]);
 		}
 	}
 	inline void ValidateOption(detail::ValidConfig& state, const detail::Option& option, const detail::ValidArguments* owner) {
@@ -204,14 +218,17 @@ namespace arger::detail {
 		if (!state.burned->program.empty())
 			detail::ValidateSpecialEntry(state, option.name, option.abbreviation);
 
+		/* validate the description */
+		detail::ValidateDescription(state, option);
+
 		/* validate the payload */
 		if (entry.payload)
 			detail::ValidateType(option.payload.type);
-
-		/* validate and configure the minimum */
-		entry.minimum = option.require.minimum.value_or(0);
-		if (!entry.payload && (option.require.minimum.has_value() || option.require.maximum.has_value()))
+		else if (option.require.minimum.has_value() || option.require.maximum.has_value())
 			throw arger::ConfigException{ L"Flags cannot have requirements defined" };
+
+		/* configure the minimum */
+		entry.minimum = option.require.minimum.value_or(0);
 
 		/* validate and configure the maximum */
 		if (!option.require.maximum.has_value())
@@ -236,7 +253,7 @@ namespace arger::detail {
 		entry.constraints = &arguments.constraints;
 		entry.nestedPositionals = !arguments.positionals.empty();
 		entry.super = super;
-		entry.depth = (super == 0 ? 0 : super->depth + 1);
+		entry.depth = (super == nullptr ? 0 : super->depth + 1);
 		entry.group = group;
 
 		/* validate and configure the group name */
@@ -244,6 +261,9 @@ namespace arger::detail {
 			entry.groupName = L"mode";
 		else
 			entry.groupName = str::View{ arguments.groups.name }.lower();
+
+		/* validate the description */
+		detail::ValidateDescription(state, arguments);
 
 		/* validate the groups */
 		if (!arguments.groups.list.empty()) {
@@ -289,14 +309,14 @@ namespace arger::detail {
 
 		/* check if an implicit endpoint needs to be added */
 		if (arguments.endpoints.empty())
-			detail::ValidateEndpoint(entry, &arguments, 0);
+			detail::ValidateEndpoint(state, entry, &arguments, nullptr);
 
 		/* validate all explicit endpoints */
 		else {
 			if (!arguments.positionals.empty() || arguments.require.minimum.has_value() || arguments.require.maximum.has_value())
 				throw arger::ConfigException{ L"Implicit and explicit endpoints cannot be used in conjunction." };
 			for (size_t i = 0; i < arguments.endpoints.size(); ++i)
-				detail::ValidateEndpoint(entry, 0, &arguments.endpoints[i]);
+				detail::ValidateEndpoint(state, entry, nullptr, &arguments.endpoints[i]);
 		}
 
 		/* sort all endpoints and ensure that they can be uniquely differentiated */
@@ -350,6 +370,7 @@ namespace arger::detail {
 					throw arger::ConfigException{ L"Help entry and version entry cannot have the same abbreviation." };
 			}
 			state.help = &state.burned->special.help;
+			detail::ValidateDescription(state, state.burned->special.help);
 		}
 		if (!state.burned->special.version.name.empty()) {
 			if (state.burned->special.version.name.size() <= 1)
@@ -357,6 +378,7 @@ namespace arger::detail {
 			if (state.burned->version.empty())
 				throw arger::ConfigException{ L"Version string must be set when using a version entry." };
 			state.version = &state.burned->special.version;
+			detail::ValidateDescription(state, state.burned->special.version);
 		}
 
 		/* validate the information attributes */
@@ -365,7 +387,7 @@ namespace arger::detail {
 		/* validate the options and arguments */
 		for (const auto& option : state.burned->options)
 			detail::ValidateOption(state, option, &state);
-		detail::ValidateArguments(state, *state.burned, 0, state, 0);
+		detail::ValidateArguments(state, *state.burned, nullptr, state, nullptr);
 
 		/* post-validate all groups after all groups and flags have been loaded */
 		for (const auto& [_, group] : state.sub)

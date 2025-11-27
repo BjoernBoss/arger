@@ -18,7 +18,10 @@ namespace arger {
 			std::wstring program;
 		};
 		struct Description {
-			std::wstring description;
+			struct {
+				std::wstring normal;
+				std::wstring reduced;
+			} description;
 		};
 		struct Information {
 		public:
@@ -53,17 +56,15 @@ namespace arger {
 		struct Use {
 			std::set<size_t> use;
 		};
+		struct Positional :
+			public detail::Description {
+			std::optional<arger::Value> defValue;
+			std::wstring name;
+			arger::Type type;
+			Positional(std::optional<arger::Value> val, std::wstring name, arger::Type type) : defValue{ val }, name{ name }, type{ type } {}
+		};
 		struct Positionals {
-		public:
-			struct Entry {
-				std::optional<arger::Value> defValue;
-				std::wstring name;
-				arger::Type type;
-				std::wstring description;
-			};
-
-		public:
-			std::vector<Entry> positionals;
+			std::vector<detail::Positional> positionals;
 		};
 		struct EndpointId {
 			size_t endpointId = 0;
@@ -124,28 +125,25 @@ namespace arger {
 			public detail::Positionals,
 			public detail::Constraint,
 			public detail::Groups,
+			public detail::Options,
+			public detail::Description,
+			public detail::Information,
 			public detail::Endpoints,
 			public detail::EndpointId {
 		};
 		struct Group :
-			public detail::Description,
-			public detail::Information,
 			public detail::Use,
 			public detail::Arguments,
-			public detail::Abbreviation,
-			public detail::Options {
+			public detail::Abbreviation {
 			std::wstring name;
 			size_t id = 0;
 			Group(std::wstring name, size_t id) : name{ name }, id{ id } {}
 		};
 
 		struct Config :
-			public detail::Description,
-			public detail::Information,
-			public detail::Options,
+			public detail::Program,
 			public detail::Arguments,
 			public detail::VersionText,
-			public detail::Program,
 			public detail::SpecialEntries {
 		};
 
@@ -311,18 +309,22 @@ namespace arger {
 		}
 	};
 
-	/* description to the corresponding object */
+	/* description to the corresponding object
+	*	Note: if reduced text is used, it will be used for reduced help menus */
 	struct Description : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
 		std::wstring pDescription;
+		std::wstring pReduced;
 
 	public:
 		constexpr Description(std::wstring desc) : pDescription{ desc } {}
+		constexpr Description(std::wstring reduced, std::wstring desc) : pReduced{ reduced }, pDescription{ desc } {}
 
 	private:
 		constexpr void burnConfig(detail::Description& base) const {
-			base.description = pDescription;
+			base.description.normal = pDescription;
+			base.description.reduced = pReduced;
 		}
 	};
 
@@ -475,15 +477,21 @@ namespace arger {
 	struct Positional : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
-		detail::Positionals::Entry pEntry;
+		detail::Positional pPositional;
 
 	public:
-		Positional(std::wstring name, arger::Type type, std::wstring description) : pEntry{ std::nullopt, name, type, description } {}
-		Positional(std::wstring name, arger::Type type, std::wstring description, arger::Value defValue) : pEntry{ defValue, name, type, description } {}
+		constexpr Positional(std::wstring name, arger::Type type, const arger::IsConfig<detail::Positional> auto&... configs) : pPositional{ std::nullopt, name, type } {}
+		constexpr Positional(std::wstring name, arger::Type type, arger::Value defValue, const arger::IsConfig<detail::Positional> auto&... configs) : pPositional{ defValue, name, type } {
+			detail::ConfigBurner::Apply(pPositional, configs...);
+		}
+		constexpr arger::Positional& add(const arger::IsConfig<detail::Positional> auto&... configs) {
+			detail::ConfigBurner::Apply(pPositional, configs...);
+			return *this;
+		}
 
 	private:
 		constexpr void burnConfig(detail::Positionals& base) const {
-			base.positionals.push_back(pEntry);
+			base.positionals.push_back(pPositional);
 		}
 	};
 

@@ -19,7 +19,7 @@ namespace arger {
 		private:
 			const std::vector<std::wstring>& pArgs;
 			detail::ValidConfig pConfig;
-			const detail::ValidArguments* pTopMost = 0;
+			const detail::ValidArguments* pTopMost = nullptr;
 			arger::Parsed pParsed;
 			std::wstring pDeferred;
 			size_t pIndex = 0;
@@ -37,11 +37,11 @@ namespace arger {
 				/* check if it could be the help or version entry (only relevant for programs) */
 				size_t i = 0;
 				if (fullName && !pConfig.burned->program.empty()) {
-					if (pConfig.help != 0 && pConfig.help->name == arg) {
+					if (pConfig.help != nullptr && pConfig.help->name == arg) {
 						pPrintHelp = detail::PrintOption::full;
 						i = arg.size();
 					}
-					else if (pConfig.version != 0 && pConfig.version->name == arg) {
+					else if (pConfig.version != nullptr && pConfig.version->name == arg) {
 						pPrintVersion = true;
 						i = arg.size();
 					}
@@ -49,7 +49,7 @@ namespace arger {
 
 				/* iterate over the list of optional abbreviations/single full-name and process them */
 				for (; i < arg.size(); ++i) {
-					detail::ValidOption* entry = 0;
+					detail::ValidOption* entry = nullptr;
 
 					/* resolve the optional-argument entry if its a full name */
 					if (fullName) {
@@ -66,12 +66,12 @@ namespace arger {
 					}
 
 					/* check if its one of the special entries (only relevant for programs) */
-					else if (!pConfig.burned->program.empty() && pConfig.help != 0 && pConfig.help->abbreviation == arg[i]) {
+					else if (!pConfig.burned->program.empty() && pConfig.help != nullptr && pConfig.help->abbreviation == arg[i]) {
 						if (pPrintHelp != detail::PrintOption::full)
 							pPrintHelp = detail::PrintOption::reduced;
 						continue;
 					}
-					else if (!pConfig.burned->program.empty() && pConfig.version != 0 && pConfig.version->abbreviation == arg[i]) {
+					else if (!pConfig.burned->program.empty() && pConfig.version != nullptr && pConfig.version->abbreviation == arg[i]) {
 						pPrintVersion = true;
 						continue;
 					}
@@ -204,7 +204,7 @@ namespace arger {
 				for (size_t i = 0; i < pParsed.pPositional.size(); ++i) {
 					/* check if the argument is out of range */
 					if (endpoint->positionals->empty() || (endpoint->maximum > 0 && i >= endpoint->maximum)) {
-						if (pTopMost->super == 0)
+						if (pTopMost->super == nullptr)
 							throw arger::ParsingException{ L"Unrecognized argument [", pParsed.pPositional[i].str(), L"] encountered." };
 						throw arger::ParsingException{ L"Unrecognized argument [", pParsed.pPositional[i].str(), L"] encountered for ", pTopMost->super->groupName, L" [", pTopMost->group->name, L"]." };
 					}
@@ -218,7 +218,7 @@ namespace arger {
 				*	necessary to be checked, as it was checked implicitly by the verification-loop) */
 				if (pParsed.pPositional.size() < endpoint->minimumEffective) {
 					size_t index = std::min<size_t>(endpoint->positionals->size() - 1, pParsed.pPositional.size());
-					if (pTopMost->super == 0)
+					if (pTopMost->super == nullptr)
 						throw arger::ParsingException{ L"Argument [", (*endpoint->positionals)[index].name, L"] is missing." };
 					throw arger::ParsingException{ L"Argument [", (*endpoint->positionals)[index].name, L"] is missing for ", pTopMost->super->groupName, L" [", pTopMost->group->name, L"]." };
 				}
@@ -285,7 +285,7 @@ namespace arger {
 				}
 			}
 			void fRecCheckConstraints(const detail::ValidArguments* args) {
-				if (args == 0)
+				if (args == nullptr)
 					return;
 				fRecCheckConstraints(args->super);
 				fCheckConstraints(*args->constraints);
@@ -307,11 +307,11 @@ namespace arger {
 
 					/* check if its the version or help group (only relevant for menus and only if no positional arguments have yet been pushed) */
 					if (pConfig.burned->program.empty() && pParsed.pPositional.empty()) {
-						if (pConfig.help != 0 && (next.size() != 1 ? (next == pConfig.help->name) : (pConfig.help->abbreviation == next[0] && next[0] != 0))) {
+						if (pConfig.help != nullptr && (next.size() != 1 ? (next == pConfig.help->name) : (pConfig.help->abbreviation == next[0] && next[0] != 0))) {
 							pPrintHelp = ((next.size() > 1 || pPrintHelp == detail::PrintOption::full) ? detail::PrintOption::full : detail::PrintOption::reduced);
 							continue;
 						}
-						if (pConfig.version != 0 && (next.size() != 1 ? (next == pConfig.version->name) : (pConfig.version->abbreviation == next[0] && next[0] != 0))) {
+						if (pConfig.version != nullptr && (next.size() != 1 ? (next == pConfig.version->name) : (pConfig.version->abbreviation == next[0] && next[0] != 0))) {
 							pPrintVersion = true;
 							continue;
 						}
@@ -348,14 +348,14 @@ namespace arger {
 					/* check if this is a group-selector */
 					if (pTopMost->endpoints.empty()) {
 						/* find the group with the matching argument-name */
-						const detail::ValidArguments* _next = 0;
+						const detail::ValidArguments* _next = nullptr;
 						if (auto it = pTopMost->sub.find(next); it != pTopMost->sub.end())
 							_next = &it->second;
 						else if (auto it = pTopMost->abbreviations.find(next.size() == 1 ? next[0] : L'\0'); it != pTopMost->abbreviations.end())
 							_next = it->second;
 
 						/* check if a matching group has been found */
-						if (_next != 0) {
+						if (_next != nullptr) {
 							pTopMost = _next;
 							pParsed.pGroupIds.push_back(pTopMost->group->id);
 							continue;
@@ -376,7 +376,7 @@ namespace arger {
 				/* check if the help or version should be printed */
 				std::wstring print = (pPrintVersion ? base.buildVersionString() : L"");
 				if (pPrintHelp != detail::PrintOption::none) {
-					bool reduced = (pPrintHelp == detail::PrintOption::reduced && pConfig.help->reducible);
+					bool reduced = (pPrintHelp == detail::PrintOption::reduced && pConfig.help != nullptr && pConfig.help->reducible);
 					print.append(print.empty() ? L"" : L"\n\n").append(detail::HelpBuilder{ base, pConfig, pTopMost, lineLength, reduced }.buildHelpString());
 				}
 				if (!print.empty())
@@ -397,7 +397,7 @@ namespace arger {
 				fRecCheckConstraints(pTopMost);
 
 				/* validate the endpoint constraints */
-				if (endpoint != 0 && endpoint->constraints != 0)
+				if (endpoint != nullptr && endpoint->constraints != nullptr)
 					fCheckConstraints(*endpoint->constraints);
 
 				/* validate all optional constraints */
