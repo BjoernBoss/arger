@@ -8,7 +8,7 @@
 
 namespace arger {
 	static constexpr size_t NumCharsHelp = 100;
-	static constexpr size_t NumCharsHelpLeft = 28;
+	static constexpr size_t NumCharsHelpLeft = 32;
 	static constexpr size_t MinNumCharsRight = 8;
 	static constexpr size_t IndentInformation = 4;
 	static constexpr size_t AutoIndentLongText = 2;

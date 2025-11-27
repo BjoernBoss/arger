@@ -11,7 +11,7 @@
 
 namespace arger {
 	/* convenience function to prepare the arguments */
-	inline std::vector<std::wstring> Prepare(int argc, const str::IsChar auto* const* argv) {
+	inline std::vector<std::wstring> Prepare(size_t argc, const str::IsChar auto* const* argv) {
 		std::vector<std::wstring> args;
 		for (size_t i = 0; i < argc; ++i)
 			args.push_back(str::wd::Safe(argv[i]));
@@ -71,7 +71,7 @@ namespace arger {
 	}
 
 	/* convenience functions for help-hints with default argument pattern from separated arguments */
-	inline constexpr std::wstring HelpHint(int argc, const str::IsChar auto* const* argv, const arger::Config& config) {
+	inline constexpr std::wstring HelpHint(size_t argc, const str::IsChar auto* const* argv, const arger::Config& config) {
 		return arger::HelpHint({ str::wd::Safe(argc == 0 ? "" : argv[0]) }, config);
 	}
 
@@ -81,7 +81,7 @@ namespace arger {
 	}
 
 	/* convenience functions for standard program or menu-input arguments parsing from separated arguments */
-	inline arger::Parsed Parse(int argc, const str::IsChar auto* const* argv, const arger::Config& config, size_t lineLength = arger::NumCharsHelp) {
+	inline arger::Parsed Parse(size_t argc, const str::IsChar auto* const* argv, const arger::Config& config, size_t lineLength = arger::NumCharsHelp) {
 		return arger::Parse(arger::Prepare(argc, argv), config, lineLength);
 	}
 }

@@ -130,7 +130,7 @@ namespace arger {
 				size_t id = std::find_if(list.begin(), list.end(), [&](const arger::EnumEntry& e) { return e.name == value.str(); })->id;
 				value = arger::Value{ detail::EnumId{.id = id } };
 			}
-			void fVerifyValue(const std::wstring& name, arger::Value& value, const arger::Type& type) const {
+			void fVerifyValue(const std::wstring& name, arger::Value& value, const arger::Type& type, bool option) const {
 				/* check if an enum was expected */
 				if (std::holds_alternative<arger::Enum>(type)) {
 					const arger::Enum& list = std::get<arger::Enum>(type);
@@ -138,7 +138,7 @@ namespace arger {
 					/* resolve the id of the string */
 					auto it = std::find_if(list.begin(), list.end(), [&](const arger::EnumEntry& e) { return e.name == value.str(); });
 					if (it == list.end())
-						throw arger::ParsingException{ L"Invalid enum for argument [", name, L"] encountered." };
+						throw arger::ParsingException{ L"Invalid enum for ", (option ? L"option" : L"argument"), L" [", name, L"] encountered."};
 
 					/* assign the new enum-id */
 					value = arger::Value{ detail::EnumId{.id = it->id } };
@@ -150,21 +150,21 @@ namespace arger {
 				case arger::Primitive::inum: {
 					auto [num, len, res] = str::SiParseNum<int64_t>(value.str(), { .prefix = str::PrefixMode::overwrite, .scale = str::SiScaleMode::detect });
 					if (res != str::NumResult::valid || len != value.str().size())
-						throw arger::ParsingException{ L"Invalid signed integer for argument [", name, L"] encountered." };
+						throw arger::ParsingException{ L"Invalid signed integer for ", (option ? L"option" : L"argument"), L" [", name, L"] encountered." };
 					value = arger::Value{ num };
 					break;
 				}
 				case arger::Primitive::unum: {
 					auto [num, len, res] = str::SiParseNum<uint64_t>(value.str(), { .prefix = str::PrefixMode::overwrite, .scale = str::SiScaleMode::detect });
 					if (res != str::NumResult::valid || len != value.str().size())
-						throw arger::ParsingException{ L"Invalid unsigned integer for argument [", name, L"] encountered." };
+						throw arger::ParsingException{ L"Invalid unsigned integer for ", (option ? L"option" : L"argument"), L" [", name, L"] encountered." };
 					value = arger::Value{ num };
 					break;
 				}
 				case arger::Primitive::real: {
 					auto [num, len, res] = str::SiParseNum<double>(value.str(), { .prefix = str::PrefixMode::overwrite, .scale = str::SiScaleMode::detect });
 					if (res != str::NumResult::valid || len != value.str().size())
-						throw arger::ParsingException{ L"Invalid real for argument [", name, L"] encountered." };
+						throw arger::ParsingException{ L"Invalid real for ", (option ? L"option" : L"argument"), L" [", name, L"] encountered." };
 					value = arger::Value{ num };
 					break;
 				}
@@ -177,7 +177,7 @@ namespace arger {
 						value = arger::Value{ false };
 						break;
 					}
-					throw arger::ParsingException{ L"Invalid boolean for argument [", name, L"] encountered." };
+					throw arger::ParsingException{ L"Invalid boolean for ", (option ? L"option" : L"argument"), L" [", name, L"] encountered." };
 				}
 				case arger::Primitive::any:
 				default:
@@ -213,7 +213,7 @@ namespace arger {
 					size_t index = std::min<size_t>(i, endpoint->positionals->size() - 1);
 
 					/* unpack and verify the value */
-					fVerifyValue((*endpoint->positionals)[index].name, pParsed.pPositional[i], (*endpoint->positionals)[index].type);
+					fVerifyValue((*endpoint->positionals)[index].name, pParsed.pPositional[i], (*endpoint->positionals)[index].type, false);
 				}
 
 				/* check if the minimum required number of parameters has not been reached (maximum not
@@ -276,7 +276,7 @@ namespace arger {
 
 					/* verify and unpack the values themselves */
 					for (size_t i = 0; i < count; ++i)
-						fVerifyValue(name, it->second.first[i], option.option->payload.type);
+						fVerifyValue(name, it->second.first[i], option.option->payload.type, true);
 
 					/* update the supplied count */
 					if (it != pParsed.pOptions.end())
