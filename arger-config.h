@@ -79,7 +79,8 @@ namespace arger {
 			public detail::Require,
 			public detail::Positionals,
 			public detail::Constraint,
-			public detail::Description {
+			public detail::Description,
+			public detail::Hidden {
 			size_t id = 0;
 			Endpoint(size_t id) : id{ id } {}
 		};
@@ -516,7 +517,7 @@ namespace arger {
 		}
 	};
 
-	/* set the visibility of options/groups and their children in the help menu (does not affect parsing) */
+	/* set the visibility of options/groups/endpoints and their children in the help menu (does not affect parsing) */
 	struct Hidden : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:

@@ -99,7 +99,7 @@ arger::Positional(std::wstring name, arger::Type type, const arger::IsConfig<det
 *	counts for optionals/must be applied to all upcoming positionals for the requirement count */
 arger::Default(arger::Value defValue);
 
-/* set the visibility of options/groups and their children in the help menu (does not affect parsing) */
+/* set the visibility of options/groups/endpoints and their children in the help menu (does not affect parsing) */
 arger::Hidden(bool hidden);
 ```
 

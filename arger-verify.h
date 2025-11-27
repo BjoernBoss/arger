@@ -15,6 +15,7 @@ namespace arger::detail {
 		size_t minimumActual = 0;
 		size_t maximum = 0;
 		size_t id = 0;
+		bool hidden = false;
 	};
 	struct ValidArguments {
 		std::map<std::wstring, detail::ValidArguments> sub;
@@ -141,7 +142,7 @@ namespace arger::detail {
 		}
 	}
 
-	inline void ValidateEndpoint(detail::ValidConfig& state, detail::ValidArguments& entry, const detail::Arguments* args, const detail::Endpoint* endpoint) {
+	inline void ValidateEndpoint(detail::ValidConfig& state, detail::ValidArguments& entry, const detail::Arguments* args, const detail::Endpoint* endpoint, bool hidden) {
 		const std::vector<detail::Positional>& positionals = (args == nullptr ? endpoint->positionals : args->positionals);
 		std::optional<size_t> minimum = (args == nullptr ? endpoint->require : args->require).minimum;
 		std::optional<size_t> maximum = (args == nullptr ? endpoint->require : args->require).maximum;
@@ -152,6 +153,7 @@ namespace arger::detail {
 		next.constraints = (args == nullptr ? &endpoint->constraints : nullptr);
 		next.description = (args == nullptr ? endpoint : nullptr);
 		next.id = (args == nullptr ? endpoint->id : args->endpointId);
+		next.hidden = (hidden || (endpoint != nullptr && endpoint->hidden));
 
 		/* validate the description */
 		if (next.description != nullptr)
@@ -323,14 +325,14 @@ namespace arger::detail {
 
 		/* check if an implicit endpoint needs to be added */
 		if (arguments.endpoints.empty())
-			detail::ValidateEndpoint(state, entry, &arguments, nullptr);
+			detail::ValidateEndpoint(state, entry, &arguments, nullptr, entry.hidden);
 
 		/* validate all explicit endpoints */
 		else {
 			if (!arguments.positionals.empty() || arguments.require.minimum.has_value() || arguments.require.maximum.has_value())
 				throw arger::ConfigException{ L"Implicit and explicit endpoints cannot be used in conjunction." };
 			for (size_t i = 0; i < arguments.endpoints.size(); ++i)
-				detail::ValidateEndpoint(state, entry, nullptr, &arguments.endpoints[i]);
+				detail::ValidateEndpoint(state, entry, nullptr, &arguments.endpoints[i], entry.hidden);
 		}
 
 		/* sort all endpoints and ensure that they can be uniquely differentiated */

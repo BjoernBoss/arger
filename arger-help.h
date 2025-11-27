@@ -340,15 +340,24 @@ namespace arger {
 				if (pTopMost->endpoints.size() > 1)
 					fAddString(L" variation...");
 
-				/* add all of the separate endpoints */
-				if (pTopMost->endpoints.size() == 1)
-					fAddEndpointUsage(pTopMost->endpoints.front());
-				else if (!pReduced) for (size_t i = 0; i < pTopMost->endpoints.size(); ++i) {
-					if (pTopMost->endpoints.size() > 1) {
-						fAddNewLine(false);
-						fAddString(str::wd::Build(L"  [Variation ", i + 1, L"]:"));
+				/* check if its only a single endpoint, which is printed immediately */
+				if (pTopMost->endpoints.size() == 1) {
+					if (!pTopMost->endpoints.front().hidden)
+						fAddEndpointUsage(pTopMost->endpoints.front());
+				}
+
+				/* print all variations (only if not reduced and not hidden) */
+				else if (!pReduced) {
+					size_t index = 0;
+					for (size_t i = 0; i < pTopMost->endpoints.size(); ++i) {
+						if (pTopMost->endpoints[i].hidden)
+							continue;
+						if (pTopMost->endpoints.size() > 1) {
+							fAddNewLine(false);
+							fAddString(str::wd::Build(L"  [Variation ", ++index, L"]:"));
+						}
+						fAddEndpointUsage(pTopMost->endpoints[i]);
 					}
-					fAddEndpointUsage(pTopMost->endpoints[i]);
 				}
 			}
 			void fBuildOptions(bool required) {
@@ -377,15 +386,15 @@ namespace arger {
 						continue;
 					std::wstring used;
 
-					/* collect the usages (if groups still need to be selected and not all are users) */
+					/* collect the usages (if groups still need to be selected and not all are users, and group is not hidden) */
 					if (pTopMost->endpoints.empty()) {
 						size_t users = 0;
 						for (const auto& [name, group] : pTopMost->sub) {
-							if (detail::CheckUsage(&option, &group))
+							if (!group.hidden && detail::CheckUsage(&option, &group))
 								++users;
 						}
 						if (users != pTopMost->sub.size()) for (const auto& [name, group] : pTopMost->sub) {
-							if (option.users.contains(&group))
+							if (!group.hidden && option.users.contains(&group))
 								used.append(used.empty() ? L"" : L", ").append(name);
 						}
 					}
@@ -484,15 +493,18 @@ namespace arger {
 					return;
 
 				/* add the separate endpoints */
+				size_t index = 0;
 				for (size_t i = 0; i < pTopMost->endpoints.size(); ++i) {
 					const detail::ValidEndpoint& endpoint = pTopMost->endpoints[i];
+					if (endpoint.hidden)
+						continue;
 
 					/* add the heading (with description for the variations) */
 					fAddNewLine(true);
 					if (pTopMost->endpoints.size() == 1)
 						fAddString(L"Positional Arguments:");
 					else {
-						fAddString(str::wd::Build(L"Variation ", i + 1, L':'));
+						fAddString(str::wd::Build(L"Variation ", ++index, L':'));
 						fAddEndpointUsage(pTopMost->endpoints[i]);
 						if (const std::wstring* text = fGetDescription(endpoint.description); text != nullptr)
 							fAddString(*text, arger::NumCharsHelpLeft, arger::AutoIndentLongText);
