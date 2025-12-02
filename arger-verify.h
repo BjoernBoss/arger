@@ -165,9 +165,9 @@ namespace arger::detail {
 			entry.owner = owner;
 			entry.info = &info;
 
-			/* register the reference-id */
-			if (info.refId.has_value())
-				state.refs[*info.refId].emplace_back(&entry);
+			/* register the reference-ids */
+			for (size_t id : info.partOf)
+				state.refs[id].emplace_back(&entry);
 		}
 	}
 	inline void ValidateEndpoint(detail::ValidationState& state, detail::ValidArguments& entry, const detail::Arguments* args, const detail::Endpoint* endpoint, bool hidden) {
@@ -242,9 +242,9 @@ namespace arger::detail {
 		entry.owner = owner;
 		entry.hidden = (hidden || option.hidden);
 
-		/* register the reference-id */
-		if (option.refId.has_value())
-			state.refs[*option.refId].emplace_back(&entry);
+		/* register the reference-ids */
+		for (size_t id : option.partOf)
+			state.refs[id].emplace_back(&entry);
 
 		/* check if the abbreviation is unique */
 		if (option.abbreviation != 0) {
@@ -305,9 +305,9 @@ namespace arger::detail {
 		entry.args = &arguments;
 		entry.hidden = (hidden || (group != nullptr && group->hidden));
 
-		/* register the reference-id */
-		if (arguments.refId.has_value())
-			state.refs[*arguments.refId].emplace_back(&entry);
+		/* register the reference-ids */
+		for (size_t id : arguments.partOf)
+			state.refs[id].emplace_back(&entry);
 
 		/* validate and configure the group name */
 		if (arguments.groups.name.empty())

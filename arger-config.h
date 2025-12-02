@@ -88,7 +88,7 @@ namespace arger {
 			size_t endpointId = 0;
 		};
 		struct Linkable {
-			std::optional<size_t> refId;
+			std::set<size_t> partOf;
 			std::set<size_t> links;
 		};
 
@@ -610,20 +610,22 @@ namespace arger {
 		}
 	};
 
-	/* add the group/option/information to the corresponding reference group
-	*	Note: Each object only be added to a single reference group, but multiple objects can be added to the same group,
-	*		which allows multiple primitives to be bound together to a single group, and displayed as such */
-	struct RefGroup : public detail::Configurator {
+	/* add the group/option/information to the corresponding reference groups (each group can consist of multiple
+	*	objects), which allows them all to be linked to other objects in a single go, as a combined group */
+	struct PartOf : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
-		size_t pId = 0;
+		std::set<size_t> pRefs;
 
 	public:
-		RefGroup(const arger::Ref& ref) : pId{ ref.id() } {}
+		PartOf(std::initializer_list<arger::Ref> refs) {
+			for (const auto& ref : refs)
+				pRefs.insert(ref.id());
+		}
 
 	private:
-		constexpr void burnConfig(detail::Linkable& base) const {
-			base.refId = pId;
+		void burnConfig(detail::Linkable& base) const {
+			base.partOf.insert(pRefs.begin(), pRefs.end());
 		}
 	};
 
@@ -635,17 +637,17 @@ namespace arger {
 	struct Link : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
-		std::set<size_t> pLinks;
+		std::set<size_t> pRefs;
 
 	public:
 		Link(std::initializer_list<arger::Ref> refs) {
 			for (const auto& ref : refs)
-				pLinks.insert(ref.id());
+				pRefs.insert(ref.id());
 		}
 
 	private:
 		void burnConfig(detail::Linkable& base) const {
-			base.links.insert(pLinks.begin(), pLinks.end());
+			base.links.insert(pRefs.begin(), pRefs.end());
 		}
 	};
 

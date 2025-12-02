@@ -377,12 +377,12 @@ namespace arger {
 					/* collect the usages (if groups still need to be selected and not all are users, and group is not hidden) */
 					if (pTopMost->endpoints.empty()) {
 						size_t users = 0;
-						for (const auto& [name, group] : pTopMost->sub) {
+						for (const auto& [_, group] : pTopMost->sub) {
 							if (!group.hidden && detail::CheckUsage(&option, &group))
 								++users;
 						}
 						if (users != pTopMost->sub.size()) for (const auto& [name, group] : pTopMost->sub) {
-							if (!group.hidden && option.links.contains(&group))
+							if (!group.hidden && detail::CheckUsage(&option, &group))
 								used.append(used.empty() ? L"" : L", ").append(name);
 						}
 					}
