@@ -43,6 +43,12 @@ This also guarantees, that the returned `arger::Parsed` structure adheres to the
 
 To further perform checking, the parser runs all defined `arger::Constraints`, which apply. I.e., if they are defined for the root, an `Option`, or a given `Endpoint`, they will be executed, if the given path was chosen or `Option` provided. These can check the `arger::Parsed` structure, to validate further inter-dependent requirements, which cannot be encoded in the configuration itself.
 
+### Linking of Objects
+
+By default, objects (such as information or flags/options) are accessible by the configuration or groups, in which they are defined, and their children. To further restrict where information is shown, or flags/options are available, they can be linked together. For this, a reference group `arger::Ref` can be created. Groups/flags/options/information can then be added to the group. And every other object, can then link to the group, thereby restricting/enabling the object to the given objects.
+
+Important: Options/information/flags can only be linked to groups it has been defined in or nested. If an information should be shown in various places, for example, simply define it in the root configuration, and link it to the specific places.
+
 ## Configuration Options
 
 There exist a set of configuration options, which can be applied to any of the conditionally configurable objects, provided they are meant for it (checked by the `arger::IsConfig` concept).
@@ -117,10 +123,6 @@ arger::EndpointId(arger::IsId auto id);
 /* add a payload to an option with a given name and of a given type */
 arger::Payload(std::wstring name, arger::Type type);
 
-/* add usage-constraints to let the corresponding options only be used by groups, which add
-*	them as usage (by default the config/group, in which the option is defined, can use it) */
-arger::Use(arger::IsId auto... options);
-
 /* setup the descriptive name for the sub-groups to be used (the default name is 'mode') */
 arger::GroupName(std::wstring name);
 
@@ -142,6 +144,21 @@ arger::Visibility(bool visible);
 *	Note: for help/version, defaults to true, otherwise will only be printed in help menu of the root
 *	Note: for information, defaults to false and will only be printed for the level it was defined at */
 arger::Reach(bool allChildren);
+
+/* add the group/option/information to the corresponding reference groups (each group can consist of multiple
+*	objects), which allows them all to be linked to other objects in a single go, as a combined group */
+arger::PartOf(std::initializer_list<arger::Ref> refs);
+
+/* add usage-constraints to let the corresponding object only be used by groups, which add
+*	them as links (by default the config/group, in which the object is defined, can use it)
+*	Note: for information, prints the information on the help page of the given groups (and children, depending on the defined reach)
+*	Note: for options, allows the option only to be used for the group and any children
+*	Note: direction of linking is irrelevant (i.e. add group to ref-group and link to option, or vice versa) */
+arger::Link(std::initializer_list<arger::Ref> refs);
+
+/* for convenience: same as normal linking, except that it can only be
+*	used by groups to be linked to options, and referencing them by name */
+arger::LinkOption(std::initializer_list<std::wstring> options);
 ```
 
 ## Common Command Line Mode

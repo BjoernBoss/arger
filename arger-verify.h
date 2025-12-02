@@ -396,6 +396,14 @@ namespace arger::detail {
 			}
 		}
 
+		/* link all named options */
+		for (const std::wstring& option : arguments.args->namedOptions) {
+			auto it = state.config.options.find(option);
+			if (it == state.config.options.end())
+				throw arger::ConfigException{ L"Links cannot be created to unkown option names." };
+			detail::ValidateLink(arguments, &it->second);
+		}
+
 		/* validate all children */
 		for (const auto& [_, child] : arguments.sub)
 			detail::ValidateLinkEntries(state, child);

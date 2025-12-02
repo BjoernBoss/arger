@@ -140,6 +140,9 @@ namespace arger {
 			size_t id = 0;
 			Option(std::wstring name, size_t id) : name{ name }, id{ id } {}
 		};
+		struct NamedOptions {
+			std::set<std::wstring> namedOptions;
+		};
 		struct OptionList {
 			std::vector<detail::Option> options;
 		};
@@ -178,7 +181,8 @@ namespace arger {
 			public detail::InformationList,
 			public detail::EndpointList,
 			public detail::EndpointId,
-			public detail::Linkable {
+			public detail::Linkable,
+			public detail::NamedOptions {
 		};
 		struct Group :
 			public detail::Arguments,
@@ -648,6 +652,25 @@ namespace arger {
 	private:
 		void burnConfig(detail::Linkable& base) const {
 			base.links.insert(pRefs.begin(), pRefs.end());
+		}
+	};
+
+	/* for convenience: same as normal linking, except that it can only be
+	*	used by groups to be linked to options, and referencing them by name */
+	struct LinkOption : public detail::Configurator {
+		friend struct detail::ConfigBurner;
+	private:
+		std::set<std::wstring> pOptions;
+
+	public:
+		LinkOption(std::initializer_list<std::wstring> options) {
+			for (const auto& option : options)
+				pOptions.insert(option);
+		}
+
+	private:
+		void burnConfig(detail::NamedOptions& options) const {
+			options.namedOptions.insert(pOptions.begin(), pOptions.end());
 		}
 	};
 
