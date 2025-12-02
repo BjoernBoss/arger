@@ -266,23 +266,6 @@ namespace arger {
 				std::wstring parents = fGroupNameHistory(topMost->super);
 				return str::wd::Build(parents, (parents.empty() ? L"[" : L" > ["), str::View{ topMost->super->groupName }.title(), L": ", topMost->group->name, L']');
 			}
-			constexpr void fRecInformationStrings(const detail::ValidArguments* topMost, bool top) {
-				if (topMost == nullptr)
-					return;
-				fRecInformationStrings(topMost->super, false);
-
-				/* iterate over the information-content and append it to the information-buffer */
-				const detail::InformationList* list = (topMost->group == nullptr ? static_cast<const detail::InformationList*>(pConfig.burned) : static_cast<const detail::InformationList*>(topMost->group));
-				for (const auto& info : list->information) {
-					if (pReduced && info.reduced.empty())
-						continue;
-					if (!info.allChildren.value_or(false) && !top)
-						continue;
-					fAddNewLine(true);
-					fAddString(info.name + L": ");
-					fAddString((pReduced ? info.reduced : info.text), arger::NumCharsHelpLeft);
-				}
-			}
 			void fAddEndpointUsage(const detail::ValidEndpoint& endpoint) {
 				/* add the positional parameter for the topmost argument-object */
 				for (size_t i = 0; i < endpoint.positionals->size(); ++i)
@@ -311,8 +294,8 @@ namespace arger {
 				*	and for the special case of the root, only print it if no other groups exist */
 				if (pTopMost->super == nullptr)
 					return pConfig.sub.empty();
-				for (const auto& user : option->users) {
-					if (detail::CheckParent(user, pTopMost))
+				for (const auto& link : option->links) {
+					if (detail::CheckParent(link, pTopMost))
 						return true;
 				}
 				return false;
@@ -350,8 +333,8 @@ namespace arger {
 
 				/* add the hint to the arguments after the final group has been selected and add the endpoint hint */
 				if (pTopMost->endpoints.empty() && pTopMost->nestedPositionals)
-					fAddSpacedToken(L"[params...]");
-				if (pTopMost->endpoints.size() > 1)
+					fAddSpacedToken(L"[args...]");
+				else if (pTopMost->endpoints.size() > 1)
 					fAddString(L" variation...");
 
 				/* check if its only a single endpoint, which is printed immediately */
@@ -399,7 +382,7 @@ namespace arger {
 								++users;
 						}
 						if (users != pTopMost->sub.size()) for (const auto& [name, group] : pTopMost->sub) {
-							if (!group.hidden && option.users.contains(&group))
+							if (!group.hidden && option.links.contains(&group))
 								used.append(used.empty() ? L"" : L", ").append(name);
 						}
 					}
@@ -553,6 +536,30 @@ namespace arger {
 					fAddString(fGroupNameHistory(topMost));
 				fAddString(*desc, arger::IndentInformation);
 			}
+			void fBuildInformation() {
+				/* iterate over the information-content and append it to the buffer */
+				for (const auto& info : pConfig.infos) {
+					if (pReduced && info.info->reduced.empty())
+						continue;
+
+					/* check if the information is not directly linked, in which
+					*	case its parent must be directly linked, for it to be shown */
+					if (!info.links.contains(pTopMost)) {
+						if (!info.info->allChildren.value_or(false))
+							continue;
+						const detail::ValidArguments* walker = pTopMost->super;
+						while (walker != nullptr && !info.links.contains(walker))
+							walker = walker->super;
+						if (walker == nullptr)
+							continue;
+					}
+
+					/* write the information out */
+					fAddNewLine(true);
+					fAddString(info.info->name + L": ");
+					fAddString((pReduced ? info.info->reduced : info.info->text), arger::NumCharsHelpLeft);
+				}
+			}
 
 		public:
 			std::wstring buildHelpString() {
@@ -569,16 +576,13 @@ namespace arger {
 					fAddString(*text, arger::IndentInformation);
 				}
 
-				/* add the group description, the description of all sub-groups, the description of the endpoints,
-				*	and the required and optional option descriptions (will automatically be sorted lexicographically) */
+				/* build all of the components in order to the output */
 				fBuildGroupDescription(pTopMost);
 				fBuildGroups();
 				fBuildEndpoints();
 				fBuildOptions(true);
 				fBuildOptions(false);
-
-				/* add all of the information descriptions for the selected group */
-				fRecInformationStrings(pTopMost, true);
+				fBuildInformation();
 
 				/* return the constructed help-string */
 				std::wstring out;

@@ -53,7 +53,7 @@ The following configurations are defined:
 /* general arger-configuration to be parsed */
 arger::Config(const arger::IsConfig<detail::Config> auto&... configs);
 
-/* general optional flag or option
+/* general optional flag or option (id's must be unique and are used to distinguish the options/flags in the parsed result)
 *	Note: if passed to a group, it is implicitly only bound to that group - but all names and abbreviations must be unique
 *	Note: if payload is provided, is not considered a flag, but an option */
 arger::Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<detail::Option> auto&... configs);

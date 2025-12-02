@@ -138,7 +138,7 @@ namespace arger {
 					/* resolve the id of the string */
 					auto it = std::find_if(list.begin(), list.end(), [&](const arger::EnumEntry& e) { return e.name == value.str(); });
 					if (it == list.end())
-						throw arger::ParsingException{ L"Invalid enum for ", (option ? L"option" : L"argument"), L" [", name, L"] encountered."};
+						throw arger::ParsingException{ L"Invalid enum for ", (option ? L"option" : L"argument"), L" [", name, L"] encountered." };
 
 					/* assign the new enum-id */
 					value = arger::Value{ detail::EnumId{.id = it->id } };
@@ -243,7 +243,8 @@ namespace arger {
 			void fVerifyOptional() {
 				/* iterate over the options and verify them */
 				for (auto& [name, option] : pConfig.options) {
-					/* check if the current option can be used by the selected group or any of its ancestors */
+					/* check if the current option can be used by the selected group or any of its ancestors (cannot defererence
+					*	nullptr, as the root top-most, with no group, will always be allowed to use an option) */
 					if (!detail::CheckUsage(&option, pTopMost) && (option.payload ? pParsed.pOptions.contains(option.option->id) : pParsed.pFlags.contains(option.option->id)))
 						throw arger::ParsingException{ L"Option [", name, L"] not meant for ", pTopMost->super->groupName, L" [", pTopMost->group->name, L"]." };
 

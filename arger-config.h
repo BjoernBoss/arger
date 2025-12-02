@@ -28,6 +28,22 @@ namespace arger {
 
 	using Checker = std::function<std::wstring(const arger::Parsed&)>;
 
+	/* used to link components together, and defines one group of referenced objects to be linked */
+	struct Ref {
+	private:
+		inline static size_t NextId = 0;
+	private:
+		size_t pId = 0;
+
+	public:
+		Ref() : pId{ arger::Ref::NextId++ } {}
+
+	public:
+		size_t id() const {
+			return pId;
+		}
+	};
+
 	namespace detail {
 		struct Configurator {};
 
@@ -68,15 +84,17 @@ namespace arger {
 				arger::Type type;
 			} payload;
 		};
-		struct Use {
-			std::set<size_t> use;
-		};
 		struct EndpointId {
 			size_t endpointId = 0;
 		};
+		struct Linkable {
+			std::optional<size_t> refId;
+			std::set<size_t> links;
+		};
 
 		struct Information :
-			public detail::Reach {
+			public detail::Reach,
+			public detail::Linkable {
 			std::wstring name;
 			std::wstring text;
 			std::wstring reduced;
@@ -116,7 +134,8 @@ namespace arger {
 			public detail::Require,
 			public detail::Abbreviation,
 			public detail::Payload,
-			public detail::Hidden {
+			public detail::Hidden,
+			public detail::Linkable {
 			std::wstring name;
 			size_t id = 0;
 			Option(std::wstring name, size_t id) : name{ name }, id{ id } {}
@@ -158,10 +177,10 @@ namespace arger {
 			public detail::Description,
 			public detail::InformationList,
 			public detail::EndpointList,
-			public detail::EndpointId {
+			public detail::EndpointId,
+			public detail::Linkable {
 		};
 		struct Group :
-			public detail::Use,
 			public detail::Arguments,
 			public detail::Abbreviation,
 			public detail::Hidden {
@@ -214,7 +233,7 @@ namespace arger {
 		}
 	};
 
-	/* general optional flag or option
+	/* general optional flag or option (id's must be unique and are used to distinguish the options/flags in the parsed result)
 	*	Note: if passed to a group, it is implicitly only bound to that group - but all names and abbreviations must be unique
 	*	Note: if payload is provided, is not considered a flag, but an option */
 	struct Option : public detail::Configurator {
@@ -498,22 +517,6 @@ namespace arger {
 		}
 	};
 
-	/* add usage-constraints to let the corresponding options only be used by groups, which add
-	*	them as usage (by default the config/group, in which the option is defined, can use it) */
-	struct Use : public detail::Configurator {
-		friend struct detail::ConfigBurner;
-	private:
-		std::set<size_t> pOptions;
-
-	public:
-		Use(arger::IsId auto... options) : pOptions{ static_cast<size_t>(options)... } {}
-
-	private:
-		void burnConfig(detail::Use& base) const {
-			base.use.insert(pOptions.begin(), pOptions.end());
-		}
-	};
-
 	/* setup the descriptive name for the sub-groups to be used (the default name is 'mode') */
 	struct GroupName : detail::Configurator {
 		friend struct detail::ConfigBurner;
@@ -604,6 +607,45 @@ namespace arger {
 	private:
 		constexpr void burnConfig(detail::Reach& base) const {
 			base.allChildren = pAllChildren;
+		}
+	};
+
+	/* add the group/option/information to the corresponding reference group
+	*	Note: Each object only be added to a single reference group, but multiple objects can be added to the same group,
+	*		which allows multiple primitives to be bound together to a single group, and displayed as such */
+	struct RefGroup : public detail::Configurator {
+		friend struct detail::ConfigBurner;
+	private:
+		size_t pId = 0;
+
+	public:
+		RefGroup(const arger::Ref& ref) : pId{ ref.id() } {}
+
+	private:
+		constexpr void burnConfig(detail::Linkable& base) const {
+			base.refId = pId;
+		}
+	};
+
+	/* add usage-constraints to let the corresponding object only be used by groups, which add
+	*	them as links (by default the config/group, in which the object is defined, can use it)
+	*	Note: for information, prints the information on the help page of the given groups (and children, depending on the defined reach)
+	*	Note: for options, allows the option only to be used for the group and any children
+	*	Note: direction of linking is irrelevant (i.e. add group to ref-group and link to option, or vice versa) */
+	struct Link : public detail::Configurator {
+		friend struct detail::ConfigBurner;
+	private:
+		std::set<size_t> pLinks;
+
+	public:
+		Link(std::initializer_list<arger::Ref> refs) {
+			for (const auto& ref : refs)
+				pLinks.insert(ref.id());
+		}
+
+	private:
+		void burnConfig(detail::Linkable& base) const {
+			base.links.insert(pLinks.begin(), pLinks.end());
 		}
 	};
 

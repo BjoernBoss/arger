@@ -24,15 +24,21 @@ namespace arger::detail {
 		std::wstring groupName;
 		const std::vector<arger::Checker>* constraints = nullptr;
 		const detail::ValidArguments* super = nullptr;
+		const detail::Arguments* args = nullptr;
 		const detail::Group* group = nullptr;
 		size_t depth = 0;
 		bool nestedPositionals = false;
 		bool hidden = false;
 	};
-	struct ValidOption {
-		std::set<const detail::ValidArguments*> users;
-		const detail::Option* option = nullptr;
+	struct ValidLink {
+		std::set<const detail::ValidArguments*> links;
 		const detail::ValidArguments* owner = nullptr;
+	};
+	struct ValidInformation : public detail::ValidLink {
+		const detail::Information* info = nullptr;
+	};
+	struct ValidOption : public detail::ValidLink {
+		const detail::Option* option = nullptr;
 		size_t minimumEffective = 0;
 		size_t minimumActual = 0;
 		size_t maximum = 0;
@@ -41,11 +47,17 @@ namespace arger::detail {
 	};
 	struct ValidConfig : public detail::ValidArguments {
 		const detail::Config* burned = nullptr;
+		std::list<detail::ValidInformation> infos;
 		std::map<std::wstring, detail::ValidOption> options;
 		std::map<wchar_t, detail::ValidOption*> abbreviations;
-		std::map<size_t, detail::ValidOption*> optionIds;
 		const detail::SpecialEntry* help = nullptr;
 		const detail::SpecialEntry* version = nullptr;
+	};
+	using RefTarget = std::variant<detail::ValidOption*, detail::ValidInformation*, detail::ValidArguments*>;
+	struct ValidationState {
+		std::set<size_t> optionIds;
+		detail::ValidConfig& config;
+		std::map<size_t, std::vector<detail::RefTarget>> refs;
 	};
 
 	inline bool CheckParent(const detail::ValidArguments* parent, const detail::ValidArguments* child) {
@@ -61,15 +73,10 @@ namespace arger::detail {
 		}
 		return false;
 	}
-	inline bool CheckAncestors(const detail::ValidArguments* a, const detail::ValidArguments* b) {
-		/* find the other group in the younger of the two groups */
-		if (a->depth < b->depth)
-			return detail::CheckParent(a, b);
-		return detail::CheckParent(b, a);
-	}
-	inline bool CheckUsage(const detail::ValidOption* option, const detail::ValidArguments* group) {
-		for (const auto& user : option->users) {
-			if (detail::CheckAncestors(user, group))
+	inline bool CheckUsage(const detail::ValidLink* link, const detail::ValidArguments* test) {
+		/* check if the test, or any of the test's parents, is linked to the link */
+		for (const auto& link : link->links) {
+			if ((link->depth < test->depth) ? detail::CheckParent(link, test) : detail::CheckParent(test, link))
 				return true;
 		}
 		return false;
@@ -80,14 +87,6 @@ namespace arger::detail {
 			throw arger::ConfigException{ L"Reduced description requires normal description as well." };
 		if (!description.description.reduced.empty() && (state.help == nullptr || !state.help->reducible))
 			throw arger::ConfigException{ L"Reduced description requires reduced help to be possible." };
-	}
-	inline constexpr void ValidateInformation(detail::ValidConfig& state, const detail::InformationList& information) {
-		for (const auto& info : information.information) {
-			if (info.name.empty() || info.text.empty())
-				throw arger::ConfigException{ L"Information name and description must not be empty." };
-			if (!info.reduced.empty() && (state.help == nullptr || !state.help->reducible))
-				throw arger::ConfigException{ L"Reduced information requires reduced help to be possible." };
-		}
 	}
 	inline constexpr void ValidateType(detail::ValidConfig& state, const arger::Type& type) {
 		if (!std::holds_alternative<arger::Enum>(type))
@@ -147,8 +146,31 @@ namespace arger::detail {
 				throw arger::ConfigException{ L"Abbreviation clashes with version entry abbreviation." };
 		}
 	}
+	inline void ValidateLink(const detail::ValidArguments& args, detail::ValidLink* link) {
+		if (!detail::CheckParent(link->owner, &args))
+			throw arger::ConfigException{ L"Group cannot be linked to objects from another group." };
+		link->links.insert(&args);
+	}
 
-	inline void ValidateEndpoint(detail::ValidConfig& state, detail::ValidArguments& entry, const detail::Arguments* args, const detail::Endpoint* endpoint, bool hidden) {
+	inline void ValidateInformation(detail::ValidationState& state, const detail::Arguments& arguments, detail::ValidArguments* owner) {
+		/* iterate over the information, validate them, and register them */
+		for (const auto& info : arguments.information) {
+			if (info.name.empty() || info.text.empty())
+				throw arger::ConfigException{ L"Information name and description must not be empty." };
+			if (!info.reduced.empty() && (state.config.help == nullptr || !state.config.help->reducible))
+				throw arger::ConfigException{ L"Reduced information requires reduced help to be possible." };
+
+			/* add the entry to the list and set it up */
+			detail::ValidInformation& entry = state.config.infos.emplace_back();
+			entry.owner = owner;
+			entry.info = &info;
+
+			/* register the reference-id */
+			if (info.refId.has_value())
+				state.refs[*info.refId].emplace_back(&entry);
+		}
+	}
+	inline void ValidateEndpoint(detail::ValidationState& state, detail::ValidArguments& entry, const detail::Arguments* args, const detail::Endpoint* endpoint, bool hidden) {
 		const std::vector<detail::Positional>& positionals = (args == nullptr ? endpoint->positionals : args->positionals);
 		std::optional<size_t> minimum = (args == nullptr ? endpoint->require : args->require).minimum;
 		std::optional<size_t> maximum = (args == nullptr ? endpoint->require : args->require).maximum;
@@ -163,7 +185,7 @@ namespace arger::detail {
 
 		/* validate the description */
 		if (next.description != nullptr)
-			detail::ValidateDescription(state, *next.description);
+			detail::ValidateDescription(state.config, *next.description);
 
 		/* validate and configure the minimum */
 		if (minimum.has_value() && positionals.empty())
@@ -190,7 +212,7 @@ namespace arger::detail {
 			/* validate the name and type */
 			if (positionals[i].name.empty())
 				throw arger::ConfigException{ L"Positional argument must not have an empty name." };
-			detail::ValidateType(state, positionals[i].type);
+			detail::ValidateType(state.config, positionals[i].type);
 
 			/* validate the default-value */
 			if (!positionals[i].defValue.has_value())
@@ -200,48 +222,52 @@ namespace arger::detail {
 				throw arger::ConfigException{ L"All positionals up to the minimum must be defaulted once one is defaulted." };
 
 			/* validat ethe description */
-			detail::ValidateDescription(state, positionals[i]);
+			detail::ValidateDescription(state.config, positionals[i]);
 		}
 	}
-	inline void ValidateOption(detail::ValidConfig& state, const detail::Option& option, const detail::ValidArguments* owner, bool hidden) {
+	inline void ValidateOption(detail::ValidationState& state, const detail::Option& option, const detail::ValidArguments* owner, bool hidden) {
 		if (option.name.size() <= 1)
 			throw arger::ConfigException{ L"Option name must at least be two characters long." };
 		if (option.name.starts_with(L"-"))
 			throw arger::ConfigException{ L"Option name must not start with a hypen." };
 
 		/* check if the name is unique */
-		if (state.options.contains(option.name))
+		if (state.config.options.contains(option.name))
 			throw arger::ConfigException{ L"Option names must be unique." };
 
 		/* setup the new entry */
-		detail::ValidOption& entry = state.options[option.name];
+		detail::ValidOption& entry = state.config.options[option.name];
 		entry.option = &option;
 		entry.payload = !option.payload.name.empty();
 		entry.owner = owner;
 		entry.hidden = (hidden || option.hidden);
 
+		/* register the reference-id */
+		if (option.refId.has_value())
+			state.refs[*option.refId].emplace_back(&entry);
+
 		/* check if the abbreviation is unique */
 		if (option.abbreviation != 0) {
-			if (state.abbreviations.contains(option.abbreviation))
+			if (state.config.abbreviations.contains(option.abbreviation))
 				throw arger::ConfigException{ L"Option abbreviations must be unique." };
-			state.abbreviations[option.abbreviation] = &entry;
+			state.config.abbreviations[option.abbreviation] = &entry;
 		}
 
 		/* check if the id is unique */
 		if (state.optionIds.contains(option.id))
 			throw arger::ConfigException{ L"Option ids must be unique." };
-		state.optionIds.insert({ option.id, &entry });
+		state.optionIds.insert(option.id);
 
 		/* check if the name or abbreviation clashes with the help/version entries (for options only necessary for programs) */
-		if (!state.burned->program.empty())
-			detail::ValidateSpecialEntry(state, option.name, option.abbreviation);
+		if (!state.config.burned->program.empty())
+			detail::ValidateSpecialEntry(state.config, option.name, option.abbreviation);
 
 		/* validate the description */
-		detail::ValidateDescription(state, option);
+		detail::ValidateDescription(state.config, option);
 
 		/* validate the payload */
 		if (entry.payload)
-			detail::ValidateType(state, option.payload.type);
+			detail::ValidateType(state.config, option.payload.type);
 		else if (option.require.minimum.has_value() || option.require.maximum.has_value())
 			throw arger::ConfigException{ L"Flags cannot have requirements defined." };
 		else if (!option.payload.defValue.empty())
@@ -269,14 +295,19 @@ namespace arger::detail {
 				detail::ValidateDefValue(option.payload.type, value);
 		}
 	}
-	inline void ValidateArguments(detail::ValidConfig& state, const detail::Arguments& arguments, const detail::Group* group, detail::ValidArguments& entry, detail::ValidArguments* super, bool hidden) {
+	inline void ValidateArguments(detail::ValidationState& state, const detail::Arguments& arguments, const detail::Group* group, detail::ValidArguments& entry, detail::ValidArguments* super, bool hidden) {
 		/* populate the entry */
 		entry.constraints = &arguments.constraints;
 		entry.nestedPositionals = !arguments.positionals.empty();
 		entry.super = super;
 		entry.depth = (super == nullptr ? 0 : super->depth + 1);
 		entry.group = group;
+		entry.args = &arguments;
 		entry.hidden = (hidden || (group != nullptr && group->hidden));
+
+		/* register the reference-id */
+		if (arguments.refId.has_value())
+			state.refs[*arguments.refId].emplace_back(&entry);
 
 		/* validate and configure the group name */
 		if (arguments.groups.name.empty())
@@ -284,8 +315,11 @@ namespace arger::detail {
 		else
 			entry.groupName = str::View{ arguments.groups.name }.lower();
 
-		/* validate the description */
-		detail::ValidateDescription(state, arguments);
+		/* validate the description, information, and options */
+		detail::ValidateDescription(state.config, arguments);
+		detail::ValidateInformation(state, arguments, &entry);
+		for (const auto& option : arguments.options)
+			detail::ValidateOption(state, option, &entry, entry.hidden);
 
 		/* validate the groups */
 		if (!arguments.groups.list.empty()) {
@@ -312,19 +346,12 @@ namespace arger::detail {
 				}
 
 				/* check if the name or abbreviation clashes with the help/version entries (for groups only necessary for menus) */
-				if (state.burned->program.empty())
-					detail::ValidateSpecialEntry(state, sub.name, sub.abbreviation);
+				if (state.config.burned->program.empty())
+					detail::ValidateSpecialEntry(state.config, sub.name, sub.abbreviation);
 
-				/* validate the arguments */
+				/* validate the entry itself and update the nesting flags */
 				detail::ValidateArguments(state, sub, &sub, next, &entry, entry.hidden);
 				entry.nestedPositionals = (entry.nestedPositionals || next.nestedPositionals);
-
-				/* register all new options */
-				for (const auto& option : sub.options)
-					detail::ValidateOption(state, option, &next, entry.hidden);
-
-				/* validate the information attributes */
-				detail::ValidateInformation(state, sub);
 			}
 			return;
 		}
@@ -350,75 +377,93 @@ namespace arger::detail {
 				throw arger::ConfigException{ L"Endpoint positional effective requirement counts must not overlap in order to ensure each endpoint can be matched uniquely." };
 		}
 	}
-	inline void ValidateFinalizeArguments(detail::ValidConfig& state, const detail::ValidArguments& group) {
-		/* validate that used options are defined and usable */
-		for (size_t option : group.group->use) {
-			auto it = state.optionIds.find(option);
-			if (it == state.optionIds.end())
-				throw arger::ConfigException{ L"Group uses undefined option." };
+	inline void ValidateLinkEntries(detail::ValidationState& state, const detail::ValidArguments& arguments) {
+		/* link all groups to information/options */
+		for (size_t link : arguments.args->links) {
+			auto it = state.refs.find(link);
+			if (it == state.refs.end())
+				throw arger::ConfigException{ L"Links cannot be created to unlinked objects." };
 
-			/* check if the used option can be used by this group */
-			if (!detail::CheckParent(it->second->owner, &group))
-				throw arger::ConfigException{ L"Group cannot use options from another group." };
+			/* iterate over the objects and find all information/options and validate and link them */
+			for (const auto& ref : it->second) {
+				/* check if its an option and the link is valid */
+				if (std::holds_alternative<detail::ValidOption*>(ref))
+					detail::ValidateLink(arguments, std::get<detail::ValidOption*>(ref));
 
-			/* add itself to the users of the group */
-			it->second->users.insert(&group);
+				/* check if its an information and the link is valid */
+				else if (std::holds_alternative<detail::ValidInformation*>(ref))
+					detail::ValidateLink(arguments, std::get<detail::ValidInformation*>(ref));
+			}
 		}
 
 		/* validate all children */
-		for (const auto& [_, child] : group.sub)
-			detail::ValidateFinalizeArguments(state, child);
+		for (const auto& [_, child] : arguments.sub)
+			detail::ValidateLinkEntries(state, child);
 	}
-	inline void ValidateConfig(const arger::Config& config, detail::ValidConfig& state) {
+	inline void ValidateLinkEntry(detail::ValidationState& state, detail::ValidLink* link, const std::set<size_t>& ids) {
+		/* iterate over the links and try to create them */
+		for (size_t id : ids) {
+			auto it = state.refs.find(id);
+			if (it == state.refs.end())
+				throw arger::ConfigException{ L"Links cannot be created to unlinked objects." };
+
+			/* iterate over the ref-entires and look for groups to link with */
+			for (const auto& ref : it->second) {
+				if (std::holds_alternative<detail::ValidArguments*>(ref))
+					detail::ValidateLink(*std::get<detail::ValidArguments*>(ref), link);
+			}
+		}
+
+		/* check if the object has no links and add its owner as single link */
+		if (link->links.empty())
+			link->links.insert(link->owner);
+	}
+	inline void ValidateConfig(const arger::Config& config, detail::ValidConfig& out) {
 		/* burn the config and reset the state (validated state must not
 		*	outlive original config and config must not be modified inbetween) */
-		state.burned = &detail::ConfigBurner::GetBurned(config);
-		state.options.clear();
-		state.abbreviations.clear();
-		state.optionIds.clear();
-		state.help = nullptr;
-		state.version = nullptr;
+		out.burned = &detail::ConfigBurner::GetBurned(config);
+		out.options.clear();
+		out.abbreviations.clear();
+		out.help = nullptr;
+		out.version = nullptr;
+
+		/* setup the the validation-state */
+		detail::ValidationState state{ .config = out };
 
 		/* validate the special-purpose entries attributes */
-		if (!state.burned->special.help.name.empty()) {
-			if (state.burned->special.help.name.size() <= 1)
+		if (!out.burned->special.help.name.empty()) {
+			if (out.burned->special.help.name.size() <= 1)
 				throw arger::ConfigException{ L"Help entry name must at least be two characters long." };
-			if (state.burned->special.version.name == state.burned->special.help.name)
+			if (out.burned->special.version.name == out.burned->special.help.name)
 				throw arger::ConfigException{ L"Help entry and version entry cannot have the same name." };
-			if (state.burned->special.help.reducible && state.burned->special.help.abbreviation == 0)
+			if (out.burned->special.help.reducible && out.burned->special.help.abbreviation == 0)
 				throw arger::ConfigException{ L"Reducible help entry requires a defined abbreviarion." };
-			if (!state.burned->special.version.name.empty()) {
-				if (state.burned->special.help.abbreviation != 0 && state.burned->special.help.abbreviation == state.burned->special.version.abbreviation)
+			if (!out.burned->special.version.name.empty()) {
+				if (out.burned->special.help.abbreviation != 0 && out.burned->special.help.abbreviation == out.burned->special.version.abbreviation)
 					throw arger::ConfigException{ L"Help entry and version entry cannot have the same abbreviation." };
 			}
-			state.help = &state.burned->special.help;
-			detail::ValidateDescription(state, state.burned->special.help);
+			out.help = &out.burned->special.help;
+			detail::ValidateDescription(out, out.burned->special.help);
 		}
-		if (!state.burned->special.version.name.empty()) {
-			if (state.burned->special.version.name.size() <= 1)
+		if (!out.burned->special.version.name.empty()) {
+			if (out.burned->special.version.name.size() <= 1)
 				throw arger::ConfigException{ L"Version entry name must at least be two characters long." };
-			if (state.burned->version.empty())
+			if (out.burned->version.empty())
 				throw arger::ConfigException{ L"Version string must be set when using a version entry." };
-			state.version = &state.burned->special.version;
-			detail::ValidateDescription(state, state.burned->special.version);
+			out.version = &out.burned->special.version;
+			detail::ValidateDescription(out, out.burned->special.version);
 		}
 
-		/* validate the information attributes */
-		detail::ValidateInformation(state, *state.burned);
+		/* validate the root arguments */
+		detail::ValidateArguments(state, *out.burned, nullptr, state.config, nullptr, false);
 
-		/* validate the options and arguments */
-		for (const auto& option : state.burned->options)
-			detail::ValidateOption(state, option, &state, false);
-		detail::ValidateArguments(state, *state.burned, nullptr, state, nullptr, false);
+		/* link all groups to information/options */
+		detail::ValidateLinkEntries(state, state.config);
 
-		/* post-validate all groups after all groups and flags have been loaded */
-		for (const auto& [_, group] : state.sub)
-			detail::ValidateFinalizeArguments(state, group);
-
-		/* finalize all options by adding the owner to all non-restricted options */
-		for (auto& [name, option] : state.options) {
-			if (option.users.empty())
-				option.users.insert(option.owner);
-		}
+		/* link all options and information to groups and finalize them */
+		for (auto& [_, option] : out.options)
+			detail::ValidateLinkEntry(state, &option, option.option->links);
+		for (auto& info : out.infos)
+			detail::ValidateLinkEntry(state, &info, info.info->links);
 	}
 }

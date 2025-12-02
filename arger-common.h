@@ -7,6 +7,7 @@
 #include <functional>
 #include <map>
 #include <vector>
+#include <list>
 #include <cwctype>
 #include <variant>
 #include <optional>
