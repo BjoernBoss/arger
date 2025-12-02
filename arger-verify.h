@@ -195,7 +195,7 @@ namespace arger::detail {
 			/* validate the default-value */
 			if (!positionals[i].defValue.has_value())
 				continue;
-			detail::ValidateDefValue(positionals[i].type, positionals[i].defValue.value());
+			detail::ValidateDefValue(positionals[i].type, *positionals[i].defValue);
 			if (i < next.minimumEffective)
 				throw arger::ConfigException{ L"All positionals up to the minimum must be defaulted once one is defaulted." };
 

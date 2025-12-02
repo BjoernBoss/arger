@@ -71,6 +71,10 @@ namespace arger {
 		struct Use {
 			std::set<size_t> use;
 		};
+		struct EndpointId {
+			size_t endpointId = 0;
+		};
+
 		struct Information :
 			public detail::Reach {
 			std::wstring name;
@@ -81,6 +85,7 @@ namespace arger {
 		struct InformationList {
 			std::vector<detail::Information> information;
 		};
+
 		struct Positional :
 			public detail::Description {
 			std::optional<arger::Value> defValue;
@@ -88,16 +93,13 @@ namespace arger {
 			arger::Type type;
 			Positional(std::optional<arger::Value> val, std::wstring name, arger::Type type) : defValue{ val }, name{ name }, type{ type } {}
 		};
-		struct Positionals {
+		struct PositionalList {
 			std::vector<detail::Positional> positionals;
-		};
-		struct EndpointId {
-			size_t endpointId = 0;
 		};
 
 		struct Endpoint :
 			public detail::Require,
-			public detail::Positionals,
+			public detail::PositionalList,
 			public detail::Constraint,
 			public detail::Description,
 			public detail::Hidden {
@@ -149,7 +151,7 @@ namespace arger {
 
 		struct Arguments :
 			public detail::Require,
-			public detail::Positionals,
+			public detail::PositionalList,
 			public detail::Constraint,
 			public detail::GroupList,
 			public detail::OptionList,
@@ -212,8 +214,9 @@ namespace arger {
 		}
 	};
 
-	/* general optional flag/payload
-	*	Note: if passed to a group, it is implicitly only bound to that group - but all names and abbreviations must be unique */
+	/* general optional flag or option
+	*	Note: if passed to a group, it is implicitly only bound to that group - but all names and abbreviations must be unique
+	*	Note: if payload is provided, is not considered a flag, but an option */
 	struct Option : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	public:
@@ -421,7 +424,7 @@ namespace arger {
 
 	/* add a minimum/maximum requirement [maximum < minimum implies no maximum]
 	*	if only minimum is supplied, default maximum will be used
-	*	- [Option]: are only acknowledged for non-flags with a default of [min: 0, max: 1]
+	*	- [Option]: are only allowed for non-flags with a default of [min: 0, max: 1]
 	*	- [Otherwise]: constrains the number of positional arguments with a default of [min = max = number-of-positionals];
 	*		if greater than number of positional arguments, last type is used as catch-all */
 	struct Require : public detail::Configurator {
@@ -495,8 +498,8 @@ namespace arger {
 		}
 	};
 
-	/* add usage-constraints to let the corresponding options only be used by groups,
-	*	which add them as usage (by default every group/argument can use all options) */
+	/* add usage-constraints to let the corresponding options only be used by groups, which add
+	*	them as usage (by default the config/group, in which the option is defined, can use it) */
 	struct Use : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
@@ -547,7 +550,7 @@ namespace arger {
 		}
 
 	private:
-		constexpr void burnConfig(detail::Positionals& base) const {
+		constexpr void burnConfig(detail::PositionalList& base) const {
 			base.positionals.push_back(pPositional);
 		}
 	};

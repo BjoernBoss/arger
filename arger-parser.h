@@ -235,7 +235,7 @@ namespace arger {
 					size_t index = std::min<size_t>(endpoint->positionals->size() - 1, i);
 					if (!(*endpoint->positionals)[index].defValue.has_value())
 						break;
-					pParsed.pPositional.push_back((*endpoint->positionals)[index].defValue.value());
+					pParsed.pPositional.push_back(*(*endpoint->positionals)[index].defValue);
 					fUnpackDefValue(pParsed.pPositional.back(), (*endpoint->positionals)[index].type);
 				}
 				return endpoint;

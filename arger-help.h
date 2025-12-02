@@ -523,7 +523,7 @@ namespace arger {
 						if (j + 1 >= endpoint.positionals->size())
 							limit = fLimitDescription((endpoint.minimumEffective > j ? endpoint.minimumEffective - j : 0), (endpoint.maximum > j ? endpoint.maximum - j : 0));
 						if (positional.defValue.has_value())
-							defDesc = fDefaultDescription(&positional.defValue.value(), &positional.defValue.value() + 1);
+							defDesc = fDefaultDescription(&*positional.defValue, &*positional.defValue + 1);
 						if (!limit.empty() || !defDesc.empty())
 							temp = str::wd::Build(L'[', limit, ((limit.empty() || defDesc.empty()) ? L"" : L"; "), defDesc, L']');
 

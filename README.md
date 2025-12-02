@@ -53,8 +53,9 @@ The following configurations are defined:
 /* general arger-configuration to be parsed */
 arger::Config(const arger::IsConfig<detail::Config> auto&... configs);
 
-/* general optional flag/payload
-*	Note: if passed to a group, it is implicitly only bound to that group - but all names and abbreviations must be unique */
+/* general optional flag or option
+*	Note: if passed to a group, it is implicitly only bound to that group - but all names and abbreviations must be unique
+*	Note: if payload is provided, is not considered a flag, but an option */
 arger::Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<detail::Option> auto&... configs);
 
 /* endpoint for positional arguments for a configuration/group (to enable a group to have multiple variations of positional counts)
@@ -98,7 +99,7 @@ arger::Constraint(arger::Checker constraint);
 
 /* add a minimum/maximum requirement [maximum < minimum implies no maximum]
 *	if only minimum is supplied, default maximum will be used
-*	- [Option]: are only acknowledged for non-flags with a default of [min: 0, max: 1]
+*	- [Option]: are only allowed for non-flags with a default of [min: 0, max: 1]
 *	- [Otherwise]: constrains the number of positional arguments with a default of [min = max = number-of-positionals];
 *		if greater than number of positional arguments, last type is used as catch-all */
 arger::Require(size_t min = 1);
@@ -116,8 +117,8 @@ arger::EndpointId(arger::IsId auto id);
 /* add a payload to an option with a given name and of a given type */
 arger::Payload(std::wstring name, arger::Type type);
 
-/* add usage-constraints to let the corresponding options only be used by groups,
-*	which add them as usage (by default every group/argument can use all options) */
+/* add usage-constraints to let the corresponding options only be used by groups, which add
+*	them as usage (by default the config/group, in which the option is defined, can use it) */
 arger::Use(arger::IsId auto... options);
 
 /* setup the descriptive name for the sub-groups to be used (the default name is 'mode') */
