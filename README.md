@@ -154,6 +154,13 @@ arger::Reach(bool allChildren);
 *		depending on the defined reach)
 *	Note: for options, allows the option only to be used for the group and any children */
 arger::PartOf(std::initializer_list<arger::Ref> refs);
+
+/* configure the group/config to group the listed flags and options by used sub-groups
+*		(i.e. list optional flags under the corresponding userss)
+*	Note: defaults to false for reduced mode and to true for normal mode
+*	Note: is inherited by child groups, if they do not overwrite it themselves */
+arger::GroupOptions(bool normal);
+arger::GroupOptions(bool normal, bool reduced);
 ```
 
 ## Common Command Line Mode

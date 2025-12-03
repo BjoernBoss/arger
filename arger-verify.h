@@ -28,6 +28,8 @@ namespace arger::detail {
 		const detail::Group* group = nullptr;
 		size_t depth = 0;
 		bool nestedPositionals = false;
+		bool reducedGroupOptions = false;
+		bool normalGroupOptions = false;
 		bool hidden = false;
 	};
 	struct ValidLink {
@@ -295,7 +297,7 @@ namespace arger::detail {
 				detail::ValidateDefValue(option.payload.type, value);
 		}
 	}
-	inline void ValidateArguments(detail::ValidationState& state, const detail::Arguments& arguments, const detail::Group* group, detail::ValidArguments& entry, detail::ValidArguments* super, bool hidden) {
+	inline void ValidateArguments(detail::ValidationState& state, const detail::Arguments& arguments, const detail::Group* group, detail::ValidArguments& entry, detail::ValidArguments* super, bool hidden, bool reducedGroupOptions, bool normalGroupOptions) {
 		/* populate the entry */
 		entry.constraints = &arguments.constraints;
 		entry.nestedPositionals = !arguments.positionals.empty();
@@ -304,6 +306,12 @@ namespace arger::detail {
 		entry.group = group;
 		entry.args = &arguments;
 		entry.hidden = (hidden || (group != nullptr && group->hidden));
+		entry.reducedGroupOptions = arguments.groupReduced.value_or(reducedGroupOptions);
+		entry.normalGroupOptions = arguments.groupNormal.value_or(normalGroupOptions);
+
+		/* check if the reduced grouping is valid */
+		if (arguments.groupReduced.has_value() && (state.config.help == nullptr || !state.config.help->reducible))
+			throw arger::ConfigException{ L"Grouping options for reduced view requires reduced help to be possible." };
 
 		/* register the reference-ids */
 		for (size_t id : arguments.links)
@@ -350,7 +358,7 @@ namespace arger::detail {
 					detail::ValidateSpecialEntry(state.config, sub.name, sub.abbreviation);
 
 				/* validate the entry itself and update the nesting flags */
-				detail::ValidateArguments(state, sub, &sub, next, &entry, entry.hidden);
+				detail::ValidateArguments(state, sub, &sub, next, &entry, entry.hidden, entry.reducedGroupOptions, entry.normalGroupOptions);
 				entry.nestedPositionals = (entry.nestedPositionals || next.nestedPositionals);
 			}
 			return;
@@ -455,7 +463,7 @@ namespace arger::detail {
 		}
 
 		/* validate the root arguments */
-		detail::ValidateArguments(state, *out.burned, nullptr, state.config, nullptr, false);
+		detail::ValidateArguments(state, *out.burned, nullptr, state.config, nullptr, false, false, true);
 
 		/* link all groups to information/options */
 		detail::ValidateLinkEntries(state, state.config);

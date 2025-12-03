@@ -324,10 +324,9 @@ namespace arger {
 						continue;
 					}
 
-					/* check if the entry can be skipped for this group */
-					if (!fCheckOptionPrint(&option))
-						continue;
-					fAddSpacedToken(str::wd::Build(L"--", name, L"=<", option.option->payload.name, L">"));
+					/* check if the entry should be added for the current group */
+					if (fCheckOptionPrint(&option))
+						fAddSpacedToken(str::wd::Build(L"--", name, L"=<", option.option->payload.name, L">"));
 				}
 				if (hasOptionals)
 					fAddSpacedToken(L"[options...]");
@@ -375,14 +374,16 @@ namespace arger {
 						continue;
 					std::wstring used;
 
-					/* collect the usages (if groups still need to be selected and not all are users, and group is not hidden) */
-					if (pTopMost->endpoints.empty()) {
-						size_t users = 0;
+					/* collect the usages (if groups still need to be selected and not all visible groups are users) */
+					if (pTopMost->endpoints.empty() && (pReduced ? pTopMost->reducedGroupOptions : pTopMost->normalGroupOptions)) {
+						bool partial = false;
 						for (const auto& [_, group] : pTopMost->sub) {
-							if (!group.hidden && detail::CheckUsage(&option, &group))
-								++users;
+							if (!group.hidden && !detail::CheckUsage(&option, &group)) {
+								partial = true;
+								break;
+							}
 						}
-						if (users != pTopMost->sub.size()) for (const auto& [name, group] : pTopMost->sub) {
+						if (partial) for (const auto& [name, group] : pTopMost->sub) {
 							if (!group.hidden && detail::CheckUsage(&option, &group))
 								used.append(used.empty() ? L"" : L", ").append(name);
 						}

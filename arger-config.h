@@ -47,6 +47,10 @@ namespace arger {
 	namespace detail {
 		struct Configurator {};
 
+		struct GroupOptions {
+			std::optional<bool> groupReduced;
+			std::optional<bool> groupNormal;
+		};
 		struct VersionText {
 			std::wstring version;
 		};
@@ -177,7 +181,8 @@ namespace arger {
 			public detail::InformationList,
 			public detail::EndpointList,
 			public detail::EndpointId,
-			public detail::Linkable {
+			public detail::Linkable,
+			public detail::GroupOptions {
 		};
 		struct Group :
 			public detail::Arguments,
@@ -633,6 +638,29 @@ namespace arger {
 	private:
 		void burnConfig(detail::Linkable& base) const {
 			base.links.insert(pRefs.begin(), pRefs.end());
+		}
+	};
+
+	/* configure the group/config to group the listed flags and options by used sub-groups
+	*		(i.e. list optional flags under the corresponding userss)
+	*	Note: defaults to false for reduced mode and to true for normal mode
+	*	Note: is inherited by child groups, if they do not overwrite it themselves */
+	struct GroupOptions : public detail::Configurator {
+		friend struct detail::ConfigBurner;
+	private:
+		std::optional<bool> pNormal;
+		std::optional<bool> pReduced;
+
+	public:
+		GroupOptions(bool normal) : pNormal{ normal } {}
+		GroupOptions(bool normal, bool reduced) : pNormal{ normal }, pReduced{ reduced } {}
+
+	private:
+		void burnConfig(detail::GroupOptions& base) const {
+			if (pNormal.has_value())
+				base.groupNormal = *pNormal;
+			if (pReduced.has_value())
+				base.groupReduced = *pReduced;
 		}
 	};
 
