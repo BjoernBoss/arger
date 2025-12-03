@@ -171,22 +171,23 @@ namespace arger {
 			}
 
 		private:
-			constexpr std::wstring fLimitDescription(size_t minimum, size_t maximum) {
-				/* check if no limit needs to be added */
-				if (minimum == maximum && (minimum == 0 || minimum == 1))
-					return L"";
+			constexpr std::wstring fLimitDescription(std::optional<size_t> minimum, std::optional<size_t> maximum) {
+				if (minimum.has_value()) {
+					/* check if both a minimum and maximum exist */
+					if (maximum.has_value()) {
+						if (*minimum == *maximum)
+							return str::wd::Build(*minimum, L'x');
+						return str::wd::Build(*minimum, L"...", *maximum);
+					}
 
-				/* check if an upper and lower bound has been defined */
-				if (minimum > 0 && maximum > 0) {
-					if (minimum == maximum)
-						return str::wd::Build(minimum, L'x');
-					return str::wd::Build(minimum, L"...", maximum);
+					/* only a minimum exists */
+					return str::wd::Build(*minimum, L"...");
 				}
 
-				/* construct the one-sided limit string */
-				if (minimum > 0)
-					return str::wd::Build(minimum, L"...");
-				return str::wd::Build(L"...", maximum);
+				/* only a maximum exists */
+				else if (maximum.has_value())
+					return str::wd::Build(L"...", *maximum);
+				return L"";
 			}
 			std::wstring fDefaultDescription(const arger::Value* begin, const arger::Value* end) {
 				/* construct the list of all default values */
@@ -418,13 +419,23 @@ namespace arger {
 						/* add the payload (append white space for visual separation) */
 						if (option != nullptr && option->payload)
 							temp.append(L"=<").append(option->option->payload.name).append(fTypeString(option->option->payload.type)).append(1, L'>');
-						temp.append(L"    ");
+						temp.append(L"  ");
 						fAddString(temp);
 
 						/* add the custom usage-limits and default values */
 						temp.clear();
 						if (option != nullptr) {
-							std::wstring limit = fLimitDescription(option->minimumActual, option->maximum > 1 ? option->maximum : 0), defDesc;
+							std::wstring limit, defDesc;
+
+							/* add the usage limits */
+							if (option->minimumActual != 0 || option->maximum != 1) {
+								if (option->minimumActual == 0)
+									limit = (option->maximum > 0 ? fLimitDescription(std::nullopt, option->maximum) : fLimitDescription(0, std::nullopt));
+								else
+									limit = fLimitDescription(option->minimumActual, (option->maximum == 0 ? std::nullopt : std::optional<size_t>{ option->maximum }));
+							}
+
+							/* add the default values and write the additional information out */
 							if (!option->option->payload.defValue.empty())
 								defDesc = fDefaultDescription(&option->option->payload.defValue.front(), &option->option->payload.defValue.back() + 1);
 							if (!limit.empty() || !defDesc.empty())
@@ -499,12 +510,18 @@ namespace arger {
 						fAddNewLine(false);
 
 						/* add the name and corresponding type and description (add visual separation in the end) */
-						fAddString(str::wd::Build("  ", positional.name, fTypeString(positional.type), L"    "));
+						fAddString(str::wd::Build("  ", positional.name, fTypeString(positional.type), L"  "));
 						std::wstring temp, limit, defDesc;
 
-						/* add the limit and default values and write the value out */
-						if (j + 1 >= endpoint.positionals->size())
-							limit = fLimitDescription((endpoint.minimumEffective > j ? endpoint.minimumEffective - j : 0), (endpoint.maximum > j ? endpoint.maximum - j : 0));
+						/* construct the limit string (only for the last entry) */
+						if (j + 1 >= endpoint.positionals->size() && (endpoint.minimumEffective != j + 1 || endpoint.maximum != j + 1)) {
+							if (endpoint.minimumEffective > j)
+								limit = fLimitDescription(endpoint.minimumEffective - j, (endpoint.maximum > j ? std::optional<size_t>{ endpoint.maximum - j } : std::nullopt));
+							else if (endpoint.maximum > j)
+								limit = fLimitDescription(std::nullopt, endpoint.maximum - j);
+						}
+
+						/* add the default value and write the data out */
 						if (positional.defValue.has_value())
 							defDesc = fDefaultDescription(&*positional.defValue, &*positional.defValue + 1);
 						if (!limit.empty() || !defDesc.empty())

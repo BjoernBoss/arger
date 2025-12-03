@@ -462,6 +462,9 @@ namespace arger {
 		static arger::Require AtLeast(size_t min) {
 			return{ min, 0 };
 		}
+		static arger::Require Exact(size_t count) {
+			return{ count, count };
+		}
 		static arger::Require Any() {
 			return{ 0, 0 };
 		}

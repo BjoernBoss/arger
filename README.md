@@ -111,6 +111,7 @@ arger::Constraint(arger::Checker constraint);
 arger::Require(size_t min = 1);
 arger::Require(size_t min, size_t max);
 arger::Require::AtLeast(size_t min);
+arger::Require::Exact(size_t value);
 arger::Require arger::Any();
 
 /* add an abbreviation character for an option, group, or help/version entry to allow it to be accessible as single letters or, for example, -x */
