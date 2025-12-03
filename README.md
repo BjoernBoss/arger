@@ -45,9 +45,9 @@ To further perform checking, the parser runs all defined `arger::Constraints`, w
 
 ### Linking of Objects
 
-By default, objects (such as information or flags/options) are accessible by the configuration or groups, in which they are defined, and their children. To further restrict where information is shown, or flags/options are available, they can be linked together. For this, a reference group `arger::Ref` can be created. Groups/flags/options/information can then be added to the group. And every other object, can then link to the group, thereby restricting/enabling the object to the given objects.
+By default, objects (such as information or flags/options) are accessible by the configuration or groups, in which they are defined, and their children. To further restrict where information is shown, or flags/options are available, they can be linked together. For this, a reference group `arger::Ref` can be created. Groups/flags/options/information can then be added to the group. And every other object part of the group then use the information, thereby restricting/enabling the object to the given objects.
 
-Important: Options/information/flags can only be linked to groups it has been defined in or nested. If an information should be shown in various places, for example, simply define it in the root configuration, and link it to the specific places.
+Important: Options/information/flags can only be linked to groups it has been defined in or nested. If an information should be shown in various places, for example, simply define it in the root configuration, and link it with the specific places.
 
 ## Configuration Options
 
@@ -146,20 +146,14 @@ arger::Visibility(bool visible);
 *	Note: for information, defaults to false and will only be printed for the level it was defined at */
 arger::Reach(bool allChildren);
 
-/* add the group/option/information to the corresponding reference groups (each group can consist of multiple
-*	objects), which allows them all to be linked to other objects in a single go, as a combined group */
+/* add usage-constraints to let the corresponding object only be used by groups, which link
+*	to them (by default the config/group, in which the object is defined, can use it)
+*	Note: groups/information/config/options can all be part of the same group, the links are only created
+*		between [config/group] <-> [information/options] within the group
+*	Note: for information, prints the information on the help page of the given groups (and children,
+*		depending on the defined reach)
+*	Note: for options, allows the option only to be used for the group and any children */
 arger::PartOf(std::initializer_list<arger::Ref> refs);
-
-/* add usage-constraints to let the corresponding object only be used by groups, which add
-*	them as links (by default the config/group, in which the object is defined, can use it)
-*	Note: for information, prints the information on the help page of the given groups (and children, depending on the defined reach)
-*	Note: for options, allows the option only to be used for the group and any children
-*	Note: direction of linking is irrelevant (i.e. add group to ref-group and link to option, or vice versa) */
-arger::Link(std::initializer_list<arger::Ref> refs);
-
-/* for convenience: same as normal linking, except that it can only be
-*	used by groups to be linked to options, and referencing them by name */
-arger::LinkOption(std::initializer_list<std::wstring> options);
 ```
 
 ## Common Command Line Mode
@@ -284,6 +278,7 @@ The following example configuration:
 enum class Mode : uint8_t { abc, def };
 enum class Group : uint8_t { get, set, read };
 enum class Option : uint8_t { test, path, mode };
+arger::Ref refPath;
 arger::Config config{
 	arger::Program{ L"test.exe" },
 	arger::VersionText{ L"Version [1.0.1]" },
@@ -302,7 +297,8 @@ arger::Config config{
 		arger::Abbreviation{ L'p' },
 		arger::Payload{ L"file-path", arger::Primitive::any },
 		arger::Description{ L"This is some path option" },
-		arger::Require{ 1 }
+		arger::Require{ 1 },
+		arger::PartOf{ refPath }
 	},
 	arger::Option{ L"mode", Option::mode,
 		arger::Payload{ L"test-mode",
@@ -325,14 +321,14 @@ arger::Config config{
 				return L"Argument must be less than 50";
 			return L"";
 		}},
-		arger::Use{ Option::path }
+		arger::PartOf{ refPath }
 	},
 
 	arger::Group{ L"set", Group::set,
 		arger::Description{ L"Set something in the test program. But this is just a demo description" },
 		arger::Require{ 1 },
 		arger::Positional{ L"first", arger::Primitive::unum, L"First Argument" },
-		arger::Use{ Option::path }
+		arger::PartOf{ refPath }
 	},
 	arger::Group{ L"read", Group::read,
 		arger::Require{ 2 },

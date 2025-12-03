@@ -166,7 +166,7 @@ namespace arger::detail {
 			entry.info = &info;
 
 			/* register the reference-ids */
-			for (size_t id : info.partOf)
+			for (size_t id : info.links)
 				state.refs[id].emplace_back(&entry);
 		}
 	}
@@ -243,7 +243,7 @@ namespace arger::detail {
 		entry.hidden = (hidden || option.hidden);
 
 		/* register the reference-ids */
-		for (size_t id : option.partOf)
+		for (size_t id : option.links)
 			state.refs[id].emplace_back(&entry);
 
 		/* check if the abbreviation is unique */
@@ -306,7 +306,7 @@ namespace arger::detail {
 		entry.hidden = (hidden || (group != nullptr && group->hidden));
 
 		/* register the reference-ids */
-		for (size_t id : arguments.partOf)
+		for (size_t id : arguments.links)
 			state.refs[id].emplace_back(&entry);
 
 		/* validate and configure the group name */
@@ -394,14 +394,6 @@ namespace arger::detail {
 				else if (std::holds_alternative<detail::ValidInformation*>(ref))
 					detail::ValidateLink(arguments, std::get<detail::ValidInformation*>(ref));
 			}
-		}
-
-		/* link all named options */
-		for (const std::wstring& option : arguments.args->namedOptions) {
-			auto it = state.config.options.find(option);
-			if (it == state.config.options.end())
-				throw arger::ConfigException{ L"Links cannot be created to unkown option names." };
-			detail::ValidateLink(arguments, &it->second);
 		}
 
 		/* validate all children */

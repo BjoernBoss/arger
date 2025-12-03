@@ -28,7 +28,7 @@ namespace arger {
 
 	using Checker = std::function<std::wstring(const arger::Parsed&)>;
 
-	/* used to link components together, and defines one group of referenced objects to be linked */
+	/* used to link components together and defines one group of referenced objects to be linked */
 	struct Ref {
 	private:
 		inline static size_t NextId = 0;
@@ -88,7 +88,6 @@ namespace arger {
 			size_t endpointId = 0;
 		};
 		struct Linkable {
-			std::set<size_t> partOf;
 			std::set<size_t> links;
 		};
 
@@ -140,9 +139,6 @@ namespace arger {
 			size_t id = 0;
 			Option(std::wstring name, size_t id) : name{ name }, id{ id } {}
 		};
-		struct NamedOptions {
-			std::set<std::wstring> namedOptions;
-		};
 		struct OptionList {
 			std::vector<detail::Option> options;
 		};
@@ -181,8 +177,7 @@ namespace arger {
 			public detail::InformationList,
 			public detail::EndpointList,
 			public detail::EndpointId,
-			public detail::Linkable,
-			public detail::NamedOptions {
+			public detail::Linkable {
 		};
 		struct Group :
 			public detail::Arguments,
@@ -617,8 +612,13 @@ namespace arger {
 		}
 	};
 
-	/* add the group/option/information to the corresponding reference groups (each group can consist of multiple
-	*	objects), which allows them all to be linked to other objects in a single go, as a combined group */
+	/* add usage-constraints to let the corresponding object only be used by groups, which link
+	*	to them (by default the config/group, in which the object is defined, can use it)
+	*	Note: groups/information/config/options can all be part of the same group, the links are only created
+	*		between [config/group] <-> [information/options] within the group
+	*	Note: for information, prints the information on the help page of the given groups (and children,
+	*		depending on the defined reach)
+	*	Note: for options, allows the option only to be used for the group and any children */
 	struct PartOf : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
@@ -632,48 +632,7 @@ namespace arger {
 
 	private:
 		void burnConfig(detail::Linkable& base) const {
-			base.partOf.insert(pRefs.begin(), pRefs.end());
-		}
-	};
-
-	/* add usage-constraints to let the corresponding object only be used by groups, which add
-	*	them as links (by default the config/group, in which the object is defined, can use it)
-	*	Note: for information, prints the information on the help page of the given groups (and children, depending on the defined reach)
-	*	Note: for options, allows the option only to be used for the group and any children
-	*	Note: direction of linking is irrelevant (i.e. add group to ref-group and link to option, or vice versa) */
-	struct Link : public detail::Configurator {
-		friend struct detail::ConfigBurner;
-	private:
-		std::set<size_t> pRefs;
-
-	public:
-		Link(std::initializer_list<arger::Ref> refs) {
-			for (const auto& ref : refs)
-				pRefs.insert(ref.id());
-		}
-
-	private:
-		void burnConfig(detail::Linkable& base) const {
 			base.links.insert(pRefs.begin(), pRefs.end());
-		}
-	};
-
-	/* for convenience: same as normal linking, except that it can only be
-	*	used by groups to be linked to options, and referencing them by name */
-	struct LinkOption : public detail::Configurator {
-		friend struct detail::ConfigBurner;
-	private:
-		std::set<std::wstring> pOptions;
-
-	public:
-		LinkOption(std::initializer_list<std::wstring> options) {
-			for (const auto& option : options)
-				pOptions.insert(option);
-		}
-
-	private:
-		void burnConfig(detail::NamedOptions& options) const {
-			options.namedOptions.insert(pOptions.begin(), pOptions.end());
 		}
 	};
 
