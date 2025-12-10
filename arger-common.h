@@ -33,9 +33,9 @@ namespace arger {
 	concept IsId = std::is_integral_v<Type> || std::is_enum_v<Type>;
 
 	/* exception thrown when using the library in an invalid way */
-	struct Exception : public str::BuildException {
+	struct Exception : public str::wd::BuildException {
 		template <class... Args>
-		constexpr Exception(const Args&... args) : str::BuildException{ args... } {}
+		constexpr Exception(const Args&... args) : str::wd::BuildException{ args... } {}
 	};
 
 	/* exception thrown when a malformed argument-configuration is used */

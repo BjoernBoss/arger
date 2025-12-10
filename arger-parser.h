@@ -273,7 +273,7 @@ namespace arger {
 					else if (option.minimumActual > count)
 						throw arger::ParsingException{ L"Option [", name, L"] is missing." };
 					else if (option.maximum > 0 && count > option.maximum)
-						throw arger::ParsingException{ L"Option [", name, L"] can at most be specified ", option.maximum, " times." };
+						throw arger::ParsingException{ L"Option [", name, L"] can at most be specified ", option.maximum, L" times." };
 
 					/* verify and unpack the values themselves */
 					for (size_t i = 0; i < count; ++i)

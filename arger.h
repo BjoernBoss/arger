@@ -72,7 +72,7 @@ namespace arger {
 
 	/* convenience functions for help-hints with default argument pattern from separated arguments */
 	inline constexpr std::wstring HelpHint(size_t argc, const str::IsChar auto* const* argv, const arger::Config& config) {
-		return arger::HelpHint({ str::wd::Safe(argc == 0 ? "" : argv[0]) }, config);
+		return arger::HelpHint({ argc == 0 ? L"" : str::wd::Safe(argv[0]) }, config);
 	}
 
 	/* convenience functions for standard program or menu-input arguments parsing from a single command-line */

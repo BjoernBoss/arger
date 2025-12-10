@@ -511,7 +511,7 @@ namespace arger {
 						fAddNewLine(false);
 
 						/* add the name and corresponding type and description (add visual separation in the end) */
-						fAddString(str::wd::Build("  ", positional.name, fTypeString(positional.type), L"  "));
+						fAddString(str::wd::Build(L"  ", positional.name, fTypeString(positional.type), L"  "));
 						std::wstring temp, limit, defDesc;
 
 						/* construct the limit string (only for the last entry) */
