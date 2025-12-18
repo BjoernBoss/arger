@@ -138,7 +138,8 @@ namespace arger {
 			public detail::Abbreviation,
 			public detail::Payload,
 			public detail::Hidden,
-			public detail::Linkable {
+			public detail::Linkable,
+			public detail::Reach {
 			std::wstring name;
 			size_t id = 0;
 			Option(std::wstring name, size_t id) : name{ name }, id{ id } {}
@@ -160,9 +161,8 @@ namespace arger {
 			public detail::Abbreviation,
 			public detail::Reach {
 			std::wstring name;
-			bool reducible = false;
 			constexpr SpecialEntry() {}
-			constexpr SpecialEntry(std::wstring name, bool reducible) : name{ name }, reducible{ reducible } {}
+			constexpr SpecialEntry(std::wstring name) : name{ name } {}
 		};
 		struct SpecialEntries {
 			struct {
@@ -198,6 +198,8 @@ namespace arger {
 			public detail::Arguments,
 			public detail::VersionText,
 			public detail::SpecialEntries {
+			bool reducible = true;
+			Config(bool reducible) : reducible{ reducible } {}
 		};
 
 		struct ConfigBurner {
@@ -221,14 +223,18 @@ namespace arger {
 	template <class Type, class Base>
 	concept IsConfig = std::is_base_of_v<detail::Configurator, Type>&& decltype(detail::ConfigBurner::CanBurn<Base, Type>(0))::value;
 
-	/* general arger-configuration to be parsed */
+	/* general arger-configuration to be parsed
+	*	Note: Can be used to define if the help will be reducible (defaults to true) */
 	struct Config {
 		friend struct detail::ConfigBurner;
 	private:
 		detail::Config pConfig;
 
 	public:
-		constexpr Config(const arger::IsConfig<detail::Config> auto&... configs) {
+		constexpr Config(const arger::IsConfig<detail::Config> auto&... configs) : pConfig{ true } {
+			detail::ConfigBurner::Apply(pConfig, configs...);
+		}
+		constexpr Config(bool reducible, const arger::IsConfig<detail::Config> auto&... configs) : pConfig{ reducible } {
 			detail::ConfigBurner::Apply(pConfig, configs...);
 		}
 		constexpr arger::Config& add(const arger::IsConfig<detail::Config> auto&... configs) {
@@ -319,7 +325,7 @@ namespace arger {
 		detail::SpecialEntry pSpecial;
 
 	public:
-		constexpr HelpEntry(std::wstring name, bool reducible, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name, reducible } {
+		constexpr HelpEntry(std::wstring name, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name } {
 			detail::ConfigBurner::Apply(pSpecial, configs...);
 		}
 		constexpr arger::HelpEntry& add(const arger::IsConfig<detail::SpecialEntry> auto&... configs) {
@@ -342,7 +348,7 @@ namespace arger {
 		detail::SpecialEntry pSpecial;
 
 	public:
-		constexpr VersionEntry(std::wstring name, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name, false } {
+		constexpr VersionEntry(std::wstring name, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name } {
 			detail::ConfigBurner::Apply(pSpecial, configs...);
 		}
 		constexpr arger::VersionEntry& add(const arger::IsConfig<detail::SpecialEntry> auto&... configs) {
@@ -601,7 +607,7 @@ namespace arger {
 	};
 
 	/* configure if the visibility of the entry for children
-	*	Note: for help/version, defaults to true, otherwise will only be printed in help menu of the root
+	*	Note: for help/version/options, defaults to true (also for required options), otherwise will only be printed in help menu of the root/parent group
 	*	Note: for information, defaults to false and will only be printed for the level it was defined at */
 	struct Reach : public detail::Configurator {
 		friend struct detail::ConfigBurner;
@@ -642,7 +648,7 @@ namespace arger {
 	};
 
 	/* configure the group/config to group the listed flags and options by used sub-groups
-	*		(i.e. list optional flags under the corresponding userss)
+	*		(i.e. list optional flags under the corresponding users)
 	*	Note: defaults to false for reduced mode and to true for normal mode
 	*	Note: is inherited by child groups, if they do not overwrite it themselves */
 	struct GroupOptions : public detail::Configurator {

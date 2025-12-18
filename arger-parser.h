@@ -382,7 +382,7 @@ namespace arger {
 				/* check if the help or version should be printed */
 				std::wstring print = (pPrintVersion ? base.buildVersionString() : L"");
 				if (pPrintHelp != detail::PrintOption::none) {
-					bool reduced = (pPrintHelp == detail::PrintOption::reduced && pConfig.help != nullptr && pConfig.help->reducible);
+					bool reduced = (pPrintHelp == detail::PrintOption::reduced && pConfig.reducible);
 					print.append(print.empty() ? L"" : L"\n\n").append(detail::HelpBuilder{ base, pConfig, pTopMost, lineLength, reduced }.buildHelpString());
 				}
 				if (!print.empty())

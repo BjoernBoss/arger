@@ -374,6 +374,10 @@ namespace arger {
 						continue;
 					std::wstring used;
 
+					/* check if the option is optional and should not be printed for children */
+					if (!required && !option.option->allChildren.value_or(true) && option.owner != pTopMost && pReduced)
+						continue;
+
 					/* collect the usages (if groups still need to be selected and not all visible groups are users) */
 					if (pTopMost->endpoints.empty() && (pReduced ? pTopMost->reducedGroupOptions : pTopMost->normalGroupOptions)) {
 						bool partial = false;

@@ -56,8 +56,10 @@ There exist a set of configuration options, which can be applied to any of the c
 The following configurations are defined:
 
 ```C++
-/* general arger-configuration to be parsed */
+/* general arger-configuration to be parsed
+*	Note: Can be used to define if the help will be reducible (defaults to true) */
 arger::Config(const arger::IsConfig<detail::Config> auto&... configs);
+arger::Config(bool reducible, const arger::IsConfig<detail::Config> auto&... configs);
 
 /* general optional flag or option (id's must be unique and are used to distinguish the options/flags in the parsed result)
 *	Note: if passed to a group, it is implicitly only bound to that group - but all names and abbreviations must be unique
@@ -142,7 +144,7 @@ arger::Default(arger::Value defValue);
 arger::Visibility(bool visible);
 
 /* configure if the visibility of the entry for children
-*	Note: for help/version, defaults to true, otherwise will only be printed in help menu of the root
+*	Note: for help/version/options, defaults to true (also for required options), otherwise will only be printed in help menu of the root/parent group
 *	Note: for information, defaults to false and will only be printed for the level it was defined at */
 arger::Reach(bool allChildren);
 
@@ -156,7 +158,7 @@ arger::Reach(bool allChildren);
 arger::PartOf(std::initializer_list<arger::Ref> refs);
 
 /* configure the group/config to group the listed flags and options by used sub-groups
-*		(i.e. list optional flags under the corresponding userss)
+*		(i.e. list optional flags under the corresponding users)
 *	Note: defaults to false for reduced mode and to true for normal mode
 *	Note: is inherited by child groups, if they do not overwrite it themselves */
 arger::GroupOptions(bool normal);

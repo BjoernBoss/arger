@@ -54,6 +54,7 @@ namespace arger::detail {
 		std::map<wchar_t, detail::ValidOption*> abbreviations;
 		const detail::SpecialEntry* help = nullptr;
 		const detail::SpecialEntry* version = nullptr;
+		bool reducible = false;
 	};
 	using RefTarget = std::variant<detail::ValidOption*, detail::ValidInformation*, detail::ValidArguments*>;
 	struct ValidationState {
@@ -84,13 +85,13 @@ namespace arger::detail {
 		return false;
 	}
 
-	inline constexpr void ValidateDescription(detail::ValidConfig& state, const detail::Description& description) {
+	inline constexpr void ValidateDescription(detail::ValidationState& state, const detail::Description& description) {
 		if (description.description.normal.empty() && !description.description.reduced.empty())
 			throw arger::ConfigException{ L"Reduced description requires normal description as well." };
-		if (!description.description.reduced.empty() && (state.help == nullptr || !state.help->reducible))
+		if (!description.description.reduced.empty() && !state.config.reducible)
 			throw arger::ConfigException{ L"Reduced description requires reduced help to be possible." };
 	}
-	inline constexpr void ValidateType(detail::ValidConfig& state, const arger::Type& type) {
+	inline constexpr void ValidateType(detail::ValidationState& state, const arger::Type& type) {
 		if (!std::holds_alternative<arger::Enum>(type))
 			return;
 		const arger::Enum& list = std::get<arger::Enum>(type);
@@ -99,7 +100,7 @@ namespace arger::detail {
 		for (const auto& entry : list) {
 			if (entry.normal.empty() && !entry.reduced.empty())
 				throw arger::ConfigException{ L"Reduced description requires normal description as well." };
-			if (!entry.reduced.empty() && (state.help == nullptr || !state.help->reducible))
+			if (!entry.reduced.empty() && !state.config.reducible)
 				throw arger::ConfigException{ L"Reduced description requires reduced help to be possible." };
 		}
 	}
@@ -159,7 +160,7 @@ namespace arger::detail {
 		for (const auto& info : arguments.information) {
 			if (info.name.empty() || info.text.empty())
 				throw arger::ConfigException{ L"Information name and description must not be empty." };
-			if (!info.reduced.empty() && (state.config.help == nullptr || !state.config.help->reducible))
+			if (!info.reduced.empty() && !state.config.reducible)
 				throw arger::ConfigException{ L"Reduced information requires reduced help to be possible." };
 
 			/* add the entry to the list and set it up */
@@ -187,7 +188,7 @@ namespace arger::detail {
 
 		/* validate the description */
 		if (next.description != nullptr)
-			detail::ValidateDescription(state.config, *next.description);
+			detail::ValidateDescription(state, *next.description);
 
 		/* validate and configure the minimum */
 		if (minimum.has_value() && positionals.empty())
@@ -214,7 +215,7 @@ namespace arger::detail {
 			/* validate the name and type */
 			if (positionals[i].name.empty())
 				throw arger::ConfigException{ L"Positional argument must not have an empty name." };
-			detail::ValidateType(state.config, positionals[i].type);
+			detail::ValidateType(state, positionals[i].type);
 
 			/* validate the default-value */
 			if (!positionals[i].defValue.has_value())
@@ -224,7 +225,7 @@ namespace arger::detail {
 				throw arger::ConfigException{ L"All positionals up to the minimum must be defaulted once one is defaulted." };
 
 			/* validat ethe description */
-			detail::ValidateDescription(state.config, positionals[i]);
+			detail::ValidateDescription(state, positionals[i]);
 		}
 	}
 	inline void ValidateOption(detail::ValidationState& state, const detail::Option& option, const detail::ValidArguments* owner, bool hidden) {
@@ -265,11 +266,11 @@ namespace arger::detail {
 			detail::ValidateSpecialEntry(state.config, option.name, option.abbreviation);
 
 		/* validate the description */
-		detail::ValidateDescription(state.config, option);
+		detail::ValidateDescription(state, option);
 
 		/* validate the payload */
 		if (entry.payload)
-			detail::ValidateType(state.config, option.payload.type);
+			detail::ValidateType(state, option.payload.type);
 		else if (option.require.minimum.has_value() || option.require.maximum.has_value())
 			throw arger::ConfigException{ L"Flags cannot have requirements defined." };
 		else if (!option.payload.defValue.empty())
@@ -310,7 +311,7 @@ namespace arger::detail {
 		entry.normalGroupOptions = arguments.groupNormal.value_or(normalGroupOptions);
 
 		/* check if the reduced grouping is valid */
-		if (arguments.groupReduced.has_value() && (state.config.help == nullptr || !state.config.help->reducible))
+		if (arguments.groupReduced.has_value() && !state.config.reducible)
 			throw arger::ConfigException{ L"Grouping options for reduced view requires reduced help to be possible." };
 
 		/* register the reference-ids */
@@ -324,7 +325,7 @@ namespace arger::detail {
 			entry.groupName = str::View{ arguments.groups.name }.lower();
 
 		/* validate the description, information, and options */
-		detail::ValidateDescription(state.config, arguments);
+		detail::ValidateDescription(state, arguments);
 		detail::ValidateInformation(state, arguments, &entry);
 		for (const auto& option : arguments.options)
 			detail::ValidateOption(state, option, &entry, entry.hidden);
@@ -437,30 +438,35 @@ namespace arger::detail {
 
 		/* setup the the validation-state */
 		detail::ValidationState state{ .config = out };
+		state.config.reducible = out.burned->reducible;
 
-		/* validate the special-purpose entries attributes */
+		/* validate the help special flag */
 		if (!out.burned->special.help.name.empty()) {
 			if (out.burned->special.help.name.size() <= 1)
 				throw arger::ConfigException{ L"Help entry name must at least be two characters long." };
 			if (out.burned->special.version.name == out.burned->special.help.name)
 				throw arger::ConfigException{ L"Help entry and version entry cannot have the same name." };
-			if (out.burned->special.help.reducible && out.burned->special.help.abbreviation == 0)
-				throw arger::ConfigException{ L"Reducible help entry requires a defined abbreviarion." };
 			if (!out.burned->special.version.name.empty()) {
 				if (out.burned->special.help.abbreviation != 0 && out.burned->special.help.abbreviation == out.burned->special.version.abbreviation)
 					throw arger::ConfigException{ L"Help entry and version entry cannot have the same abbreviation." };
 			}
 			out.help = &out.burned->special.help;
-			detail::ValidateDescription(out, out.burned->special.help);
+			detail::ValidateDescription(state, out.burned->special.help);
 		}
+
+		/* validate the version special flag */
 		if (!out.burned->special.version.name.empty()) {
 			if (out.burned->special.version.name.size() <= 1)
 				throw arger::ConfigException{ L"Version entry name must at least be two characters long." };
 			if (out.burned->version.empty())
 				throw arger::ConfigException{ L"Version string must be set when using a version entry." };
 			out.version = &out.burned->special.version;
-			detail::ValidateDescription(out, out.burned->special.version);
+			detail::ValidateDescription(state, out.burned->special.version);
 		}
+
+		/* validate the reduce-flag */
+		if (state.config.reducible && (out.help == nullptr || out.help->abbreviation == 0))
+			throw arger::ConfigException{ L"Reducible requires a defined abbreviation for the help entry." };
 
 		/* validate the root arguments */
 		detail::ValidateArguments(state, *out.burned, nullptr, state.config, nullptr, false, false, true);
