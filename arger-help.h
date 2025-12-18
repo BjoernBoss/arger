@@ -12,6 +12,7 @@ namespace arger {
 	static constexpr size_t MinNumCharsRight = 8;
 	static constexpr size_t IndentInformation = 4;
 	static constexpr size_t AutoIndentLongText = 2;
+	static constexpr std::wstring_view VisualPadding = L"   ";
 
 	namespace detail {
 		class BaseBuilder {
@@ -112,7 +113,7 @@ namespace arger {
 				}
 				fAddToken(add);
 			}
-			constexpr void fAddString(const std::wstring& add, size_t offset = 0, size_t indentAutoBreaks = 0) {
+			constexpr void fAddString(std::wstring_view add, size_t offset = 0, size_t indentAutoBreaks = 0) {
 				std::wstring tokenPrint;
 				bool isWhitespace = true;
 
@@ -189,14 +190,18 @@ namespace arger {
 					return str::wd::Build(L"...", *maximum);
 				return L"";
 			}
-			std::wstring fDefaultDescription(const arger::Value* begin, const arger::Value* end) {
+			std::wstring fDefaultDescription(const arger::Value* begin, const arger::Value* end, bool isEnumType) {
 				/* construct the list of all default values */
 				std::wstring temp = L"Default: ";
 				for (const arger::Value* it = begin; it != end; ++it) {
 					temp.append(it == begin ? L"" : L", ");
 
-					if (it->isStr())
-						temp.append(it->str());
+					if (it->isStr()) {
+						if (isEnumType)
+							temp.append(it->str());
+						else
+							temp.append(1, L'\"').append(it->str()).append(1, L'\"');
+					}
 					else if (it->isUNum())
 						str::IntTo(temp, it->unum());
 					else if (it->isINum())
@@ -421,10 +426,10 @@ namespace arger {
 						temp.append(L"--").append(name);
 						const detail::ValidOption* option = cache.option;
 
-						/* add the payload (append white space for visual separation) */
+						/* add the payload */
 						if (option != nullptr && option->payload)
 							temp.append(L"=<").append(option->option->payload.name).append(fTypeString(option->option->payload.type)).append(1, L'>');
-						temp.append(L"  ");
+						temp.append(VisualPadding);
 						fAddString(temp);
 
 						/* add the custom usage-limits and default values */
@@ -441,8 +446,8 @@ namespace arger {
 							}
 
 							/* add the default values and write the additional information out */
-							if (!option->option->payload.defValue.empty())
-								defDesc = fDefaultDescription(&option->option->payload.defValue.front(), &option->option->payload.defValue.back() + 1);
+							if (const std::vector<arger::Value>& defValue = option->option->payload.defValue; !defValue.empty())
+								defDesc = fDefaultDescription(&defValue.front(), &defValue.back() + 1, std::holds_alternative<arger::Enum>(option->option->payload.type));
 							if (!limit.empty() || !defDesc.empty())
 								temp = str::wd::Build(L'[', limit, ((limit.empty() || defDesc.empty()) ? L"" : L"; "), defDesc, L']');
 						}
@@ -505,6 +510,7 @@ namespace arger {
 					else {
 						fAddString(str::wd::Build(L"Variation ", ++index, L':'));
 						fAddEndpointUsage(pTopMost->endpoints[i]);
+						fAddString(VisualPadding);
 						if (const std::wstring* text = fGetDescription(endpoint.description); text != nullptr)
 							fAddString(*text, arger::NumCharsHelpLeft, arger::AutoIndentLongText);
 					}
@@ -514,12 +520,12 @@ namespace arger {
 						const detail::Positional& positional = (*endpoint.positionals)[j];
 						fAddNewLine(false);
 
-						/* add the name and corresponding type and description (add visual separation in the end) */
-						fAddString(str::wd::Build(L"  ", positional.name, fTypeString(positional.type), L"  "));
+						/* add the name and corresponding type and description */
+						fAddString(str::wd::Build(L"  ", fEndpointName(endpoint, j), fTypeString(positional.type), VisualPadding));
 						std::wstring temp, limit, defDesc;
 
 						/* construct the limit string (only for the last entry) */
-						if (j + 1 >= endpoint.positionals->size() && (endpoint.minimumEffective != j + 1 || endpoint.maximum != j + 1)) {
+						if (j + 1 >= endpoint.positionals->size() && (endpoint.minimumEffective > j + 1 || endpoint.maximum > j + 1)) {
 							if (endpoint.minimumEffective > j)
 								limit = fLimitDescription(endpoint.minimumEffective - j, (endpoint.maximum > j ? std::optional<size_t>{ endpoint.maximum - j } : std::nullopt));
 							else if (endpoint.maximum > j)
@@ -528,7 +534,7 @@ namespace arger {
 
 						/* add the default value and write the data out */
 						if (positional.defValue.has_value())
-							defDesc = fDefaultDescription(&*positional.defValue, &*positional.defValue + 1);
+							defDesc = fDefaultDescription(&*positional.defValue, &*positional.defValue + 1, std::holds_alternative<arger::Enum>(positional.type));
 						if (!limit.empty() || !defDesc.empty())
 							temp = str::wd::Build(L'[', limit, ((limit.empty() || defDesc.empty()) ? L"" : L"; "), defDesc, L']');
 
