@@ -25,7 +25,7 @@ namespace arger {
 		/* split the string */
 		char32_t inStr = U'\0';
 		bool lastWhitespace = true, lastEscape = false;
-		for (char32_t cp : str::CPRange{ line }) {
+		for (char32_t cp : str::View{ line }.codepoints()) {
 			/* check if the last character was escaped, in which case the codepoint can just be added */
 			if (lastEscape) {
 				lastEscape = false;
