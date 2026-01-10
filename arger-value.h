@@ -1,14 +1,14 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/* Copyright (c) 2024-2025 Bjoern Boss Henrichsen */
+/* Copyright (c) 2024-2026 Bjoern Boss Henrichsen */
 #pragma once
 
 #include "arger-common.h"
 
 namespace arger {
 	/* representation of a single argument value (performs primitive type-conversions when accessing values) */
-	struct Value : private std::variant<uint64_t, int64_t, double, bool, std::wstring, detail::EnumId> {
+	struct Value : private std::variant<uint64_t, int64_t, double, bool, std::string, detail::EnumId> {
 	private:
-		using Parent = std::variant<uint64_t, int64_t, double, bool, std::wstring, detail::EnumId>;
+		using Parent = std::variant<uint64_t, int64_t, double, bool, std::string, detail::EnumId>;
 
 	public:
 		Value() : Parent{ 0llu } {}
@@ -25,7 +25,7 @@ namespace arger {
 		}
 		constexpr Value(double v) : Parent{ v } {}
 		constexpr Value(bool v) : Parent{ v } {}
-		constexpr Value(const str::IsStr auto& v) : Parent{ str::wd::To(v) } {}
+		constexpr Value(const str::IsStr auto& v) : Parent{ str::ch::To(v) } {}
 		constexpr Value(const detail::EnumId& v) : Parent{ v } {}
 
 	public:
@@ -59,7 +59,7 @@ namespace arger {
 			return std::holds_alternative<bool>(*this);
 		}
 		constexpr bool isStr() const {
-			return std::holds_alternative<std::wstring>(*this);
+			return std::holds_alternative<std::string>(*this);
 		}
 
 	public:
@@ -67,19 +67,19 @@ namespace arger {
 		constexpr Type id() const {
 			if (std::holds_alternative<detail::EnumId>(*this))
 				return static_cast<Type>(std::get<detail::EnumId>(*this).id);
-			throw arger::TypeException{ L"arger::Value is not an enum." };
+			throw arger::TypeException{ "arger::Value is not an enum." };
 		}
 		constexpr uint64_t unum() const {
 			if (std::holds_alternative<uint64_t>(*this))
 				return std::get<uint64_t>(*this);
-			throw arger::TypeException{ L"arger::Value is not an unsigned-number." };
+			throw arger::TypeException{ "arger::Value is not an unsigned-number." };
 		}
 		constexpr int64_t inum() const {
 			if (std::holds_alternative<uint64_t>(*this))
 				return int64_t(std::get<uint64_t>(*this));
 			if (std::holds_alternative<int64_t>(*this))
 				return std::get<int64_t>(*this);
-			throw arger::TypeException{ L"arger::Value is not a signed-number." };
+			throw arger::TypeException{ "arger::Value is not a signed-number." };
 		}
 		constexpr double real() const {
 			if (std::holds_alternative<double>(*this))
@@ -88,18 +88,18 @@ namespace arger {
 				return double(std::get<uint64_t>(*this));
 			if (std::holds_alternative<int64_t>(*this))
 				return double(std::get<int64_t>(*this));
-			throw arger::TypeException{ L"arger::Value is not a real." };
+			throw arger::TypeException{ "arger::Value is not a real." };
 		}
 		constexpr bool boolean() const {
 			if (std::holds_alternative<bool>(*this))
 				return std::get<bool>(*this);
-			throw arger::TypeException{ L"arger::Value is not a boolean." };
+			throw arger::TypeException{ "arger::Value is not a boolean." };
 		}
-		template <str::IsChar ChType = wchar_t>
+		template <str::IsChar ChType = char>
 		constexpr std::basic_string<ChType> str() const {
-			if (std::holds_alternative<std::wstring>(*this))
-				return str::View{ std::get<std::wstring>(*this) }.str<ChType>();
-			throw arger::TypeException{ L"arger::Value is not a string." };
+			if (std::holds_alternative<std::string>(*this))
+				return str::View{ std::get<std::string>(*this) }.str<ChType>();
+			throw arger::TypeException{ "arger::Value is not a string." };
 		}
 	};
 }

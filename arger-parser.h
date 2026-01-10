@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/* Copyright (c) 2024-2025 Bjoern Boss Henrichsen */
+/* Copyright (c) 2024-2026 Bjoern Boss Henrichsen */
 #pragma once
 
 #include "arger-parsed.h"
@@ -17,21 +17,21 @@ namespace arger {
 
 		class Parser {
 		private:
-			const std::vector<std::wstring>& pArgs;
+			const std::vector<std::string>& pArgs;
 			detail::ValidConfig pConfig;
 			const detail::ValidArguments* pTopMost = nullptr;
 			arger::Parsed pParsed;
-			std::wstring pDeferred;
+			std::string pDeferred;
 			size_t pIndex = 0;
 			detail::PrintOption pPrintHelp = detail::PrintOption::none;
 			bool pPrintVersion = false;
 			bool pPositionalLocked = false;
 
 		public:
-			Parser(const std::vector<std::wstring>& args) : pArgs{ args } {}
+			Parser(const std::vector<std::string>& args) : pArgs{ args } {}
 
 		private:
-			void fParseOptional(const std::wstring& arg, const std::wstring& payload, bool fullName, bool hasPayload) {
+			void fParseOptional(const std::string& arg, const std::string& payload, bool fullName, bool hasPayload) {
 				bool payloadUsed = false;
 
 				/* check if it could be the help or version entry (only relevant for programs) */
@@ -56,7 +56,7 @@ namespace arger {
 						auto it = pConfig.options.find(arg);
 						if (it == pConfig.options.end()) {
 							if (pDeferred.empty())
-								str::BuildTo(pDeferred, L"Unknown option [", arg, L"] encountered.");
+								str::BuildTo(pDeferred, "Unknown option [", arg, "] encountered.");
 
 							/* continue parsing, as the special entries might still occur */
 							continue;
@@ -81,7 +81,7 @@ namespace arger {
 						auto it = pConfig.abbreviations.find(arg[i]);
 						if (it == pConfig.abbreviations.end()) {
 							if (pDeferred.empty())
-								str::BuildTo(pDeferred, L"Unknown option abbreviation [", arg[i], L"] encountered.");
+								str::BuildTo(pDeferred, "Unknown option abbreviation [", arg[i], "] encountered.");
 
 							/* continue parsing, as the special entries might still occur */
 							continue;
@@ -116,7 +116,7 @@ namespace arger {
 
 				/* check if a payload was supplied but not consumed */
 				if (hasPayload && !payloadUsed && pDeferred.empty())
-					str::BuildTo(pDeferred, L"Value [", payload, L"] not used by option.");
+					str::BuildTo(pDeferred, "Value [", payload, "] not used by option.");
 			}
 
 		private:
@@ -130,7 +130,7 @@ namespace arger {
 				size_t id = std::find_if(list.begin(), list.end(), [&](const arger::EnumEntry& e) { return e.name == value.str(); })->id;
 				value = arger::Value{ detail::EnumId{.id = id } };
 			}
-			void fVerifyValue(const std::wstring& name, arger::Value& value, const arger::Type& type, bool option) const {
+			void fVerifyValue(const std::string& name, arger::Value& value, const arger::Type& type, bool option) const {
 				/* check if an enum was expected */
 				if (std::holds_alternative<arger::Enum>(type)) {
 					const arger::Enum& list = std::get<arger::Enum>(type);
@@ -138,7 +138,7 @@ namespace arger {
 					/* resolve the id of the string */
 					auto it = std::find_if(list.begin(), list.end(), [&](const arger::EnumEntry& e) { return e.name == value.str(); });
 					if (it == list.end())
-						throw arger::ParsingException{ L"Invalid enum for ", (option ? L"option" : L"argument"), L" [", name, L"] encountered." };
+						throw arger::ParsingException{ "Invalid enum for ", (option ? "option" : "argument"), " [", name, "] encountered." };
 
 					/* assign the new enum-id */
 					value = arger::Value{ detail::EnumId{.id = it->id } };
@@ -150,34 +150,34 @@ namespace arger {
 				case arger::Primitive::inum: {
 					auto [num, len, res] = str::SiParseNum<int64_t>(value.str(), { .prefix = str::PrefixMode::overwrite, .scale = str::SiScaleMode::detect });
 					if (res != str::NumResult::valid || len != value.str().size())
-						throw arger::ParsingException{ L"Invalid signed integer for ", (option ? L"option" : L"argument"), L" [", name, L"] encountered." };
+						throw arger::ParsingException{ "Invalid signed integer for ", (option ? "option" : "argument"), " [", name, "] encountered." };
 					value = arger::Value{ num };
 					break;
 				}
 				case arger::Primitive::unum: {
 					auto [num, len, res] = str::SiParseNum<uint64_t>(value.str(), { .prefix = str::PrefixMode::overwrite, .scale = str::SiScaleMode::detect });
 					if (res != str::NumResult::valid || len != value.str().size())
-						throw arger::ParsingException{ L"Invalid unsigned integer for ", (option ? L"option" : L"argument"), L" [", name, L"] encountered." };
+						throw arger::ParsingException{ "Invalid unsigned integer for ", (option ? "option" : "argument"), " [", name, "] encountered." };
 					value = arger::Value{ num };
 					break;
 				}
 				case arger::Primitive::real: {
 					auto [num, len, res] = str::SiParseNum<double>(value.str(), { .prefix = str::PrefixMode::overwrite, .scale = str::SiScaleMode::detect });
 					if (res != str::NumResult::valid || len != value.str().size())
-						throw arger::ParsingException{ L"Invalid real for ", (option ? L"option" : L"argument"), L" [", name, L"] encountered." };
+						throw arger::ParsingException{ "Invalid real for ", (option ? "option" : "argument"), " [", name, "] encountered." };
 					value = arger::Value{ num };
 					break;
 				}
 				case arger::Primitive::boolean: {
-					if (str::View{ value.str() }.icompare(L"true") || value.str() == L"1") {
+					if (str::View{ value.str() }.icompare("true") || value.str() == "1") {
 						value = arger::Value{ true };
 						break;
 					}
-					if (str::View{ value.str() }.icompare(L"false") || value.str() == L"0") {
+					if (str::View{ value.str() }.icompare("false") || value.str() == "0") {
 						value = arger::Value{ false };
 						break;
 					}
-					throw arger::ParsingException{ L"Invalid boolean for ", (option ? L"option" : L"argument"), L" [", name, L"] encountered." };
+					throw arger::ParsingException{ "Invalid boolean for ", (option ? "option" : "argument"), " [", name, "] encountered." };
 				}
 				case arger::Primitive::any:
 				default:
@@ -187,7 +187,7 @@ namespace arger {
 			constexpr const detail::ValidEndpoint* fVerifyPositional() {
 				/* check if the topmost object is still incomplete */
 				if (pTopMost->endpoints.empty())
-					throw arger::ParsingException{ str::View{ pTopMost->groupName }.title(), L" missing." };
+					throw arger::ParsingException{ str::View{ pTopMost->groupName }.title(), " missing." };
 
 				/* select the endpoint to be used (this ensures that for too few arguments, the first one is picked, too
 				*	many arguments, the last one is picked, and for in-between, the one next in line is picked) */
@@ -207,8 +207,8 @@ namespace arger {
 					/* check if the argument is out of range */
 					if (endpoint->positionals->empty() || (endpoint->maximum > 0 && i >= endpoint->maximum)) {
 						if (pTopMost->super == nullptr)
-							throw arger::ParsingException{ L"Unrecognized argument [", pParsed.pPositional[i].str(), L"] encountered." };
-						throw arger::ParsingException{ L"Unrecognized argument [", pParsed.pPositional[i].str(), L"] encountered for ", pTopMost->super->groupName, L" [", pTopMost->group->name, L"]." };
+							throw arger::ParsingException{ "Unrecognized argument [", pParsed.pPositional[i].str(), "] encountered." };
+						throw arger::ParsingException{ "Unrecognized argument [", pParsed.pPositional[i].str(), "] encountered for ", pTopMost->super->groupName, " [", pTopMost->group->name, "]." };
 					}
 					size_t index = std::min<size_t>(i, endpoint->positionals->size() - 1);
 
@@ -221,8 +221,8 @@ namespace arger {
 				if (pParsed.pPositional.size() < endpoint->minimumEffective) {
 					size_t index = std::min<size_t>(endpoint->positionals->size() - 1, pParsed.pPositional.size());
 					if (pTopMost->super == nullptr)
-						throw arger::ParsingException{ L"Argument [", (*endpoint->positionals)[index].name, L"] is missing." };
-					throw arger::ParsingException{ L"Argument [", (*endpoint->positionals)[index].name, L"] is missing for ", pTopMost->super->groupName, L" [", pTopMost->group->name, L"]." };
+						throw arger::ParsingException{ "Argument [", (*endpoint->positionals)[index].name, "] is missing." };
+					throw arger::ParsingException{ "Argument [", (*endpoint->positionals)[index].name, "] is missing for ", pTopMost->super->groupName, " [", pTopMost->group->name, "]." };
 				}
 
 				/* update the actual supplied-counter of the positionals (before adding the default-values) */
@@ -246,7 +246,7 @@ namespace arger {
 					/* check if the current option can be used by the selected group or any of its ancestors (cannot defererence
 					*	nullptr, as the root top-most, with no group, will always be allowed to use an option) */
 					if (!detail::CheckUsage(&option, pTopMost) && (option.payload ? pParsed.pOptions.contains(option.option->id) : pParsed.pFlags.contains(option.option->id)))
-						throw arger::ParsingException{ L"Option [", name, L"] not meant for ", pTopMost->super->groupName, L" [", pTopMost->group->name, L"]." };
+						throw arger::ParsingException{ "Option [", name, "] not meant for ", pTopMost->super->groupName, " [", pTopMost->group->name, "]." };
 
 					/* check if this is a flag, in which case nothing more needs to be checked */
 					if (!option.payload)
@@ -258,7 +258,7 @@ namespace arger {
 
 					/* check if the payload was forgotten - at least once, in which case the entry will exist but without any values */
 					if (it != pParsed.pOptions.end() && count == 0)
-						throw arger::ParsingException{ L"Payload [", option.option->payload.name, L"] of option [", option.option->name, L"] missing." };
+						throw arger::ParsingException{ "Payload [", option.option->payload.name, "] of option [", option.option->name, "] missing." };
 
 					/* check if default values should be assigned (limits are already ensured to be valid) */
 					if (count < option.option->payload.defValue.size()) {
@@ -271,9 +271,9 @@ namespace arger {
 
 					/* validate the limits of the supplied options */
 					else if (option.minimumActual > count)
-						throw arger::ParsingException{ L"Option [", name, L"] is missing." };
+						throw arger::ParsingException{ "Option [", name, "] is missing." };
 					else if (option.maximum > 0 && count > option.maximum)
-						throw arger::ParsingException{ L"Option [", name, L"] can at most be specified ", option.maximum, L" times." };
+						throw arger::ParsingException{ "Option [", name, "] can at most be specified ", option.maximum, " times." };
 
 					/* verify and unpack the values themselves */
 					for (size_t i = 0; i < count; ++i)
@@ -286,7 +286,7 @@ namespace arger {
 			}
 			void fCheckConstraints(const std::vector<arger::Checker>& constraints) {
 				for (const auto& fn : constraints) {
-					if (std::wstring err = fn(pParsed); !err.empty())
+					if (std::string err = fn(pParsed); !err.empty())
 						throw arger::ParsingException{ err };
 				}
 			}
@@ -305,11 +305,11 @@ namespace arger {
 				detail::ValidateConfig(config, pConfig);
 
 				/* extract the program name (no argument needed for menus) */
-				detail::BaseBuilder base{ ((pArgs.empty() || pConfig.burned->program.empty()) ? L"" : pArgs[pIndex++]), config };
+				detail::BaseBuilder base{ ((pArgs.empty() || pConfig.burned->program.empty()) ? "" : pArgs[pIndex++]), config };
 
 				/* iterate over the arguments and parse them based on the definitions */
 				while (pIndex < pArgs.size()) {
-					const std::wstring& next = pArgs[pIndex++];
+					const std::string& next = pArgs[pIndex++];
 
 					/* check if its the version or help group (only relevant for menus and only if no positional arguments have yet been pushed) */
 					if (pConfig.burned->program.empty() && pParsed.pPositional.empty()) {
@@ -324,18 +324,18 @@ namespace arger {
 					}
 
 					/* check if its an options or positional-lock */
-					if (!pPositionalLocked && !next.empty() && next[0] == L'-') {
-						if (next == L"--") {
+					if (!pPositionalLocked && !next.empty() && next[0] == '-') {
+						if (next == "--") {
 							pPositionalLocked = true;
 							continue;
 						}
 
 						/* check if a payload is baked into the string */
-						std::wstring payload;
+						std::string payload;
 						size_t end = next.size();
 						bool hasPayload = false;
 						for (size_t i = 1; i < next.size(); ++i) {
-							if (next[i] != L'=')
+							if (next[i] != '=')
 								continue;
 
 							/* extract the payload and mark the actual end of the options */
@@ -346,7 +346,7 @@ namespace arger {
 						}
 
 						/* parse the single long or multiple short arguments */
-						size_t hypenCount = (next.size() > 2 && next[1] == L'-' ? 2 : 1);
+						size_t hypenCount = (next.size() > 2 && next[1] == '-' ? 2 : 1);
 						fParseOptional(next.substr(hypenCount, end - hypenCount), payload, (hypenCount == 2), hasPayload);
 						continue;
 					}
@@ -357,7 +357,7 @@ namespace arger {
 						const detail::ValidArguments* _next = nullptr;
 						if (auto it = pTopMost->sub.find(next); it != pTopMost->sub.end())
 							_next = &it->second;
-						else if (auto it = pTopMost->abbreviations.find(next.size() == 1 ? next[0] : L'\0'); it != pTopMost->abbreviations.end())
+						else if (auto it = pTopMost->abbreviations.find(next.size() == 1 ? next[0] : '\0'); it != pTopMost->abbreviations.end())
 							_next = it->second;
 
 						/* check if a matching group has been found */
@@ -369,7 +369,7 @@ namespace arger {
 
 						/* setup the failed match */
 						if (pDeferred.empty())
-							str::BuildTo(pDeferred, L"Unknown ", pTopMost->groupName, L" [", next, L"] encountered.");
+							str::BuildTo(pDeferred, "Unknown ", pTopMost->groupName, " [", next, "] encountered.");
 						continue;
 					}
 
@@ -380,10 +380,10 @@ namespace arger {
 				}
 
 				/* check if the help or version should be printed */
-				std::wstring print = (pPrintVersion ? base.buildVersionString() : L"");
+				std::string print = (pPrintVersion ? base.buildVersionString() : "");
 				if (pPrintHelp != detail::PrintOption::none) {
 					bool reduced = (pPrintHelp == detail::PrintOption::reduced && pConfig.reducible);
-					print.append(print.empty() ? L"" : L"\n\n").append(detail::HelpBuilder{ base, pConfig, pTopMost, lineLength, reduced }.buildHelpString());
+					print.append(print.empty() ? "" : "\n\n").append(detail::HelpBuilder{ base, pConfig, pTopMost, lineLength, reduced }.buildHelpString());
 				}
 				if (!print.empty())
 					throw arger::PrintMessage{ print };
@@ -421,7 +421,7 @@ namespace arger {
 	}
 
 	/* parse the arguments as standard program or menu-input arguments */
-	inline arger::Parsed Parse(const std::vector<std::wstring>& args, const arger::Config& config, size_t lineLength = arger::NumCharsHelp) {
+	inline arger::Parsed Parse(const std::vector<std::string>& args, const arger::Config& config, size_t lineLength = arger::NumCharsHelp) {
 		return detail::Parser{ args }.parse(config, lineLength);
 	}
 }

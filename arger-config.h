@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/* Copyright (c) 2024-2025 Bjoern Boss Henrichsen */
+/* Copyright (c) 2024-2026 Bjoern Boss Henrichsen */
 #pragma once
 
 #include "arger-common.h"
@@ -16,17 +16,17 @@ namespace arger {
 		boolean
 	};
 	struct EnumEntry {
-		std::wstring name;
-		std::wstring normal;
-		std::wstring reduced;
+		std::string name;
+		std::string normal;
+		std::string reduced;
 		size_t id = 0;
-		constexpr EnumEntry(std::wstring name, arger::IsId auto id, std::wstring description) : name{ name }, normal{ description }, id{ static_cast<size_t>(id) } {}
-		constexpr EnumEntry(std::wstring name, arger::IsId auto id, std::wstring reduced, std::wstring description) : name{ name }, reduced{ reduced }, normal{ description }, id{ static_cast<size_t>(id) } {}
+		constexpr EnumEntry(std::string name, arger::IsId auto id, std::string description) : name{ name }, normal{ description }, id{ static_cast<size_t>(id) } {}
+		constexpr EnumEntry(std::string name, arger::IsId auto id, std::string reduced, std::string description) : name{ name }, reduced{ reduced }, normal{ description }, id{ static_cast<size_t>(id) } {}
 	};
 	using Enum = std::vector<arger::EnumEntry>;
 	using Type = std::variant<arger::Primitive, arger::Enum>;
 
-	using Checker = std::function<std::wstring(const arger::Parsed&)>;
+	using Checker = std::function<std::string(const arger::Parsed&)>;
 
 	/* used to link components together and defines one group of referenced objects to be linked */
 	struct Ref {
@@ -52,15 +52,15 @@ namespace arger {
 			std::optional<bool> groupNormal;
 		};
 		struct VersionText {
-			std::wstring version;
+			std::string version;
 		};
 		struct Program {
-			std::wstring program;
+			std::string program;
 		};
 		struct Description {
 			struct {
-				std::wstring normal;
-				std::wstring reduced;
+				std::string normal;
+				std::string reduced;
 			} description;
 		};
 		struct Hidden {
@@ -79,12 +79,12 @@ namespace arger {
 			} require;
 		};
 		struct Abbreviation {
-			wchar_t abbreviation = 0;
+			char abbreviation = 0;
 		};
 		struct Payload {
 			struct {
 				std::vector<arger::Value> defValue;
-				std::wstring name;
+				std::string name;
 				arger::Type type;
 			} payload;
 		};
@@ -98,10 +98,10 @@ namespace arger {
 		struct Information :
 			public detail::Reach,
 			public detail::Linkable {
-			std::wstring name;
-			std::wstring text;
-			std::wstring reduced;
-			Information(std::wstring name, std::wstring text, std::wstring reduced) : name{ name }, text{ text }, reduced{ reduced } {}
+			std::string name;
+			std::string text;
+			std::string reduced;
+			Information(std::string name, std::string text, std::string reduced) : name{ name }, text{ text }, reduced{ reduced } {}
 		};
 		struct InformationList {
 			std::vector<detail::Information> information;
@@ -110,9 +110,9 @@ namespace arger {
 		struct Positional :
 			public detail::Description {
 			std::optional<arger::Value> defValue;
-			std::wstring name;
+			std::string name;
 			arger::Type type;
-			Positional(std::optional<arger::Value> val, std::wstring name, arger::Type type) : defValue{ val }, name{ name }, type{ type } {}
+			Positional(std::optional<arger::Value> val, std::string name, arger::Type type) : defValue{ val }, name{ name }, type{ type } {}
 		};
 		struct PositionalList {
 			std::vector<detail::Positional> positionals;
@@ -140,9 +140,9 @@ namespace arger {
 			public detail::Hidden,
 			public detail::Linkable,
 			public detail::Reach {
-			std::wstring name;
+			std::string name;
 			size_t id = 0;
-			Option(std::wstring name, size_t id) : name{ name }, id{ id } {}
+			Option(std::string name, size_t id) : name{ name }, id{ id } {}
 		};
 		struct OptionList {
 			std::vector<detail::Option> options;
@@ -152,7 +152,7 @@ namespace arger {
 		struct GroupList {
 			struct {
 				std::vector<detail::Group> list;
-				std::wstring name;
+				std::string name;
 			} groups;
 		};
 
@@ -160,9 +160,9 @@ namespace arger {
 			public detail::Description,
 			public detail::Abbreviation,
 			public detail::Reach {
-			std::wstring name;
+			std::string name;
 			constexpr SpecialEntry() {}
-			constexpr SpecialEntry(std::wstring name) : name{ name } {}
+			constexpr SpecialEntry(std::string name) : name{ name } {}
 		};
 		struct SpecialEntries {
 			struct {
@@ -188,9 +188,9 @@ namespace arger {
 			public detail::Arguments,
 			public detail::Abbreviation,
 			public detail::Hidden {
-			std::wstring name;
+			std::string name;
 			size_t id = 0;
-			Group(std::wstring name, size_t id) : name{ name }, id{ id } {}
+			Group(std::string name, size_t id) : name{ name }, id{ id } {}
 		};
 
 		struct Config :
@@ -252,7 +252,7 @@ namespace arger {
 		detail::Option pOption;
 
 	public:
-		constexpr Option(std::wstring name, arger::IsId auto id, const arger::IsConfig<detail::Option> auto&... configs) : pOption{ name, static_cast<size_t>(id) } {
+		constexpr Option(std::string name, arger::IsId auto id, const arger::IsConfig<detail::Option> auto&... configs) : pOption{ name, static_cast<size_t>(id) } {
 			detail::ConfigBurner::Apply(pOption, configs...);
 		}
 		constexpr arger::Option& add(const arger::IsConfig<detail::Option> auto&... configs) {
@@ -299,10 +299,10 @@ namespace arger {
 		detail::Group pGroup;
 
 	public:
-		constexpr Group(std::wstring name, const arger::IsConfig<detail::Group> auto&... configs) : pGroup{ name, 0 } {
+		constexpr Group(std::string name, const arger::IsConfig<detail::Group> auto&... configs) : pGroup{ name, 0 } {
 			detail::ConfigBurner::Apply(pGroup, configs...);
 		}
-		constexpr Group(std::wstring name, arger::IsId auto id, const arger::IsConfig<detail::Group> auto&... configs) : pGroup{ name, static_cast<size_t>(id) } {
+		constexpr Group(std::string name, arger::IsId auto id, const arger::IsConfig<detail::Group> auto&... configs) : pGroup{ name, static_cast<size_t>(id) } {
 			detail::ConfigBurner::Apply(pGroup, configs...);
 		}
 		constexpr arger::Group& add(const arger::IsConfig<detail::Group> auto&... configs) {
@@ -325,7 +325,7 @@ namespace arger {
 		detail::SpecialEntry pSpecial;
 
 	public:
-		constexpr HelpEntry(std::wstring name, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name } {
+		constexpr HelpEntry(std::string name, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name } {
 			detail::ConfigBurner::Apply(pSpecial, configs...);
 		}
 		constexpr arger::HelpEntry& add(const arger::IsConfig<detail::SpecialEntry> auto&... configs) {
@@ -348,7 +348,7 @@ namespace arger {
 		detail::SpecialEntry pSpecial;
 
 	public:
-		constexpr VersionEntry(std::wstring name, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name } {
+		constexpr VersionEntry(std::string name, const arger::IsConfig<detail::SpecialEntry> auto&... configs) : pSpecial{ name } {
 			detail::ConfigBurner::Apply(pSpecial, configs...);
 		}
 		constexpr arger::VersionEntry& add(const arger::IsConfig<detail::SpecialEntry> auto&... configs) {
@@ -366,10 +366,10 @@ namespace arger {
 	struct VersionText : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
-		std::wstring pText;
+		std::string pText;
 
 	public:
-		constexpr VersionText(std::wstring text) : pText{ text } {}
+		constexpr VersionText(std::string text) : pText{ text } {}
 
 	private:
 		constexpr void burnConfig(detail::VersionText& base) const {
@@ -381,10 +381,10 @@ namespace arger {
 	struct Program : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
-		std::wstring pProgram;
+		std::string pProgram;
 
 	public:
-		constexpr Program(std::wstring program) : pProgram{ program } {}
+		constexpr Program(std::string program) : pProgram{ program } {}
 
 	private:
 		constexpr void burnConfig(detail::Program& base) const {
@@ -397,12 +397,12 @@ namespace arger {
 	struct Description : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
-		std::wstring pDescription;
-		std::wstring pReduced;
+		std::string pDescription;
+		std::string pReduced;
 
 	public:
-		constexpr Description(std::wstring desc) : pDescription{ desc } {}
-		constexpr Description(std::wstring reduced, std::wstring desc) : pReduced{ reduced }, pDescription{ desc } {}
+		constexpr Description(std::string desc) : pDescription{ desc } {}
+		constexpr Description(std::string reduced, std::string desc) : pReduced{ reduced }, pDescription{ desc } {}
 
 	private:
 		constexpr void burnConfig(detail::Description& base) const {
@@ -419,10 +419,10 @@ namespace arger {
 		detail::Information pEntry;
 
 	public:
-		constexpr Information(std::wstring name, std::wstring text, const arger::IsConfig<detail::Information> auto&... configs) : pEntry{ name, text, L"" } {
+		constexpr Information(std::string name, std::string text, const arger::IsConfig<detail::Information> auto&... configs) : pEntry{ name, text, "" } {
 			detail::ConfigBurner::Apply(pEntry, configs...);
 		}
-		constexpr Information(std::wstring name, std::wstring reduced, std::wstring text, const arger::IsConfig<detail::Information> auto&... configs) : pEntry{ name, text, reduced } {
+		constexpr Information(std::string name, std::string reduced, std::string text, const arger::IsConfig<detail::Information> auto&... configs) : pEntry{ name, text, reduced } {
 			detail::ConfigBurner::Apply(pEntry, configs...);
 		}
 		constexpr arger::Information& add(const arger::IsConfig<detail::Information> auto&... configs) {
@@ -486,10 +486,10 @@ namespace arger {
 	struct Abbreviation : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
-		wchar_t pChar = 0;
+		char pChar = 0;
 
 	public:
-		constexpr Abbreviation(wchar_t c) : pChar{ c } {}
+		constexpr Abbreviation(char c) : pChar{ c } {}
 
 	private:
 		constexpr void burnConfig(detail::Abbreviation& base) const {
@@ -517,11 +517,11 @@ namespace arger {
 	struct Payload : public detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
-		std::wstring pName;
+		std::string pName;
 		arger::Type pType;
 
 	public:
-		Payload(std::wstring name, arger::Type type) : pName{ name }, pType{ type } {}
+		Payload(std::string name, arger::Type type) : pName{ name }, pType{ type } {}
 
 	private:
 		constexpr void burnConfig(detail::Payload& base) const {
@@ -534,10 +534,10 @@ namespace arger {
 	struct GroupName : detail::Configurator {
 		friend struct detail::ConfigBurner;
 	private:
-		std::wstring pName;
+		std::string pName;
 
 	public:
-		constexpr GroupName(std::wstring name) : pName{ name } {}
+		constexpr GroupName(std::string name) : pName{ name } {}
 
 	private:
 		constexpr void burnConfig(detail::GroupList& base) const {
@@ -554,10 +554,10 @@ namespace arger {
 		detail::Positional pPositional;
 
 	public:
-		Positional(std::wstring name, arger::Type type, std::wstring desc) : pPositional{ std::nullopt, name, type } {
+		Positional(std::string name, arger::Type type, std::string desc) : pPositional{ std::nullopt, name, type } {
 			pPositional.description.normal = desc;
 		}
-		Positional(std::wstring name, arger::Type type, const arger::IsConfig<detail::Positional> auto&... configs) : pPositional{ std::nullopt, name, type } {
+		Positional(std::string name, arger::Type type, const arger::IsConfig<detail::Positional> auto&... configs) : pPositional{ std::nullopt, name, type } {
 			detail::ConfigBurner::Apply(pPositional, configs...);
 		}
 		constexpr arger::Positional& add(const arger::IsConfig<detail::Positional> auto&... configs) {

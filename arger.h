@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/* Copyright (c) 2024-2025 Bjoern Boss Henrichsen */
+/* Copyright (c) 2024-2026 Bjoern Boss Henrichsen */
 #pragma once
 
 #include "arger-common.h"
@@ -11,21 +11,21 @@
 
 namespace arger {
 	/* convenience function to prepare the arguments */
-	inline std::vector<std::wstring> Prepare(size_t argc, const str::IsChar auto* const* argv) {
-		std::vector<std::wstring> args;
+	inline std::vector<std::string> Prepare(size_t argc, const str::IsChar auto* const* argv) {
+		std::vector<std::string> args;
 		for (size_t i = 0; i < argc; ++i)
-			args.push_back(str::wd::Safe(argv[i]));
+			args.push_back(str::ch::Safe(argv[i]));
 		return args;
 	}
 
 	/* split the argument line into the list of separate arguments */
-	inline std::vector<std::wstring> Prepare(const str::IsStr auto& line) {
+	inline std::vector<std::string> Prepare(const str::IsStr auto& line) {
 		using ChType = str::StringChar<decltype(line)>;
-		std::vector<std::wstring> args;
+		std::vector<std::string> args;
 		std::basic_string_view<ChType> view{ line };
 
 		/* split the string */
-		wchar_t inStr = 0;
+		char inStr = 0;
 		bool lastWhitespace = true;
 		for (size_t i = 0; i < view.size(); ++i) {
 			/* check if the character is whitespace and a new argument needs to be
@@ -42,22 +42,22 @@ namespace arger {
 			lastWhitespace = false;
 
 			/* check if the next character is escaped */
-			if (view[i] == L'\\') {
+			if (view[i] == '\\') {
 				if (++i >= view.size())
 					break;
 				args.back().push_back(view[i]);
 			}
 
 			/* check if a string is being ended or continued */
-			else if (inStr != L'\0') {
+			else if (inStr != '\0') {
 				if (view[i] == inStr)
-					inStr = L'\0';
+					inStr = '\0';
 				else
 					args.back().push_back(view[i]);
 			}
 
 			/* check if a string is being started */
-			else if (view[i] == L'\'' || view[i] == L'\"')
+			else if (view[i] == '\'' || view[i] == '\"')
 				inStr = view[i];
 			else
 				args.back().push_back(view[i]);
@@ -66,13 +66,13 @@ namespace arger {
 	}
 
 	/* convenience functions for help-hints with default argument pattern from a single command-line */
-	inline constexpr std::wstring HelpHint(const str::IsStr auto& line, const arger::Config& config) {
+	inline constexpr std::string HelpHint(const str::IsStr auto& line, const arger::Config& config) {
 		return arger::HelpHint(arger::Prepare(line), config);
 	}
 
 	/* convenience functions for help-hints with default argument pattern from separated arguments */
-	inline constexpr std::wstring HelpHint(size_t argc, const str::IsChar auto* const* argv, const arger::Config& config) {
-		return arger::HelpHint({ argc == 0 ? L"" : str::wd::Safe(argv[0]) }, config);
+	inline constexpr std::string HelpHint(size_t argc, const str::IsChar auto* const* argv, const arger::Config& config) {
+		return arger::HelpHint({ argc == 0 ? "" : str::ch::Safe(argv[0]) }, config);
 	}
 
 	/* convenience functions for standard program or menu-input arguments parsing from a single command-line */

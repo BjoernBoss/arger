@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/* Copyright (c) 2024-2025 Bjoern Boss Henrichsen */
+/* Copyright (c) 2024-2026 Bjoern Boss Henrichsen */
 #pragma once
 
 #include "arger-parsed.h"
@@ -12,45 +12,45 @@ namespace arger {
 	static constexpr size_t MinNumCharsRight = 8;
 	static constexpr size_t IndentInformation = 4;
 	static constexpr size_t AutoIndentLongText = 2;
-	static constexpr std::wstring_view VisualPadding = L"   ";
+	static constexpr std::string_view VisualPadding = "   ";
 
 	namespace detail {
 		class BaseBuilder {
 		private:
 			const detail::Config& pConfig;
-			std::wstring pProgram;
+			std::string pProgram;
 
 		public:
-			BaseBuilder(const std::wstring& firstArg, const arger::Config& config) : pConfig{ detail::ConfigBurner::GetBurned(config) } {
+			BaseBuilder(const std::string& firstArg, const arger::Config& config) : pConfig{ detail::ConfigBurner::GetBurned(config) } {
 				/* check if the first argument contains a valid program-name */
-				std::wstring_view view{ firstArg };
+				std::string_view view{ firstArg };
 				size_t begin = view.size();
-				while (begin > 0 && view[begin - 1] != L'/' && view[begin - 1] != L'\\')
+				while (begin > 0 && view[begin - 1] != '/' && view[begin - 1] != '\\')
 					--begin;
 
 				/* setup the final program name (if the first argument is an empty string, the configured program name will be used) */
-				pProgram = (begin == view.size() ? pConfig.program : std::wstring{ view.substr(begin) });
+				pProgram = (begin == view.size() ? pConfig.program : std::string{ view.substr(begin) });
 			}
 
 		public:
-			constexpr std::wstring buildVersionString() const {
+			constexpr std::string buildVersionString() const {
 				/* version string is guaranteed to never be empty if it can be requested to be built */
 				if (pConfig.program.empty())
 					return pConfig.version;
 				if (pProgram.empty())
-					throw arger::ConfigException{ L"Configuration must have a program name." };
-				return str::wd::Build(pProgram, L' ', pConfig.version);
+					throw arger::ConfigException{ "Configuration must have a program name." };
+				return str::ch::Build(pProgram, ' ', pConfig.version);
 			}
-			constexpr std::wstring buildHelpHintString() const {
+			constexpr std::string buildHelpHintString() const {
 				if (pConfig.special.help.name.empty())
-					throw arger::ConfigException{ L"Help entry name must not be empty for help-hint string." };
+					throw arger::ConfigException{ "Help entry name must not be empty for help-hint string." };
 				if (pConfig.program.empty())
-					return str::wd::Build(L"Use '", pConfig.special.help.name, L"' for more information.");
+					return str::ch::Build("Use '", pConfig.special.help.name, "' for more information.");
 				if (pProgram.empty())
-					throw arger::ConfigException{ L"Configuration must have a program name." };
-				return str::wd::Build(L"Try '", pProgram, L" --", pConfig.special.help.name, L"' for more information.");
+					throw arger::ConfigException{ "Configuration must have a program name." };
+				return str::ch::Build("Try '", pProgram, " --", pConfig.special.help.name, "' for more information.");
 			}
-			constexpr const std::wstring& program() const {
+			constexpr const std::string& program() const {
 				return pProgram;
 			}
 		};
@@ -58,14 +58,14 @@ namespace arger {
 		class HelpBuilder {
 		private:
 			struct NameCache {
-				std::wstring used;
+				std::string used;
 				const detail::Description* description = 0;
 				const detail::ValidOption* option = 0;
-				wchar_t abbreviation = 0;
+				char abbreviation = 0;
 			};
 
 		private:
-			std::wstring pBuffer;
+			std::string pBuffer;
 			const detail::ValidArguments* pTopMost = 0;
 			const detail::ValidConfig& pConfig;
 			const detail::BaseBuilder& pBase;
@@ -83,16 +83,16 @@ namespace arger {
 			constexpr void fAddNewLine(bool emptyLine) {
 				if (pBuffer.empty())
 					return;
-				if (pBuffer.back() != L'\n')
-					pBuffer.push_back(L'\n');
+				if (pBuffer.back() != '\n')
+					pBuffer.push_back('\n');
 				if (emptyLine)
-					pBuffer.push_back(L'\n');
+					pBuffer.push_back('\n');
 				pPosition = 0;
 				pOpenWhiteSpace = 0;
 			}
-			constexpr void fAddToken(const std::wstring& add) {
+			constexpr void fAddToken(const std::string& add) {
 				if (pPosition > 0 && pPosition + add.size() > pNumChars) {
-					pBuffer.push_back(L'\n');
+					pBuffer.push_back('\n');
 					pPosition = 0;
 				}
 
@@ -100,30 +100,30 @@ namespace arger {
 				pPosition += add.size();
 				pOpenWhiteSpace = 0;
 			}
-			constexpr void fAddSpacedToken(const std::wstring& add) {
+			constexpr void fAddSpacedToken(const std::string& add) {
 				if (pPosition > 0) {
 					if (pPosition + 1 + add.size() > pNumChars) {
-						pBuffer.push_back(L'\n');
+						pBuffer.push_back('\n');
 						pPosition = 0;
 					}
 					else {
-						pBuffer.push_back(L' ');
+						pBuffer.push_back(' ');
 						++pPosition;
 					}
 				}
 				fAddToken(add);
 			}
-			constexpr void fAddString(std::wstring_view add, size_t offset = 0, size_t indentAutoBreaks = 0) {
-				std::wstring tokenPrint;
+			constexpr void fAddString(std::string_view add, size_t offset = 0, size_t indentAutoBreaks = 0) {
+				std::string tokenPrint;
 				bool isWhitespace = true;
 
 				/* ensure the initial indentation is valid */
 				if (offset > 0) {
 					if (pPosition + pOpenWhiteSpace >= offset) {
-						pBuffer.push_back(L'\n');
+						pBuffer.push_back('\n');
 						pPosition = 0;
 					}
-					pBuffer.append(offset - pPosition, L' ');
+					pBuffer.append(offset - pPosition, ' ');
 					pPosition = offset;
 					offset += indentAutoBreaks;
 				}
@@ -145,9 +145,9 @@ namespace arger {
 						*	does not start at the beginning of the line but exceeds the line limit, and otherwise flush
 						*	the whitespace (this ensures that user-placed whitespace after a new-line will be respected) */
 						if ((pPosition > offset || pOpenWhiteSpace > 0) && pPosition + pOpenWhiteSpace + tokenPrint.size() > pNumChars)
-							pBuffer.append(1, L'\n').append(pPosition = offset, L' ');
+							pBuffer.append(1, '\n').append(pPosition = offset, ' ');
 						else {
-							pBuffer.append(pOpenWhiteSpace, L' ');
+							pBuffer.append(pOpenWhiteSpace, ' ');
 							pPosition += pOpenWhiteSpace;
 						}
 
@@ -162,9 +162,9 @@ namespace arger {
 
 					/* check if the new token is a linebreak and insert it and otherwise add the whitespace to the current token */
 					isWhitespace = true;
-					if (add[i] == L'\n')
-						pBuffer.append(1, L'\n').append(pPosition = offset, L' ');
-					else if (add[i] == L'\t')
+					if (add[i] == '\n')
+						pBuffer.append(1, '\n').append(pPosition = offset, ' ');
+					else if (add[i] == '\t')
 						pOpenWhiteSpace += 4;
 					else
 						++pOpenWhiteSpace;
@@ -172,35 +172,35 @@ namespace arger {
 			}
 
 		private:
-			constexpr std::wstring fLimitDescription(std::optional<size_t> minimum, std::optional<size_t> maximum) {
+			constexpr std::string fLimitDescription(std::optional<size_t> minimum, std::optional<size_t> maximum) {
 				if (minimum.has_value()) {
 					/* check if both a minimum and maximum exist */
 					if (maximum.has_value()) {
 						if (*minimum == *maximum)
-							return str::wd::Build(*minimum, L'x');
-						return str::wd::Build(*minimum, L"...", *maximum);
+							return str::ch::Build(*minimum, 'x');
+						return str::ch::Build(*minimum, "...", *maximum);
 					}
 
 					/* only a minimum exists */
-					return str::wd::Build(*minimum, L"...");
+					return str::ch::Build(*minimum, "...");
 				}
 
 				/* only a maximum exists */
 				else if (maximum.has_value())
-					return str::wd::Build(L"...", *maximum);
-				return L"";
+					return str::ch::Build("...", *maximum);
+				return "";
 			}
-			std::wstring fDefaultDescription(const arger::Value* begin, const arger::Value* end, bool isEnumType) {
+			std::string fDefaultDescription(const arger::Value* begin, const arger::Value* end, bool isEnumType) {
 				/* construct the list of all default values */
-				std::wstring temp = L"Default: ";
+				std::string temp = "Default: ";
 				for (const arger::Value* it = begin; it != end; ++it) {
-					temp.append(it == begin ? L"" : L", ");
+					temp.append(it == begin ? "" : ", ");
 
 					if (it->isStr()) {
 						if (isEnumType)
 							temp.append(it->str());
 						else
-							temp.append(1, L'\"').append(it->str()).append(1, L'\"');
+							temp.append(1, '\"').append(it->str()).append(1, '\"');
 					}
 					else if (it->isUNum())
 						str::IntTo(temp, it->unum());
@@ -209,7 +209,7 @@ namespace arger {
 					else if (it->isReal())
 						str::FloatTo(temp, it->real());
 					else
-						temp.append(it->boolean() ? L"true" : L"false");
+						temp.append(it->boolean() ? "true" : "false");
 				}
 				return temp;
 			}
@@ -226,36 +226,36 @@ namespace arger {
 				/* add the separate keys  */
 				for (const auto& val : std::get<arger::Enum>(type)) {
 					fAddNewLine(false);
-					const std::wstring& text = ((pReduced && !val.reduced.empty()) ? val.reduced : val.normal);
-					fAddString(str::wd::Format(L" - [{:<{}}]: {}", val.name, length, text), arger::NumCharsHelpLeft, 7 + length);
+					const std::string& text = ((pReduced && !val.reduced.empty()) ? val.reduced : val.normal);
+					fAddString(str::ch::Format(" - [{:<{}}]: {}", val.name, length, text), arger::NumCharsHelpLeft, 7 + length);
 				}
 			}
-			constexpr const wchar_t* fTypeString(const arger::Type& type) {
+			constexpr const char* fTypeString(const arger::Type& type) {
 				if (std::holds_alternative<arger::Enum>(type))
-					return L" [enum]";
+					return " [enum]";
 				arger::Primitive actual = std::get<arger::Primitive>(type);
 				if (actual == arger::Primitive::boolean)
-					return L" [bool]";
+					return " [bool]";
 				if (actual == arger::Primitive::unum)
-					return L" [uint]";
+					return " [uint]";
 				if (actual == arger::Primitive::inum)
-					return L" [int]";
+					return " [int]";
 				if (actual == arger::Primitive::real)
-					return L" [real]";
-				return L"";
+					return " [real]";
+				return "";
 			}
-			std::wstring fEndpointName(const detail::ValidEndpoint& endpoint, size_t index) {
-				std::wstring token = (*endpoint.positionals)[index].name;
+			std::string fEndpointName(const detail::ValidEndpoint& endpoint, size_t index) {
+				std::string token = (*endpoint.positionals)[index].name;
 				if (index + 1 >= endpoint.positionals->size() && (endpoint.maximum == 0 || index + 1 < endpoint.maximum))
-					token += L"...";
+					token += "...";
 				if (index >= endpoint.minimumEffective)
-					token = L"[" + token + L']';
+					token = "[" + token + ']';
 				return token;
 			}
-			const std::wstring* fGetDescription(const detail::Description* desc) {
+			const std::string* fGetDescription(const detail::Description* desc) {
 				if (desc == nullptr)
 					return nullptr;
-				const std::wstring& text = ((!pReduced || desc->description.reduced.empty()) ? desc->description.normal : desc->description.reduced);
+				const std::string& text = ((!pReduced || desc->description.reduced.empty()) ? desc->description.normal : desc->description.reduced);
 				return (text.empty() ? nullptr : &text);
 			}
 
@@ -266,25 +266,25 @@ namespace arger {
 				fRecGroupUsage(topMost->super);
 				fAddSpacedToken(topMost->group->name);
 			}
-			constexpr std::wstring fGroupNameHistory(const detail::ValidArguments* topMost) {
+			constexpr std::string fGroupNameHistory(const detail::ValidArguments* topMost) {
 				if (topMost->super == nullptr)
-					return L"";
-				std::wstring parents = fGroupNameHistory(topMost->super);
-				return str::wd::Build(parents, (parents.empty() ? L"[" : L" > ["), str::View{ topMost->super->groupName }.title(), L": ", topMost->group->name, L']');
+					return "";
+				std::string parents = fGroupNameHistory(topMost->super);
+				return str::ch::Build(parents, (parents.empty() ? "[" : " > ["), str::View{ topMost->super->groupName }.title(), ": ", topMost->group->name, ']');
 			}
 			void fAddEndpointUsage(const detail::ValidEndpoint& endpoint) {
 				/* add the positional parameter for the topmost argument-object */
 				for (size_t i = 0; i < endpoint.positionals->size(); ++i)
 					fAddSpacedToken(fEndpointName(endpoint, i));
 			}
-			bool fSelectSpecial(std::map<std::wstring, NameCache>& selected) {
+			bool fSelectSpecial(std::map<std::string, NameCache>& selected) {
 				bool added = false;
 				if (pConfig.help != nullptr && (pTopMost->super == nullptr || pConfig.help->allChildren.value_or(true))) {
-					selected.insert({ pConfig.help->name, NameCache{ L"", pConfig.help, nullptr, pConfig.help->abbreviation } });
+					selected.insert({ pConfig.help->name, NameCache{ "", pConfig.help, nullptr, pConfig.help->abbreviation } });
 					added = true;
 				}
 				if (pConfig.version != nullptr && (pTopMost->super == nullptr || pConfig.version->allChildren.value_or(true))) {
-					selected.insert({ pConfig.version->name, NameCache{ L"", pConfig.version, nullptr, pConfig.version->abbreviation } });
+					selected.insert({ pConfig.version->name, NameCache{ "", pConfig.version, nullptr, pConfig.version->abbreviation } });
 					added = true;
 				}
 				return added;
@@ -308,14 +308,14 @@ namespace arger {
 			}
 			void fBuildUsage() {
 				/* add the example-usage descriptive line */
-				fAddToken(pConfig.burned->program.empty() ? L"Input>" : L"Usage: ");
+				fAddToken(pConfig.burned->program.empty() ? "Input>" : "Usage: ");
 				if (!pConfig.burned->program.empty())
 					fAddToken(pBase.program());
 
 				/* add the already selected groups and potentially upcoming group-name */
 				fRecGroupUsage(pTopMost);
 				if (pTopMost->endpoints.empty())
-					fAddSpacedToken(str::wd::Build(L'[', pTopMost->groupName, L']'));
+					fAddSpacedToken(str::ch::Build('[', pTopMost->groupName, ']'));
 
 				/* add all required options (must all consume a payload, as flags are never required) */
 				bool hasOptionals = false;
@@ -331,16 +331,16 @@ namespace arger {
 
 					/* check if the entry should be added for the current group */
 					if (fCheckOptionPrint(&option))
-						fAddSpacedToken(str::wd::Build(L"--", name, L"=<", option.option->payload.name, L">"));
+						fAddSpacedToken(str::ch::Build("--", name, "=<", option.option->payload.name, ">"));
 				}
 				if (hasOptionals)
-					fAddSpacedToken(L"[options...]");
+					fAddSpacedToken("[options...]");
 
 				/* add the hint to the arguments after the final group has been selected and add the endpoint hint */
 				if (pTopMost->endpoints.empty() && pTopMost->nestedPositionals)
-					fAddSpacedToken(L"[args...]");
+					fAddSpacedToken("[args...]");
 				else if (pTopMost->endpoints.size() > 1)
-					fAddString(L" variation...");
+					fAddString(" variation...");
 
 				/* check if its only a single endpoint, which is printed immediately */
 				if (pTopMost->endpoints.size() == 1) {
@@ -356,20 +356,20 @@ namespace arger {
 							continue;
 						if (pTopMost->endpoints.size() > 1) {
 							fAddNewLine(false);
-							fAddString(str::wd::Build(L"  [Variation ", ++index, L"]:"));
+							fAddString(str::ch::Build("  [Variation ", ++index, "]:"));
 						}
 						fAddEndpointUsage(pTopMost->endpoints[i]);
 					}
 				}
 			}
 			void fBuildOptions(bool required) {
-				std::map<std::wstring, NameCache> selected;
-				std::set<std::wstring> usedList;
+				std::map<std::string, NameCache> selected;
+				std::set<std::string> usedList;
 
 				/* collect all of the names to be used (add the help/version options for programs and select
 				*	the used-by lists, which will automatically be lexicographically sorted in itself) */
 				if (!pConfig.burned->program.empty() && !required && fSelectSpecial(selected))
-					usedList.insert(L"");
+					usedList.insert("");
 				for (const auto& [name, option] : pConfig.options) {
 					if (option.hidden)
 						continue;
@@ -377,7 +377,7 @@ namespace arger {
 					/* check if the option can be discarded based on the selection */
 					if ((option.minimumEffective > 0) != required || !fCheckOptionPrint(&option))
 						continue;
-					std::wstring used;
+					std::string used;
 
 					/* check if the option is optional and should not be printed for children */
 					if (!required && !option.option->allChildren.value_or(true) && option.owner != pTopMost && pReduced)
@@ -394,7 +394,7 @@ namespace arger {
 						}
 						if (partial) for (const auto& [name, group] : pTopMost->sub) {
 							if (!group.hidden && detail::CheckUsage(&option, &group))
-								used.append(used.empty() ? L"" : L", ").append(name);
+								used.append(used.empty() ? "" : ", ").append(name);
 						}
 					}
 					selected.insert({ name, NameCache{ used, option.option, &option, option.option->abbreviation } });
@@ -403,14 +403,14 @@ namespace arger {
 
 				/* iterate over the used-lists and optionals and print them (will automatically be
 				*	lexicographically sorted by used-list, with empty first, and then by option name) */
-				for (const std::wstring& used : usedList) {
+				for (const std::string& used : usedList) {
 					/* print the used-header */
 					fAddNewLine(true);
-					std::wstring temp = str::wd::Build(required ? L"Required" : L"Optional");
+					std::string temp = str::ch::Build(required ? "Required" : "Optional");
 					if (used.empty())
-						temp.push_back(L':');
+						temp.push_back(':');
 					else
-						str::BuildTo(temp, L" for [", used, L"]: ");
+						str::BuildTo(temp, " for [", used, "]: ");
 					fAddString(temp);
 
 					/* print the optionals, which are part of the used list */
@@ -420,22 +420,22 @@ namespace arger {
 						fAddNewLine(false);
 
 						/* add the abbreviation and name */
-						std::wstring temp = L"  ";
+						std::string temp = "  ";
 						if (cache.abbreviation != 0)
-							temp.append(1, L'-').append(1, cache.abbreviation).append(L", ");
-						temp.append(L"--").append(name);
+							temp.append(1, '-').append(1, cache.abbreviation).append(", ");
+						temp.append("--").append(name);
 						const detail::ValidOption* option = cache.option;
 
 						/* add the payload */
 						if (option != nullptr && option->payload)
-							temp.append(L"=<").append(option->option->payload.name).append(fTypeString(option->option->payload.type)).append(1, L'>');
+							temp.append("=<").append(option->option->payload.name).append(fTypeString(option->option->payload.type)).append(1, '>');
 						temp.append(VisualPadding);
 						fAddString(temp);
 
 						/* add the custom usage-limits and default values */
 						temp.clear();
 						if (option != nullptr) {
-							std::wstring limit, defDesc;
+							std::string limit, defDesc;
 
 							/* add the usage limits */
 							if (option->minimumActual != 0 || option->maximum != 1) {
@@ -449,12 +449,12 @@ namespace arger {
 							if (const std::vector<arger::Value>& defValue = option->option->payload.defValue; !defValue.empty())
 								defDesc = fDefaultDescription(&defValue.front(), &defValue.back() + 1, std::holds_alternative<arger::Enum>(option->option->payload.type));
 							if (!limit.empty() || !defDesc.empty())
-								temp = str::wd::Build(L'[', limit, ((limit.empty() || defDesc.empty()) ? L"" : L"; "), defDesc, L']');
+								temp = str::ch::Build('[', limit, ((limit.empty() || defDesc.empty()) ? "" : "; "), defDesc, ']');
 						}
 
 						/* write the description out and check if the enum descriptions need to be written out as well */
-						if (const std::wstring* text = fGetDescription(cache.description); text != nullptr)
-							temp.append((temp.empty() ? 0 : 1), L' ').append(*text);
+						if (const std::string* text = fGetDescription(cache.description); text != nullptr)
+							temp.append((temp.empty() ? 0 : 1), ' ').append(*text);
 						fAddString(temp, arger::NumCharsHelpLeft, arger::AutoIndentLongText);
 						if (option != nullptr)
 							fAddEnumDescription(option->option->payload.type);
@@ -463,12 +463,12 @@ namespace arger {
 			}
 			void fBuildGroups() {
 				/* collect the list of all names to be used (add the help and version entries for menus) */
-				std::map<std::wstring, NameCache> selected;
+				std::map<std::string, NameCache> selected;
 				if (pConfig.burned->program.empty())
 					fSelectSpecial(selected);
 				if (pTopMost->endpoints.empty()) for (const auto& [name, group] : pTopMost->sub) {
 					if (!group.hidden)
-						selected.insert({ name, NameCache{ L"", group.group, nullptr, group.group->abbreviation } });
+						selected.insert({ name, NameCache{ "", group.group, nullptr, group.group->abbreviation } });
 				}
 
 				/* check if anything actually needs to be printed */
@@ -478,17 +478,17 @@ namespace arger {
 				/* print the header */
 				fAddNewLine(true);
 				if (pTopMost->endpoints.empty())
-					fAddString(str::wd::Build(L"Defined for [", pTopMost->groupName, L"]:"));
+					fAddString(str::ch::Build("Defined for [", pTopMost->groupName, "]:"));
 				else
-					fAddString(L"Additional:");
+					fAddString("Additional:");
 
 				/* print all of the selected entries */
 				for (const auto& [name, cache] : selected) {
 					fAddNewLine(false);
-					fAddString(str::wd::Build(L"  ", name));
+					fAddString(str::ch::Build("  ", name));
 					if (cache.abbreviation != 0)
-						fAddString(str::wd::Build(L", ", cache.abbreviation));
-					if (const std::wstring* text = fGetDescription(cache.description); text != nullptr)
+						fAddString(str::ch::Build(", ", cache.abbreviation));
+					if (const std::string* text = fGetDescription(cache.description); text != nullptr)
 						fAddString(*text, arger::NumCharsHelpLeft, arger::AutoIndentLongText);
 				}
 			}
@@ -506,12 +506,12 @@ namespace arger {
 					/* add the heading (with description for the variations) */
 					fAddNewLine(true);
 					if (pTopMost->endpoints.size() == 1)
-						fAddString(pConfig.burned->program.empty() ? L"Arguments:" : L"Positional Arguments:");
+						fAddString(pConfig.burned->program.empty() ? "Arguments:" : "Positional Arguments:");
 					else {
-						fAddString(str::wd::Build(L"Variation ", ++index, L':'));
+						fAddString(str::ch::Build("Variation ", ++index, ':'));
 						fAddEndpointUsage(pTopMost->endpoints[i]);
 						fAddString(VisualPadding);
-						if (const std::wstring* text = fGetDescription(endpoint.description); text != nullptr)
+						if (const std::string* text = fGetDescription(endpoint.description); text != nullptr)
 							fAddString(*text, arger::NumCharsHelpLeft, arger::AutoIndentLongText);
 					}
 
@@ -521,8 +521,8 @@ namespace arger {
 						fAddNewLine(false);
 
 						/* add the name and corresponding type and description */
-						fAddString(str::wd::Build(L"  ", fEndpointName(endpoint, j), fTypeString(positional.type), VisualPadding));
-						std::wstring temp, limit, defDesc;
+						fAddString(str::ch::Build("  ", fEndpointName(endpoint, j), fTypeString(positional.type), VisualPadding));
+						std::string temp, limit, defDesc;
 
 						/* construct the limit string (only for the last entry) */
 						if (j + 1 >= endpoint.positionals->size() && (endpoint.minimumEffective > j + 1 || endpoint.maximum > j + 1)) {
@@ -536,11 +536,11 @@ namespace arger {
 						if (positional.defValue.has_value())
 							defDesc = fDefaultDescription(&*positional.defValue, &*positional.defValue + 1, std::holds_alternative<arger::Enum>(positional.type));
 						if (!limit.empty() || !defDesc.empty())
-							temp = str::wd::Build(L'[', limit, ((limit.empty() || defDesc.empty()) ? L"" : L"; "), defDesc, L']');
+							temp = str::ch::Build('[', limit, ((limit.empty() || defDesc.empty()) ? "" : "; "), defDesc, ']');
 
 						/* add the description and append the enum value description */
-						if (const std::wstring* text = fGetDescription(&positional); text != nullptr)
-							temp.append((temp.empty() ? 0 : 1), L' ').append(*text);
+						if (const std::string* text = fGetDescription(&positional); text != nullptr)
+							temp.append((temp.empty() ? 0 : 1), ' ').append(*text);
 						fAddString(temp, arger::NumCharsHelpLeft, arger::AutoIndentLongText);
 						fAddEnumDescription(positional.type);
 					}
@@ -554,7 +554,7 @@ namespace arger {
 					fBuildGroupDescription(topMost->super);
 
 				/* select the proper description to be used */
-				const std::wstring* desc = fGetDescription(topMost->group);
+				const std::string* desc = fGetDescription(topMost->group);
 				if (desc == nullptr)
 					return;
 
@@ -584,13 +584,13 @@ namespace arger {
 
 					/* write the information out */
 					fAddNewLine(true);
-					fAddString(info.info->name + L": ");
+					fAddString(info.info->name + ": ");
 					fAddString((pReduced ? info.info->reduced : info.info->text), arger::NumCharsHelpLeft);
 				}
 			}
 
 		public:
-			std::wstring buildHelpString() {
+			std::string buildHelpString() {
 				/* update top-most to the first not-hidden entry (root config can never be hidden) */
 				while (pTopMost->super != nullptr && pTopMost->hidden)
 					pTopMost = pTopMost->super;
@@ -599,7 +599,7 @@ namespace arger {
 				fBuildUsage();
 
 				/* add the program description */
-				if (const std::wstring* text = fGetDescription(pConfig.burned); text != nullptr && (!pReduced || pTopMost->super == nullptr)) {
+				if (const std::string* text = fGetDescription(pConfig.burned); text != nullptr && (!pReduced || pTopMost->super == nullptr)) {
 					fAddNewLine(true);
 					fAddString(*text, arger::IndentInformation);
 				}
@@ -613,7 +613,7 @@ namespace arger {
 				fBuildInformation();
 
 				/* return the constructed help-string */
-				std::wstring out;
+				std::string out;
 				std::swap(out, pBuffer);
 				return out;
 			}
@@ -621,7 +621,7 @@ namespace arger {
 	}
 
 	/* construct help-hint suggesting to use the help entry (for example 'try --help', or 'use help') */
-	inline std::wstring HelpHint(const std::vector<std::wstring>& args, const arger::Config& config) {
-		return detail::BaseBuilder{ (args.empty() ? L"" : args[0]), config }.buildHelpHintString();
+	inline std::string HelpHint(const std::vector<std::string>& args, const arger::Config& config) {
+		return detail::BaseBuilder{ (args.empty() ? "" : args[0]), config }.buildHelpHintString();
 	}
 }

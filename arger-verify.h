@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/* Copyright (c) 2024-2025 Bjoern Boss Henrichsen */
+/* Copyright (c) 2024-2026 Bjoern Boss Henrichsen */
 #pragma once
 
 #include "arger-common.h"
@@ -18,10 +18,10 @@ namespace arger::detail {
 		bool hidden = false;
 	};
 	struct ValidArguments {
-		std::map<std::wstring, detail::ValidArguments> sub;
-		std::map<wchar_t, detail::ValidArguments*> abbreviations;
+		std::map<std::string, detail::ValidArguments> sub;
+		std::map<char, detail::ValidArguments*> abbreviations;
 		std::vector<detail::ValidEndpoint> endpoints;
-		std::wstring groupName;
+		std::string groupName;
 		const std::vector<arger::Checker>* constraints = nullptr;
 		const detail::ValidArguments* super = nullptr;
 		const detail::Arguments* args = nullptr;
@@ -50,8 +50,8 @@ namespace arger::detail {
 	struct ValidConfig : public detail::ValidArguments {
 		const detail::Config* burned = nullptr;
 		std::list<detail::ValidInformation> infos;
-		std::map<std::wstring, detail::ValidOption> options;
-		std::map<wchar_t, detail::ValidOption*> abbreviations;
+		std::map<std::string, detail::ValidOption> options;
+		std::map<char, detail::ValidOption*> abbreviations;
 		const detail::SpecialEntry* help = nullptr;
 		const detail::SpecialEntry* version = nullptr;
 		bool reducible = false;
@@ -87,21 +87,21 @@ namespace arger::detail {
 
 	inline constexpr void ValidateDescription(detail::ValidationState& state, const detail::Description& description) {
 		if (description.description.normal.empty() && !description.description.reduced.empty())
-			throw arger::ConfigException{ L"Reduced description requires normal description as well." };
+			throw arger::ConfigException{ "Reduced description requires normal description as well." };
 		if (!description.description.reduced.empty() && !state.config.reducible)
-			throw arger::ConfigException{ L"Reduced description requires reduced help to be possible." };
+			throw arger::ConfigException{ "Reduced description requires reduced help to be possible." };
 	}
 	inline constexpr void ValidateType(detail::ValidationState& state, const arger::Type& type) {
 		if (!std::holds_alternative<arger::Enum>(type))
 			return;
 		const arger::Enum& list = std::get<arger::Enum>(type);
 		if (list.empty())
-			throw arger::ConfigException{ L"Enum must not be empty." };
+			throw arger::ConfigException{ "Enum must not be empty." };
 		for (const auto& entry : list) {
 			if (entry.normal.empty() && !entry.reduced.empty())
-				throw arger::ConfigException{ L"Reduced description requires normal description as well." };
+				throw arger::ConfigException{ "Reduced description requires normal description as well." };
 			if (!entry.reduced.empty() && !state.config.reducible)
-				throw arger::ConfigException{ L"Reduced description requires reduced help to be possible." };
+				throw arger::ConfigException{ "Reduced description requires reduced help to be possible." };
 		}
 	}
 	inline constexpr void ValidateDefValue(const arger::Type& type, const arger::Value& value) {
@@ -110,48 +110,48 @@ namespace arger::detail {
 			const arger::Enum& allowed = std::get<arger::Enum>(type);
 			if (value.isStr() && std::find_if(allowed.begin(), allowed.end(), [&](const arger::EnumEntry& e) { return e.name == value.str(); }) != allowed.end())
 				return;
-			throw arger::ConfigException{ L"Default value must be a valid enum-string for the given type." };
+			throw arger::ConfigException{ "Default value must be a valid enum-string for the given type." };
 		}
 
 		/* validate the expected default type (value automatically performs conversion) */
 		switch (std::get<arger::Primitive>(type)) {
 		case arger::Primitive::boolean:
 			if (!value.isBool())
-				throw arger::ConfigException{ L"Default value is expected to be a boolean." };
+				throw arger::ConfigException{ "Default value is expected to be a boolean." };
 			break;
 		case arger::Primitive::real:
 			if (!value.isReal())
-				throw arger::ConfigException{ L"Default value is expected to be a real." };
+				throw arger::ConfigException{ "Default value is expected to be a real." };
 			break;
 		case arger::Primitive::inum:
 			if (!value.isINum())
-				throw arger::ConfigException{ L"Default value is expected to be a signed integer." };
+				throw arger::ConfigException{ "Default value is expected to be a signed integer." };
 			break;
 		case arger::Primitive::unum:
 			if (!value.isUNum())
-				throw arger::ConfigException{ L"Default value is expected to be an unsigned integer." };
+				throw arger::ConfigException{ "Default value is expected to be an unsigned integer." };
 			break;
 		case arger::Primitive::any:
 			break;
 		}
 	}
-	inline constexpr void ValidateSpecialEntry(const detail::ValidConfig& state, const std::wstring& name, wchar_t abbreviation) {
+	inline constexpr void ValidateSpecialEntry(const detail::ValidConfig& state, const std::string& name, char abbreviation) {
 		if (state.help != nullptr) {
 			if (name == state.help->name)
-				throw arger::ConfigException{ L"Name clashes with help entry name." };
+				throw arger::ConfigException{ "Name clashes with help entry name." };
 			if (abbreviation != 0 && abbreviation == state.help->abbreviation)
-				throw arger::ConfigException{ L"Abbreviation clashes with help entry abbreviation." };
+				throw arger::ConfigException{ "Abbreviation clashes with help entry abbreviation." };
 		}
 		if (state.version != nullptr) {
 			if (name == state.version->name)
-				throw arger::ConfigException{ L"Name clashes with version entry name." };
+				throw arger::ConfigException{ "Name clashes with version entry name." };
 			if (abbreviation != 0 && abbreviation == state.version->abbreviation)
-				throw arger::ConfigException{ L"Abbreviation clashes with version entry abbreviation." };
+				throw arger::ConfigException{ "Abbreviation clashes with version entry abbreviation." };
 		}
 	}
 	inline void ValidateLink(const detail::ValidArguments& args, detail::ValidLink* link) {
 		if (!detail::CheckParent(link->owner, &args))
-			throw arger::ConfigException{ L"Group cannot be linked to objects from another group." };
+			throw arger::ConfigException{ "Group cannot be linked to objects from another group." };
 		link->links.insert(&args);
 	}
 
@@ -159,9 +159,9 @@ namespace arger::detail {
 		/* iterate over the information, validate them, and register them */
 		for (const auto& info : arguments.information) {
 			if (info.name.empty() || info.text.empty())
-				throw arger::ConfigException{ L"Information name and description must not be empty." };
+				throw arger::ConfigException{ "Information name and description must not be empty." };
 			if (!info.reduced.empty() && !state.config.reducible)
-				throw arger::ConfigException{ L"Reduced information requires reduced help to be possible." };
+				throw arger::ConfigException{ "Reduced information requires reduced help to be possible." };
 
 			/* add the entry to the list and set it up */
 			detail::ValidInformation& entry = state.config.infos.emplace_back();
@@ -192,7 +192,7 @@ namespace arger::detail {
 
 		/* validate and configure the minimum */
 		if (minimum.has_value() && positionals.empty())
-			throw arger::ConfigException{ L"Minimum requires at least one positional to be defined." };
+			throw arger::ConfigException{ "Minimum requires at least one positional to be defined." };
 		next.minimumActual = minimum.value_or(positionals.size());
 
 		/* validate and configure the maximum */
@@ -201,7 +201,7 @@ namespace arger::detail {
 		else if (*maximum < next.minimumActual)
 			next.maximum = 0;
 		else if (*maximum < positionals.size() && *maximum > 0)
-			throw arger::ConfigException{ L"Maximum must be at least the number of positionals." };
+			throw arger::ConfigException{ "Maximum must be at least the number of positionals." };
 		else
 			next.maximum = *maximum;
 
@@ -214,7 +214,7 @@ namespace arger::detail {
 		for (size_t i = 0; i < positionals.size(); ++i) {
 			/* validate the name and type */
 			if (positionals[i].name.empty())
-				throw arger::ConfigException{ L"Positional argument must not have an empty name." };
+				throw arger::ConfigException{ "Positional argument must not have an empty name." };
 			detail::ValidateType(state, positionals[i].type);
 
 			/* validate the default-value */
@@ -222,7 +222,7 @@ namespace arger::detail {
 				continue;
 			detail::ValidateDefValue(positionals[i].type, *positionals[i].defValue);
 			if (i < next.minimumEffective)
-				throw arger::ConfigException{ L"All positionals up to the minimum must be defaulted once one is defaulted." };
+				throw arger::ConfigException{ "All positionals up to the minimum must be defaulted once one is defaulted." };
 
 			/* validat ethe description */
 			detail::ValidateDescription(state, positionals[i]);
@@ -230,13 +230,13 @@ namespace arger::detail {
 	}
 	inline void ValidateOption(detail::ValidationState& state, const detail::Option& option, const detail::ValidArguments* owner, bool hidden) {
 		if (option.name.size() <= 1)
-			throw arger::ConfigException{ L"Option name must at least be two characters long." };
-		if (option.name.starts_with(L"-"))
-			throw arger::ConfigException{ L"Option name must not start with a hypen." };
+			throw arger::ConfigException{ "Option name must at least be two characters long." };
+		if (option.name.starts_with("-"))
+			throw arger::ConfigException{ "Option name must not start with a hypen." };
 
 		/* check if the name is unique */
 		if (state.config.options.contains(option.name))
-			throw arger::ConfigException{ L"Option names must be unique." };
+			throw arger::ConfigException{ "Option names must be unique." };
 
 		/* setup the new entry */
 		detail::ValidOption& entry = state.config.options[option.name];
@@ -252,13 +252,13 @@ namespace arger::detail {
 		/* check if the abbreviation is unique */
 		if (option.abbreviation != 0) {
 			if (state.config.abbreviations.contains(option.abbreviation))
-				throw arger::ConfigException{ L"Option abbreviations must be unique." };
+				throw arger::ConfigException{ "Option abbreviations must be unique." };
 			state.config.abbreviations[option.abbreviation] = &entry;
 		}
 
 		/* check if the id is unique */
 		if (state.optionIds.contains(option.id))
-			throw arger::ConfigException{ L"Option ids must be unique." };
+			throw arger::ConfigException{ "Option ids must be unique." };
 		state.optionIds.insert(option.id);
 
 		/* check if the name or abbreviation clashes with the help/version entries (for options only necessary for programs) */
@@ -272,9 +272,9 @@ namespace arger::detail {
 		if (entry.payload)
 			detail::ValidateType(state, option.payload.type);
 		else if (option.require.minimum.has_value() || option.require.maximum.has_value())
-			throw arger::ConfigException{ L"Flags cannot have requirements defined." };
+			throw arger::ConfigException{ "Flags cannot have requirements defined." };
 		else if (!option.payload.defValue.empty())
-			throw arger::ConfigException{ L"Default values are not allowed for flags without payload." };
+			throw arger::ConfigException{ "Default values are not allowed for flags without payload." };
 
 		/* configure the minimum */
 		entry.minimumActual = option.require.minimum.value_or(0);
@@ -291,9 +291,9 @@ namespace arger::detail {
 		/* validate the default-values */
 		if (entry.payload && !option.payload.defValue.empty()) {
 			if (option.payload.defValue.size() < entry.minimumActual)
-				throw arger::ConfigException{ L"Default values for option must not violate its own minimum requirements." };
+				throw arger::ConfigException{ "Default values for option must not violate its own minimum requirements." };
 			if (entry.maximum > 0 && option.payload.defValue.size() > entry.maximum)
-				throw arger::ConfigException{ L"Default values for option must not violate its own maximum requirements." };
+				throw arger::ConfigException{ "Default values for option must not violate its own maximum requirements." };
 			for (const auto& value : option.payload.defValue)
 				detail::ValidateDefValue(option.payload.type, value);
 		}
@@ -312,7 +312,7 @@ namespace arger::detail {
 
 		/* check if the reduced grouping is valid */
 		if (arguments.groupReduced.has_value() && !state.config.reducible)
-			throw arger::ConfigException{ L"Grouping options for reduced view requires reduced help to be possible." };
+			throw arger::ConfigException{ "Grouping options for reduced view requires reduced help to be possible." };
 
 		/* register the reference-ids */
 		for (size_t id : arguments.links)
@@ -320,7 +320,7 @@ namespace arger::detail {
 
 		/* validate and configure the group name */
 		if (arguments.groups.name.empty())
-			entry.groupName = L"mode";
+			entry.groupName = "mode";
 		else
 			entry.groupName = str::View{ arguments.groups.name }.lower();
 
@@ -333,24 +333,24 @@ namespace arger::detail {
 		/* validate the groups */
 		if (!arguments.groups.list.empty()) {
 			if (!arguments.positionals.empty() || !arguments.endpoints.empty())
-				throw arger::ConfigException{ L"Groups and positional arguments cannot be used in conjunction." };
+				throw arger::ConfigException{ "Groups and positional arguments cannot be used in conjunction." };
 
 			/* register all groups */
 			for (const auto& sub : arguments.groups.list) {
 				if (sub.name.size() <= 1)
-					throw arger::ConfigException{ L"Group name must at least be two characters long." };
-				if (sub.name.starts_with(L"-"))
-					throw arger::ConfigException{ L"Group name must not start with a hypen." };
+					throw arger::ConfigException{ "Group name must at least be two characters long." };
+				if (sub.name.starts_with("-"))
+					throw arger::ConfigException{ "Group name must not start with a hypen." };
 
 				/* validate the name's uniqueness */
 				if (entry.sub.contains(sub.name))
-					throw arger::ConfigException{ L"Group names within a sub-group must be unique." };
+					throw arger::ConfigException{ "Group names within a sub-group must be unique." };
 				detail::ValidArguments& next = entry.sub[sub.name];
 
 				/* check if the abbreviation is unique */
 				if (sub.abbreviation != 0) {
 					if (entry.abbreviations.contains(sub.abbreviation))
-						throw arger::ConfigException{ L"Group abbreviations within a sub-group must be unique." };
+						throw arger::ConfigException{ "Group abbreviations within a sub-group must be unique." };
 					entry.abbreviations[sub.abbreviation] = &next;
 				}
 
@@ -372,7 +372,7 @@ namespace arger::detail {
 		/* validate all explicit endpoints */
 		else {
 			if (!arguments.positionals.empty() || arguments.require.minimum.has_value() || arguments.require.maximum.has_value())
-				throw arger::ConfigException{ L"Implicit and explicit endpoints cannot be used in conjunction." };
+				throw arger::ConfigException{ "Implicit and explicit endpoints cannot be used in conjunction." };
 			for (size_t i = 0; i < arguments.endpoints.size(); ++i)
 				detail::ValidateEndpoint(state, entry, nullptr, &arguments.endpoints[i], entry.hidden);
 		}
@@ -383,7 +383,7 @@ namespace arger::detail {
 			});
 		for (size_t i = 1; i < entry.endpoints.size(); ++i) {
 			if (entry.endpoints[i - 1].maximum >= entry.endpoints[i].minimumEffective)
-				throw arger::ConfigException{ L"Endpoint positional effective requirement counts must not overlap in order to ensure each endpoint can be matched uniquely." };
+				throw arger::ConfigException{ "Endpoint positional effective requirement counts must not overlap in order to ensure each endpoint can be matched uniquely." };
 		}
 	}
 	inline void ValidateLinkEntries(detail::ValidationState& state, const detail::ValidArguments& arguments) {
@@ -391,7 +391,7 @@ namespace arger::detail {
 		for (size_t link : arguments.args->links) {
 			auto it = state.refs.find(link);
 			if (it == state.refs.end())
-				throw arger::ConfigException{ L"Links cannot be created to unlinked objects." };
+				throw arger::ConfigException{ "Links cannot be created to unlinked objects." };
 
 			/* iterate over the objects and find all information/options and validate and link them */
 			for (const auto& ref : it->second) {
@@ -414,7 +414,7 @@ namespace arger::detail {
 		for (size_t id : ids) {
 			auto it = state.refs.find(id);
 			if (it == state.refs.end())
-				throw arger::ConfigException{ L"Links cannot be created to unlinked objects." };
+				throw arger::ConfigException{ "Links cannot be created to unlinked objects." };
 
 			/* iterate over the ref-entires and look for groups to link with */
 			for (const auto& ref : it->second) {
@@ -443,12 +443,12 @@ namespace arger::detail {
 		/* validate the help special flag */
 		if (!out.burned->special.help.name.empty()) {
 			if (out.burned->special.help.name.size() <= 1)
-				throw arger::ConfigException{ L"Help entry name must at least be two characters long." };
+				throw arger::ConfigException{ "Help entry name must at least be two characters long." };
 			if (out.burned->special.version.name == out.burned->special.help.name)
-				throw arger::ConfigException{ L"Help entry and version entry cannot have the same name." };
+				throw arger::ConfigException{ "Help entry and version entry cannot have the same name." };
 			if (!out.burned->special.version.name.empty()) {
 				if (out.burned->special.help.abbreviation != 0 && out.burned->special.help.abbreviation == out.burned->special.version.abbreviation)
-					throw arger::ConfigException{ L"Help entry and version entry cannot have the same abbreviation." };
+					throw arger::ConfigException{ "Help entry and version entry cannot have the same abbreviation." };
 			}
 			out.help = &out.burned->special.help;
 			detail::ValidateDescription(state, out.burned->special.help);
@@ -457,16 +457,16 @@ namespace arger::detail {
 		/* validate the version special flag */
 		if (!out.burned->special.version.name.empty()) {
 			if (out.burned->special.version.name.size() <= 1)
-				throw arger::ConfigException{ L"Version entry name must at least be two characters long." };
+				throw arger::ConfigException{ "Version entry name must at least be two characters long." };
 			if (out.burned->version.empty())
-				throw arger::ConfigException{ L"Version string must be set when using a version entry." };
+				throw arger::ConfigException{ "Version string must be set when using a version entry." };
 			out.version = &out.burned->special.version;
 			detail::ValidateDescription(state, out.burned->special.version);
 		}
 
 		/* validate the reduce-flag */
 		if (state.config.reducible && (out.help == nullptr || out.help->abbreviation == 0))
-			throw arger::ConfigException{ L"Reducible requires a defined abbreviation for the help entry." };
+			throw arger::ConfigException{ "Reducible requires a defined abbreviation for the help entry." };
 
 		/* validate the root arguments */
 		detail::ValidateArguments(state, *out.burned, nullptr, state.config, nullptr, false, false, true);
