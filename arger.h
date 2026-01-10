@@ -20,19 +20,24 @@ namespace arger {
 
 	/* split the argument line into the list of separate arguments */
 	inline std::vector<std::string> Prepare(const str::IsStr auto& line) {
-		using ChType = str::StringChar<decltype(line)>;
 		std::vector<std::string> args;
-		std::basic_string_view<ChType> view{ line };
 
 		/* split the string */
-		char inStr = 0;
-		bool lastWhitespace = true;
-		for (size_t i = 0; i < view.size(); ++i) {
+		char32_t inStr = U'\0';
+		bool lastWhitespace = true, lastEscape = false;
+		for (char32_t cp : str::CPRange{ line }) {
+			/* check if the last character was escaped, in which case the codepoint can just be added */
+			if (lastEscape) {
+				lastEscape = false;
+				str::CodepointTo(args.back(), cp);
+				continue;
+			}
+
 			/* check if the character is whitespace and a new argument needs to be
 			*	started or if it can just be written out, as its part of a string */
-			if (std::iswspace(view[i])) {
+			if (cp::prop::IsSpace(cp)) {
 				if (inStr != 0)
-					args.back().push_back(view[i]);
+					str::CodepointTo(args.back(), cp);
 				else
 					lastWhitespace = true;
 				continue;
@@ -42,25 +47,22 @@ namespace arger {
 			lastWhitespace = false;
 
 			/* check if the next character is escaped */
-			if (view[i] == '\\') {
-				if (++i >= view.size())
-					break;
-				args.back().push_back(view[i]);
-			}
+			if (cp == U'\\')
+				lastEscape = true;
 
 			/* check if a string is being ended or continued */
-			else if (inStr != '\0') {
-				if (view[i] == inStr)
-					inStr = '\0';
+			else if (inStr != U'\0') {
+				if (cp == inStr)
+					inStr = U'\0';
 				else
-					args.back().push_back(view[i]);
+					str::CodepointTo(args.back(), cp);
 			}
 
 			/* check if a string is being started */
-			else if (view[i] == '\'' || view[i] == '\"')
-				inStr = view[i];
+			else if (cp == U'\'' || cp == U'\"')
+				inStr = cp;
 			else
-				args.back().push_back(view[i]);
+				str::CodepointTo(args.back(), cp);
 		}
 		return args;
 	}
